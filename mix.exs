@@ -31,6 +31,8 @@ defmodule CliSubprocessCore.MixProject do
         "guides/getting-started.md": [title: "Getting Started"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
+        "guides/raw-transport.md": [title: "Raw Transport"],
+        "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"],
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"]
       ],
@@ -62,6 +64,8 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
+      {:erlexec, "~> 2.2"},
+      {:jason, "~> 1.4"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}

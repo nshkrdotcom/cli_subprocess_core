@@ -46,6 +46,16 @@ defmodule CliSubprocessCore.ProcessExit do
     %__MODULE__{status: :signal, signal: signal, reason: {:signal, signal}}
   end
 
+  defp normalize_exit({:signal, signal, _core}) do
+    %__MODULE__{status: :signal, signal: signal, reason: {:signal, signal}}
+  end
+
+  defp normalize_exit(:enoent),
+    do: %__MODULE__{status: :error, reason: {:command_not_found, :enoent}}
+
+  defp normalize_exit(:eacces),
+    do: %__MODULE__{status: :error, reason: {:command_not_found, :eacces}}
+
   defp normalize_exit(reason), do: %__MODULE__{status: :error, reason: reason}
 
   defp exit_with_code(reason, 0), do: %__MODULE__{status: :success, code: 0, reason: reason}

@@ -14,9 +14,10 @@ The current foundation gives downstream repos a stable starting point for:
 - provider profile validation with `CliSubprocessCore.ProviderProfile`
 - provider profile lookup with `CliSubprocessCore.ProviderRegistry`
 - runtime sequencing with `CliSubprocessCore.Runtime`
+- raw subprocess ownership with `CliSubprocessCore.Transport`
 
-The raw transport and session engine modules described by the architecture
-packet are intentionally not implemented in this prompt.
+The higher-level session engine described by the architecture packet still lands
+later. The raw transport layer is already available.
 
 ## Define A Provider Profile
 
@@ -129,3 +130,30 @@ state = CliSubprocessCore.LineFraming.new()
 
 `lines` contains complete lines and `tail` contains the final buffered fragment
 once the stream ends.
+
+## Start A Raw Transport
+
+Use `CliSubprocessCore.Transport` when you need raw process ownership without
+provider-specific parsing:
+
+```elixir
+ref = make_ref()
+
+{:ok, transport} =
+  CliSubprocessCore.Transport.start(
+    command: CliSubprocessCore.Command.new("sh", ["-c", "cat"]),
+    subscriber: {self(), ref}
+  )
+
+:ok = CliSubprocessCore.Transport.send(transport, "hello")
+:ok = CliSubprocessCore.Transport.end_input(transport)
+
+receive do
+  {:cli_subprocess_core, ^ref, {:message, "hello"}} -> :ok
+end
+```
+
+See `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md` for the
+transport contract and
+`/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md` for
+shutdown and timeout behavior.

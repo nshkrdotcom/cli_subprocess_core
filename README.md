@@ -11,11 +11,11 @@ This initial foundation owns:
 - the normalized payload vocabulary in `CliSubprocessCore.Payload.*`
 - the provider profile behaviour in `CliSubprocessCore.ProviderProfile`
 - the provider profile registry in `CliSubprocessCore.ProviderRegistry`
-- the shared support modules used by later transport and session work
+- the raw subprocess transport contract and erlexec-backed implementation
+- the shared support modules used by the transport and later session work
 
-The first-party provider profile modules and the higher-level session and raw
-transport layers land in later prompts. This repo already includes the contract
-surface those modules will plug into.
+The first-party provider profile modules and the higher-level session layer
+still land in later prompts. The raw transport layer is implemented now.
 
 ## Core Surface
 
@@ -31,6 +31,12 @@ surface those modules will plug into.
   metadata.
 - `CliSubprocessCore.TaskSupport` wraps the task startup and
   `Task.yield || Task.shutdown` pattern used by subprocess ownership code.
+- `CliSubprocessCore.Transport` exposes the raw transport behaviour and default
+  facade.
+- `CliSubprocessCore.Transport.Erlexec` implements subprocess lifecycle,
+  stderr, interrupt, and force-close handling.
+- `CliSubprocessCore.Transport.Options` validates transport startup options.
+- `CliSubprocessCore.Transport.Error` provides structured transport failures.
 
 ## Built-In Profile Registration
 
@@ -54,6 +60,8 @@ The initial guides live at:
 - `/home/home/p/g/n/cli_subprocess_core/guides/getting-started.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/event-and-payload-model.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/provider-profile-contract.md`
+- `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md`
+- `/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md`
 
 ## Validation
 
