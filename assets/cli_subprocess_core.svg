@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Base background gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+
+    <!-- Glowing outline gradient -->
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#C084FC" />
+    </linearGradient>
+
+    <!-- Drop shadow for the main hexagon -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.6" />
+    </filter>
+
+    <!-- Glow effect for internal technical lines -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Base Hexagon -->
+  <polygon points="100,5 186.6,55 186.6,145 100,195 13.4,145 13.4,55" 
+           fill="url(#bgGrad)" 
+           stroke="url(#glowGrad)" 
+           stroke-width="3" 
+           filter="url(#shadow)" />
+
+  <!-- Inner Technical Border -->
+  <polygon points="100,15 178,60 178,140 100,185 22,140 22,60" 
+           fill="none" 
+           stroke="#334155" 
+           stroke-width="1" />
+
+  <!-- Background grid/pattern (subtle) -->
+  <path d="M 60,35 L 140,165 M 140,35 L 60,165 M 30,100 L 170,100" 
+        stroke="#1E293B" 
+        stroke-width="1" />
+
+  <!-- Central Processing Core / CLI Subprocess representation -->
+  <g transform="translate(100, 100)">
+    <!-- Core Hub -->
+    <circle cx="0" cy="0" r="18" fill="#1E1B4B" stroke="url(#glowGrad)" stroke-width="2" filter="url(#glow)" />
+    <circle cx="0" cy="0" r="8" fill="#38BDF8" filter="url(#glow)" />
+    
+    <!-- Subprocess nodes and connecting lines -->
+    <!-- Top Left -->
+    <line x1="-12" y1="-12" x2="-35" y2="-35" stroke="#818CF8" stroke-width="2" />
+    <circle cx="-35" cy="-35" r="6" fill="#0F172A" stroke="#818CF8" stroke-width="2" />
+    <!-- Pulse element -->
+    <circle cx="-23.5" cy="-23.5" r="3" fill="#C084FC" filter="url(#glow)" />
+
+    <!-- Top Right -->
+    <line x1="12" y1="-12" x2="40" y2="-25" stroke="#38BDF8" stroke-width="2" stroke-dasharray="2 2" />
+    <circle cx="40" cy="-25" r="8" fill="#0F172A" stroke="#38BDF8" stroke-width="2" />
+    <rect x="36" y="-29" width="8" height="8" fill="#38BDF8" rx="1" />
+
+    <!-- Bottom -->
+    <line x1="0" y1="18" x2="0" y2="45" stroke="#C084FC" stroke-width="2" />
+    <polygon points="0,55 10,40 -10,40" fill="#0F172A" stroke="#C084FC" stroke-width="2" filter="url(#glow)" />
+    <line x1="-15" y1="45" x2="15" y2="45" stroke="#38BDF8" stroke-width="2" />
+
+    <!-- Left -->
+    <path d="M -18,0 Q -40,10 -55,-5" fill="none" stroke="#818CF8" stroke-width="2" />
+    <rect x="-60" y="-10" width="10" height="10" fill="#818CF8" />
+
+    <!-- Right -->
+    <path d="M 18,0 Q 40,20 50,5" fill="none" stroke="#C084FC" stroke-width="2" />
+    <circle cx="50" cy="5" r="5" fill="#C084FC" />
+  </g>
+
+</svg>
