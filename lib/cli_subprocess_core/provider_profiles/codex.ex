@@ -102,16 +102,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       item when is_map(item) ->
         case Shared.fetch_any(item, [:type, "type"]) do
           "agent_message" ->
-            assistant_message(item, state)
+            emit_completed_assistant_message(item, raw, state)
 
           "reasoning" ->
-            thinking(item, state)
+            emit_completed_thinking(item, raw, state)
 
           "tool_call" ->
-            tool_use(item, state)
+            emit_completed_tool_use(item, raw, state)
 
           "tool_result" ->
-            tool_result(item, state)
+            emit_completed_tool_result(item, raw, state)
 
           _ ->
             Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
@@ -145,12 +145,24 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     )
   end
 
-  defp thinking(raw, state) do
+  defp emit_completed_assistant_message(item, raw, state) do
+    Shared.emit_single(
+      :assistant_message,
+      Payload.AssistantMessage.new(
+        content: Shared.content_blocks(item),
+        model: Shared.fetch_any(item, [:model, "model"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp emit_completed_thinking(item, raw, state) do
     Shared.emit_single(
       :thinking,
       Payload.Thinking.new(
-        content: Shared.fetch_any(raw, [:thinking, "thinking", :text, "text"]) || "",
-        signature: Shared.fetch_any(raw, [:signature, "signature"])
+        content: Shared.fetch_any(item, [:thinking, "thinking", :text, "text"]) || "",
+        signature: Shared.fetch_any(item, [:signature, "signature"])
       ),
       raw,
       state
@@ -170,6 +182,19 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     )
   end
 
+  defp emit_completed_tool_use(item, raw, state) do
+    Shared.emit_single(
+      :tool_use,
+      Payload.ToolUse.new(
+        tool_name: Shared.fetch_any(item, [:tool_name, "tool_name", :name, "name"]),
+        tool_call_id: Shared.fetch_any(item, [:tool_id, "tool_id", :id, "id"]),
+        input: Shared.tool_input(item)
+      ),
+      raw,
+      state
+    )
+  end
+
   defp tool_result(raw, state) do
     Shared.emit_single(
       :tool_result,
@@ -177,6 +202,19 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
         tool_call_id: Shared.fetch_any(raw, [:tool_id, "tool_id", :id, "id"]),
         content: Shared.fetch_any(raw, [:content, "content"]),
         is_error: Shared.truthy?(Shared.fetch_any(raw, [:is_error, "is_error", :error, "error"]))
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp emit_completed_tool_result(item, raw, state) do
+    Shared.emit_single(
+      :tool_result,
+      Payload.ToolResult.new(
+        tool_call_id: Shared.fetch_any(item, [:tool_id, "tool_id", :id, "id"]),
+        content: Shared.fetch_any(item, [:content, "content"]),
+        is_error: Shared.truthy?(Shared.fetch_any(item, [:is_error, "is_error", :error, "error"]))
       ),
       raw,
       state

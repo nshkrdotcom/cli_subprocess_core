@@ -245,8 +245,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     {:reply, transport_error(Error.not_connected()), state}
   end
 
-  def handle_call(:interrupt, from, %{subprocess: {pid, _os_pid}} = state) do
-    case start_io_task(state, fn -> interrupt_subprocess(pid) end) do
+  def handle_call(:interrupt, from, %{subprocess: {_pid, os_pid}} = state) do
+    case start_io_task(state, fn -> interrupt_subprocess(os_pid) end) do
       {:ok, task} ->
         {:noreply, put_pending_call(state, task.ref, from)}
 
@@ -556,7 +556,9 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     []
     |> maybe_put_cwd(options.cwd)
     |> maybe_put_env(options.env)
-    |> Kernel.++([:stdin, :stdout, :stderr, :monitor])
+    # Put each subprocess in its own process group so control signals and
+    # force-close behavior reach shell wrappers and their active children.
+    |> Kernel.++([{:group, 0}, :kill_group, :stdin, :stdout, :stderr, :monitor])
   end
 
   defp maybe_put_cwd(opts, nil), do: opts
@@ -700,9 +702,22 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       transport_error(Error.send_failed({kind, reason}))
   end
 
-  defp interrupt_subprocess(pid) when is_pid(pid) do
-    _ = :exec.kill(pid, 2)
-    :ok
+  defp interrupt_subprocess(os_pid) when is_integer(os_pid) and os_pid > 0 do
+    case System.find_executable("kill") do
+      nil ->
+        transport_error(Error.send_failed(:kill_command_not_found))
+
+      kill_executable ->
+        case System.cmd(kill_executable, ["-INT", "--", "-#{os_pid}"], stderr_to_stdout: true) do
+          {_output, 0} ->
+            :ok
+
+          {output, status} ->
+            transport_error(
+              Error.send_failed({:kill_exit_status, status, String.trim_trailing(output)})
+            )
+        end
+    end
   catch
     _, _ ->
       transport_error(Error.not_connected())

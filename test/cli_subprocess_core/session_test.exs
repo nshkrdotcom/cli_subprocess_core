@@ -88,7 +88,8 @@ defmodule CliSubprocessCore.SessionTest do
     assert message =~ "CLI exited with code"
 
     monitor = Process.monitor(session)
-    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
+    assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 2_000
+    assert reason in [:normal, :noproc]
   end
 
   test "stderr-only provider output is normalized before the terminal error" do
