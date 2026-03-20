@@ -1,0 +1,231 @@
+defmodule CliSubprocessCore.ProviderProfiles.Codex do
+  @moduledoc """
+  Built-in provider profile for the common Codex CLI runtime.
+  """
+
+  @behaviour CliSubprocessCore.ProviderProfile
+
+  alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderProfiles.Shared
+
+  @required_flags ["exec", "--json"]
+
+  @impl true
+  def id, do: :codex
+
+  @impl true
+  def capabilities do
+    [:interrupt, :plan, :reasoning, :streaming, :structured_output, :tools]
+  end
+
+  @impl true
+  def build_invocation(opts) when is_list(opts) do
+    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
+      args =
+        @required_flags ++
+          option_flags(opts) ++
+          [prompt]
+
+      {:ok, Shared.command(Shared.resolve_command(opts, "codex"), args, opts)}
+    end
+  end
+
+  @impl true
+  def init_parser_state(opts), do: Shared.init_parser_state(id(), opts)
+
+  @impl true
+  def decode_stdout(line, state) when is_binary(line) and is_map(state) do
+    Shared.decode_json_stdout(line, state, &decode_event/2)
+  end
+
+  @impl true
+  def decode_stderr(chunk, state), do: Shared.decode_stderr(chunk, state)
+
+  @impl true
+  def handle_exit(reason, state), do: Shared.handle_exit(reason, state)
+
+  @impl true
+  def transport_options(opts), do: Shared.transport_options(opts)
+
+  defp option_flags(opts) do
+    []
+    |> Shared.maybe_add_pair("--model", Keyword.get(opts, :model))
+    |> Shared.maybe_add_pair("--reasoning-effort", Keyword.get(opts, :reasoning_effort))
+    |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
+    |> Kernel.++(permission_flags(opts))
+  end
+
+  defp permission_flags(opts) do
+    case Shared.permission_mode(opts) do
+      :auto_edit -> ["--full-auto"]
+      :yolo -> ["--dangerously-bypass-approvals-and-sandbox"]
+      :plan -> ["--plan"]
+      _ -> []
+    end
+  end
+
+  defp decode_event(raw, state) do
+    case Shared.event_type(raw) do
+      "response.output_text.delta" ->
+        assistant_delta(raw, state)
+
+      "assistant_delta" ->
+        assistant_delta(raw, state)
+
+      "response.output_text.done" ->
+        assistant_message(raw, state)
+
+      "assistant_message" ->
+        assistant_message(raw, state)
+
+      "item.completed" ->
+        completed_item(raw, state)
+
+      "tool_call" ->
+        tool_use(raw, state)
+
+      "tool_use" ->
+        tool_use(raw, state)
+
+      "tool_result" ->
+        tool_result(raw, state)
+
+      "turn.completed" ->
+        result(raw, state, :end_turn)
+
+      "result" ->
+        result(raw, state, :unknown)
+
+      "error" ->
+        error_event(raw, state)
+
+      _other ->
+        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+    end
+  end
+
+  defp completed_item(raw, state) do
+    case Shared.fetch_any(raw, [:item, "item"]) do
+      item when is_map(item) ->
+        case Shared.fetch_any(item, [:type, "type"]) do
+          "agent_message" ->
+            assistant_message(item, state)
+
+          "reasoning" ->
+            thinking(item, state)
+
+          "tool_call" ->
+            tool_use(item, state)
+
+          "tool_result" ->
+            tool_result(item, state)
+
+          _ ->
+            Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+        end
+
+      _other ->
+        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+    end
+  end
+
+  defp assistant_delta(raw, state) do
+    Shared.emit_single(
+      :assistant_delta,
+      Payload.AssistantDelta.new(
+        content: Shared.fetch_any(raw, [:delta, "delta", :text, "text"]) || ""
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp assistant_message(raw, state) do
+    Shared.emit_single(
+      :assistant_message,
+      Payload.AssistantMessage.new(
+        content: Shared.content_blocks(raw),
+        model: Shared.fetch_any(raw, [:model, "model"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp thinking(raw, state) do
+    Shared.emit_single(
+      :thinking,
+      Payload.Thinking.new(
+        content: Shared.fetch_any(raw, [:thinking, "thinking", :text, "text"]) || "",
+        signature: Shared.fetch_any(raw, [:signature, "signature"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp tool_use(raw, state) do
+    Shared.emit_single(
+      :tool_use,
+      Payload.ToolUse.new(
+        tool_name: Shared.fetch_any(raw, [:tool_name, "tool_name", :name, "name"]),
+        tool_call_id: Shared.fetch_any(raw, [:tool_id, "tool_id", :id, "id"]),
+        input: Shared.tool_input(raw)
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp tool_result(raw, state) do
+    Shared.emit_single(
+      :tool_result,
+      Payload.ToolResult.new(
+        tool_call_id: Shared.fetch_any(raw, [:tool_id, "tool_id", :id, "id"]),
+        content: Shared.fetch_any(raw, [:content, "content"]),
+        is_error: Shared.truthy?(Shared.fetch_any(raw, [:is_error, "is_error", :error, "error"]))
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp result(raw, state, default_stop_reason) do
+    usage = Shared.fetch_any(raw, [:usage, "usage"])
+    usage = if is_map(usage), do: usage, else: %{}
+
+    Shared.emit_single(
+      :result,
+      Payload.Result.new(
+        status: :completed,
+        stop_reason:
+          Shared.fetch_any(raw, [:stop_reason, "stop_reason", :reason, "reason"]) ||
+            default_stop_reason,
+        output: %{
+          usage: %{
+            input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
+            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
+          }
+        }
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp error_event(raw, state) do
+    payload =
+      Payload.Error.new(
+        message: Shared.fetch_any(raw, [:message, "message"]) || "Codex parser error",
+        code:
+          raw
+          |> Shared.fetch_any([:kind, "kind"])
+          |> Shared.normalize_kind()
+          |> Atom.to_string(),
+        severity: Shared.normalize_severity(Shared.fetch_any(raw, [:severity, "severity"])),
+        metadata: Shared.normalize_map(raw)
+      )
+
+    Shared.emit_single(:error, payload, raw, state)
+  end
+end

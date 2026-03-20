@@ -1,0 +1,333 @@
+defmodule CliSubprocessCore.ProviderProfiles.Amp do
+  @moduledoc """
+  Built-in provider profile for the common Amp CLI runtime.
+  """
+
+  @behaviour CliSubprocessCore.ProviderProfile
+
+  alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderProfiles.Shared
+
+  @required_flags ["run", "--output", "jsonl"]
+
+  @impl true
+  def id, do: :amp
+
+  @impl true
+  def capabilities do
+    [:approval, :interrupt, :mcp, :streaming, :thinking, :tools]
+  end
+
+  @impl true
+  def build_invocation(opts) when is_list(opts) do
+    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
+      args = @required_flags ++ option_flags(opts) ++ [prompt]
+      {:ok, Shared.command(Shared.resolve_command(opts, "amp"), args, opts)}
+    end
+  rescue
+    error ->
+      {:error, {:invalid_option_encoding, Exception.message(error)}}
+  end
+
+  @impl true
+  def init_parser_state(opts), do: Shared.init_parser_state(id(), opts)
+
+  @impl true
+  def decode_stdout(line, state) when is_binary(line) and is_map(state) do
+    Shared.decode_json_stdout(line, state, &decode_event/2)
+  end
+
+  @impl true
+  def decode_stderr(chunk, state), do: Shared.decode_stderr(chunk, state)
+
+  @impl true
+  def handle_exit(reason, state), do: Shared.handle_exit(reason, state)
+
+  @impl true
+  def transport_options(opts), do: Shared.transport_options(opts)
+
+  defp option_flags(opts) do
+    []
+    |> Shared.maybe_add_pair("--model", Keyword.get(opts, :model))
+    |> Shared.maybe_add_pair("--mode", Keyword.get(opts, :mode))
+    |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
+    |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
+    |> Shared.maybe_add_json_pair("--permissions-json", Keyword.get(opts, :permissions))
+    |> Shared.maybe_add_json_pair("--mcp-config-json", Keyword.get(opts, :mcp_config))
+    |> Shared.maybe_add_repeat("--tool", Keyword.get(opts, :tools, []))
+    |> Shared.maybe_add_flag("--thinking", Keyword.get(opts, :include_thinking, false))
+    |> Kernel.++(permission_flags(opts))
+  end
+
+  defp permission_flags(opts) do
+    case Shared.permission_mode(opts) do
+      :auto ->
+        ["--permission-mode", "auto"]
+
+      :plan ->
+        ["--permission-mode", "plan"]
+
+      :dangerously_allow_all ->
+        ["--dangerously-allow-all"]
+
+      value when is_atom(value) and value != :default ->
+        ["--permission-mode", Atom.to_string(value)]
+
+      value when is_binary(value) and value != "" ->
+        ["--permission-mode", value]
+
+      _ ->
+        []
+    end
+  end
+
+  defp decode_event(raw, state) do
+    case Shared.event_type(raw) do
+      "assistant_delta" ->
+        assistant_delta(raw, state)
+
+      "message_streamed" ->
+        assistant_delta(raw, state)
+
+      "assistant_message" ->
+        assistant_message(raw, state)
+
+      "message_received" ->
+        assistant_message(raw, state)
+
+      "tool_use" ->
+        tool_use(raw, state)
+
+      "tool_call_started" ->
+        tool_use(raw, state)
+
+      "tool_result" ->
+        tool_result(raw, state, nil)
+
+      "tool_call_completed" ->
+        tool_result(raw, state, false)
+
+      "tool_call_failed" ->
+        tool_result(raw, state, true)
+
+      "token_usage_updated" ->
+        cost_update(raw, state)
+
+      "cost_update" ->
+        cost_update(raw, state)
+
+      "run_completed" ->
+        result(raw, state)
+
+      "result" ->
+        result(raw, state)
+
+      "approval_requested" ->
+        approval_requested(raw, state)
+
+      "approval_resolved" ->
+        approval_resolved(raw, state)
+
+      "run_cancelled" ->
+        cancelled(raw, state)
+
+      "run_failed" ->
+        error_event(raw, state)
+
+      "error_occurred" ->
+        error_event(raw, state)
+
+      "error" ->
+        error_event(raw, state)
+
+      _other ->
+        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+    end
+  end
+
+  defp assistant_delta(raw, state) do
+    Shared.emit_single(
+      :assistant_delta,
+      Payload.AssistantDelta.new(
+        content:
+          Shared.fetch_any(raw, [:delta, "delta", :text, "text", :content, "content"]) || ""
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp assistant_message(raw, state) do
+    Shared.emit_single(
+      :assistant_message,
+      Payload.AssistantMessage.new(
+        content: Shared.content_blocks(raw),
+        model: Shared.fetch_any(raw, [:model, "model"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp tool_use(raw, state) do
+    Shared.emit_single(
+      :tool_use,
+      Payload.ToolUse.new(
+        tool_name: Shared.fetch_any(raw, [:tool_name, "tool_name", :name, "name"]),
+        tool_call_id:
+          Shared.fetch_any(raw, [:tool_call_id, "tool_call_id", :tool_id, "tool_id", :id, "id"]),
+        input: Shared.tool_input(raw)
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp tool_result(raw, state, forced_error) do
+    is_error =
+      case forced_error do
+        value when is_boolean(value) ->
+          value
+
+        _other ->
+          Shared.truthy?(Shared.fetch_any(raw, [:is_error, "is_error", :error, "error"]))
+      end
+
+    Shared.emit_single(
+      :tool_result,
+      Payload.ToolResult.new(
+        tool_call_id:
+          Shared.fetch_any(raw, [:tool_call_id, "tool_call_id", :tool_id, "tool_id", :id, "id"]),
+        content:
+          Shared.fetch_any(raw, [
+            :tool_output,
+            "tool_output",
+            :content,
+            "content",
+            :output,
+            "output"
+          ]),
+        is_error: is_error
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp approval_requested(raw, state) do
+    Shared.emit_single(
+      :approval_requested,
+      Payload.ApprovalRequested.new(
+        approval_id: Shared.fetch_any(raw, [:approval_id, "approval_id"]),
+        subject: Shared.fetch_any(raw, [:tool_name, "tool_name", :name, "name"]),
+        details: %{"tool_input" => Shared.tool_input(raw)}
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp approval_resolved(raw, state) do
+    decision =
+      case Shared.fetch_any(raw, [:decision, "decision"]) do
+        value when value in [:allow, "allow", "approved", true] -> :allow
+        _ -> :deny
+      end
+
+    Shared.emit_single(
+      :approval_resolved,
+      Payload.ApprovalResolved.new(
+        approval_id: Shared.fetch_any(raw, [:approval_id, "approval_id"]),
+        decision: decision,
+        reason: Shared.fetch_any(raw, [:reason, "reason"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp cost_update(raw, state) do
+    usage = Shared.fetch_any(raw, [:token_usage, "token_usage", :usage, "usage", :stats, "stats"])
+    usage = if is_map(usage), do: usage, else: raw
+
+    input_tokens = Shared.int_value(usage, [:input_tokens, "input_tokens"])
+    output_tokens = Shared.int_value(usage, [:output_tokens, "output_tokens"])
+
+    Shared.emit_single(
+      :cost_update,
+      Payload.CostUpdate.new(
+        input_tokens: input_tokens,
+        output_tokens: output_tokens,
+        total_tokens: input_tokens + output_tokens,
+        cost_usd: Shared.float_value(raw, [:cost_usd, "cost_usd"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp result(raw, state) do
+    usage = Shared.fetch_any(raw, [:token_usage, "token_usage", :usage, "usage", :stats, "stats"])
+    usage = if is_map(usage), do: usage, else: %{}
+
+    Shared.emit_single(
+      :result,
+      Payload.Result.new(
+        status: :completed,
+        stop_reason:
+          Shared.fetch_any(raw, [
+            :stop_reason,
+            "stop_reason",
+            :status,
+            "status",
+            :reason,
+            "reason"
+          ]) ||
+            :unknown,
+        output: %{
+          duration_ms: Shared.fetch_any(raw, [:duration_ms, "duration_ms"]),
+          usage: %{
+            input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
+            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
+          }
+        }
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp cancelled(raw, state) do
+    Shared.emit_single(
+      :error,
+      Payload.Error.new(message: "Run cancelled", code: "user_cancelled", severity: :warning),
+      raw,
+      state
+    )
+  end
+
+  defp error_event(raw, state) do
+    payload =
+      Payload.Error.new(
+        message:
+          Shared.fetch_any(raw, [:error_message, "error_message", :message, "message"]) ||
+            "Amp parser error",
+        code:
+          raw
+          |> Shared.fetch_any([
+            :error_code,
+            "error_code",
+            :error_kind,
+            "error_kind",
+            :kind,
+            "kind"
+          ])
+          |> Shared.normalize_kind()
+          |> Atom.to_string(),
+        severity: Shared.normalize_severity(Shared.fetch_any(raw, [:severity, "severity"])),
+        metadata: Shared.normalize_map(raw)
+      )
+
+    Shared.emit_single(:error, payload, raw, state)
+  end
+end

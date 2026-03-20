@@ -5,12 +5,21 @@ defmodule CliSubprocessCore do
 
   alias CliSubprocessCore.{Event, ProviderRegistry}
 
+  @default_built_in_profile_modules [
+    CliSubprocessCore.ProviderProfiles.Claude,
+    CliSubprocessCore.ProviderProfiles.Codex,
+    CliSubprocessCore.ProviderProfiles.Gemini,
+    CliSubprocessCore.ProviderProfiles.Amp
+  ]
+
   @doc """
   Returns the configured built-in provider profile modules.
   """
   @spec built_in_profile_modules() :: [module()]
   def built_in_profile_modules do
-    Application.get_env(:cli_subprocess_core, :built_in_profile_modules, [])
+    (@default_built_in_profile_modules ++
+       Application.get_env(:cli_subprocess_core, :built_in_profile_modules, []))
+    |> Enum.uniq()
   end
 
   @doc """

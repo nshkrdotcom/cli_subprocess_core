@@ -1,0 +1,6 @@
+{"type":"message","role":"assistant","content":"Hel","delta":true,"session_id":"gemini-session-1"}
+{"type":"message","role":"assistant","content":"Hello","model":"gemini-2.5-pro"}
+{"type":"message","role":"user","content":"Please help"}
+{"type":"tool_use","tool_name":"search","tool_id":"tool-3","input":{"q":"weather"}}
+{"type":"tool_result","tool_id":"tool-3","output":"sunny","is_error":false}
+{"type":"result","status":"completed","stats":{"input_tokens":2,"output_tokens":4}}

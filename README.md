@@ -11,11 +11,10 @@ This initial foundation owns:
 - the normalized payload vocabulary in `CliSubprocessCore.Payload.*`
 - the provider profile behaviour in `CliSubprocessCore.ProviderProfile`
 - the provider profile registry in `CliSubprocessCore.ProviderRegistry`
+- the built-in first-party provider profiles for Claude, Codex, Gemini, and Amp
+- the common CLI session engine in `CliSubprocessCore.Session`
 - the raw subprocess transport contract and erlexec-backed implementation
-- the shared support modules used by the transport and later session work
-
-The first-party provider profile modules and the higher-level session layer
-still land in later prompts. The raw transport layer is implemented now.
+- the shared support modules used by the transport and session work
 
 ## Core Surface
 
@@ -27,8 +26,13 @@ still land in later prompts. The raw transport layer is implemented now.
 - `CliSubprocessCore.LineFraming` incrementally frames stdout and stderr into
   complete lines.
 - `CliSubprocessCore.ProcessExit` normalizes process exit reasons.
+- `CliSubprocessCore.ProviderProfiles.*` implements the built-in first-party
+  CLI profiles.
 - `CliSubprocessCore.Runtime` maintains per-session event sequencing and
   metadata.
+- `CliSubprocessCore.Session` owns provider resolution, invocation building,
+  parser state, subscription, and normalized event emission.
+- `CliSubprocessCore.Session.Options` validates session startup options.
 - `CliSubprocessCore.TaskSupport` wraps the task startup and
   `Task.yield || Task.shutdown` pattern used by subprocess ownership code.
 - `CliSubprocessCore.Transport` exposes the raw transport behaviour and default
@@ -40,8 +44,9 @@ still land in later prompts. The raw transport layer is implemented now.
 
 ## Built-In Profile Registration
 
-The default registry is started by `CliSubprocessCore.Application`. Built-in
-profile modules can be preloaded with application configuration:
+The default registry is started by `CliSubprocessCore.Application` and includes
+the first-party profile modules automatically. Extra built-in profile modules
+can be appended with application configuration:
 
 ```elixir
 config :cli_subprocess_core,
@@ -50,8 +55,12 @@ config :cli_subprocess_core,
   ]
 ```
 
-No first-party profile modules are shipped in this prompt, but the registry
-supports those built-in registrations now.
+The built-in ids are:
+
+- `:claude`
+- `:codex`
+- `:gemini`
+- `:amp`
 
 ## Guides
 
@@ -60,7 +69,9 @@ The initial guides live at:
 - `/home/home/p/g/n/cli_subprocess_core/guides/getting-started.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/event-and-payload-model.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/provider-profile-contract.md`
+- `/home/home/p/g/n/cli_subprocess_core/guides/built-in-provider-profiles.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md`
+- `/home/home/p/g/n/cli_subprocess_core/guides/session-api.md`
 - `/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md`
 
 ## Validation

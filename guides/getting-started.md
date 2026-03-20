@@ -13,11 +13,10 @@ The current foundation gives downstream repos a stable starting point for:
 - normalized payload structs with `CliSubprocessCore.Payload.*`
 - provider profile validation with `CliSubprocessCore.ProviderProfile`
 - provider profile lookup with `CliSubprocessCore.ProviderRegistry`
+- built-in first-party provider profiles for Claude, Codex, Gemini, and Amp
 - runtime sequencing with `CliSubprocessCore.Runtime`
+- session-oriented provider runtime ownership with `CliSubprocessCore.Session`
 - raw subprocess ownership with `CliSubprocessCore.Transport`
-
-The higher-level session engine described by the architecture packet still lands
-later. The raw transport layer is already available.
 
 ## Define A Provider Profile
 
@@ -157,3 +156,29 @@ See `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md` for the
 transport contract and
 `/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md` for
 shutdown and timeout behavior.
+
+## Start A Session
+
+Use the session layer when you want provider command construction, parsing, and
+normalized event emission handled by the core:
+
+```elixir
+ref = make_ref()
+
+{:ok, _session, _info} =
+  CliSubprocessCore.Session.start_session(
+    provider: :claude,
+    prompt: "Summarize the repo",
+    subscriber: {self(), ref}
+  )
+
+receive do
+  {:cli_subprocess_core_session, ^ref, {:event, event}} ->
+    IO.inspect({event.sequence, event.kind})
+end
+```
+
+See `/home/home/p/g/n/cli_subprocess_core/guides/session-api.md` for the
+session contract and
+`/home/home/p/g/n/cli_subprocess_core/guides/built-in-provider-profiles.md`
+for the first-party profile catalog.

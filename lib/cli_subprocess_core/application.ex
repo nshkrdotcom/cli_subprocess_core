@@ -10,6 +10,7 @@ defmodule CliSubprocessCore.Application do
     children = [
       {Task.Supervisor, name: CliSubprocessCore.TaskSupervisor},
       {CliSubprocessCore.ProviderRegistry,
+       name: CliSubprocessCore.ProviderRegistry,
        profile_modules: CliSubprocessCore.built_in_profile_modules()}
     ]
 

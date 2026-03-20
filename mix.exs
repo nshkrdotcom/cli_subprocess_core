@@ -31,7 +31,9 @@ defmodule CliSubprocessCore.MixProject do
         "guides/getting-started.md": [title: "Getting Started"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
+        "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
         "guides/raw-transport.md": [title: "Raw Transport"],
+        "guides/session-api.md": [title: "Session API"],
         "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"],
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"]

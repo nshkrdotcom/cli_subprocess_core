@@ -1,0 +1,9 @@
+{"type":"assistant_delta","delta":"Hel","session_id":"claude-session-1"}
+{"type":"assistant_message","message":{"content":[{"type":"text","text":"Hello"}],"model":"claude-3.7-sonnet"}}
+{"type":"thinking","thinking":"Need tool","signature":"sig-1"}
+{"type":"tool_use","tool_name":"shell","tool_id":"tool-1","input":{"cmd":"pwd"}}
+{"type":"tool_result","tool_id":"tool-1","content":"/tmp","is_error":false}
+{"type":"approval_requested","approval_id":"approval-1","tool_name":"shell","tool_input":{"cmd":"rm -rf /tmp/demo"}}
+{"type":"approval_resolved","approval_id":"approval-1","decision":"allow","reason":"approved"}
+{"type":"cost_update","input_tokens":3,"output_tokens":5,"cost_usd":0.12}
+{"type":"result","stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":5},"duration_ms":250}
