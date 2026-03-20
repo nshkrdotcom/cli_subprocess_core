@@ -25,9 +25,12 @@ defmodule CliSubprocessCore.MixProject do
   defp docs do
     [
       main: "readme",
+      assets: %{"assets" => "assets"},
       logo: "assets/cli_subprocess_core.svg",
       extras: [
         "README.md": [title: "Overview"],
+        "CHANGELOG.md": [title: "Changelog"],
+        LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
@@ -36,15 +39,14 @@ defmodule CliSubprocessCore.MixProject do
         "guides/raw-transport.md": [title: "Raw Transport"],
         "guides/session-api.md": [title: "Session API"],
         "guides/testing-and-conformance.md": [title: "Testing And Conformance"],
-        "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"],
-        "CHANGELOG.md": [title: "Changelog"],
-        LICENSE: [title: "License"]
+        "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"]
       ],
       groups_for_extras: [
-        Project: ~r"README\.md|CHANGELOG\.md|LICENSE",
+        "Project Overview": ~r"README\.md",
+        "Project Reference": ~r"CHANGELOG\.md|LICENSE",
         Guides: ~r"guides/"
       ],
-      formatters: ["html"],
+      formatters: ["html", "epub", "markdown"],
       source_url: @source_url
     ]
   end
@@ -54,7 +56,12 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       files: ~w(lib guides .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* assets),
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url}
+      links: %{
+        "GitHub" => @source_url,
+        "HexDocs" => "https://hexdocs.pm/cli_subprocess_core",
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
+        "License" => "#{@source_url}/blob/main/LICENSE"
+      }
     ]
   end
 

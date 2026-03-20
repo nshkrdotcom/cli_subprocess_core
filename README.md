@@ -1,4 +1,20 @@
+<p align="center">
+  <img src="assets/cli_subprocess_core.svg" alt="CliSubprocessCore logo" width="240" />
+</p>
+
 # CliSubprocessCore
+
+<p align="center">
+  <a href="https://hex.pm/packages/cli_subprocess_core">
+    <img src="https://img.shields.io/hexpm/v/cli_subprocess_core.svg" alt="Hex" />
+  </a>
+  <a href="https://hexdocs.pm/cli_subprocess_core">
+    <img src="https://img.shields.io/badge/hexdocs-docs-blue.svg" alt="HexDocs" />
+  </a>
+  <a href="https://github.com/nshkrdotcom/cli_subprocess_core">
+    <img src="https://img.shields.io/badge/github-nshkrdotcom%2Fcli__subprocess__core-24292e.svg" alt="GitHub" />
+  </a>
+</p>
 
 `CliSubprocessCore` is the shared runtime foundation for first-party CLI
 providers. It owns the raw subprocess transport, the normalized session/event
@@ -11,6 +27,16 @@ The library is designed for two consumers:
   `CliSubprocessCore.Transport`
 - callers that want provider resolution, command construction, parsing, event
   sequencing, and normalized payloads through `CliSubprocessCore.Session`
+
+## Menu
+
+- [Overview](#clisubprocesscore)
+- [What The Package Owns](#what-the-package-owns)
+- [Quick Start](#quick-start)
+- [Built-In Profiles](#built-in-profiles)
+- [Guides](#guides)
+- [Project Links](#project-links)
+- [Development](#development)
 
 ## What The Package Owns
 
@@ -112,6 +138,14 @@ Ad hoc profiles can also be registered at runtime with
 - `guides/session-api.md`
 - `guides/testing-and-conformance.md`
 - `guides/shutdown-and-timeouts.md`
+
+## Project Links
+
+- Hex: `https://hex.pm/packages/cli_subprocess_core`
+- HexDocs: `https://hexdocs.pm/cli_subprocess_core`
+- GitHub: `https://github.com/nshkrdotcom/cli_subprocess_core`
+- Changelog: `CHANGELOG.md`
+- License: `LICENSE`
 
 ## Development
 
