@@ -9,6 +9,26 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["run", "--output", "jsonl"]
+  @event_handlers %{
+    "approval_requested" => :approval_requested,
+    "approval_resolved" => :approval_resolved,
+    "assistant_delta" => :assistant_delta,
+    "cost_update" => :cost_update,
+    "error" => :error_event,
+    "error_occurred" => :error_event,
+    "message_received" => :assistant_message,
+    "message_streamed" => :assistant_delta,
+    "result" => :result,
+    "run_cancelled" => :cancelled,
+    "run_completed" => :result,
+    "run_failed" => :error_event,
+    "token_usage_updated" => :cost_update,
+    "tool_call_completed" => {:tool_result, false},
+    "tool_call_failed" => {:tool_result, true},
+    "tool_call_started" => :tool_use,
+    "tool_result" => {:tool_result, nil},
+    "tool_use" => :tool_use
+  }
 
   @impl true
   def id, do: :amp
@@ -82,67 +102,27 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   end
 
   defp decode_event(raw, state) do
-    case Shared.event_type(raw) do
-      "assistant_delta" ->
-        assistant_delta(raw, state)
+    @event_handlers
+    |> Map.get(Shared.event_type(raw))
+    |> dispatch_event(raw, state)
+  end
 
-      "message_streamed" ->
-        assistant_delta(raw, state)
+  defp dispatch_event(:assistant_delta, raw, state), do: assistant_delta(raw, state)
+  defp dispatch_event(:assistant_message, raw, state), do: assistant_message(raw, state)
+  defp dispatch_event(:tool_use, raw, state), do: tool_use(raw, state)
 
-      "assistant_message" ->
-        assistant_message(raw, state)
+  defp dispatch_event({:tool_result, forced_error}, raw, state),
+    do: tool_result(raw, state, forced_error)
 
-      "message_received" ->
-        assistant_message(raw, state)
+  defp dispatch_event(:cost_update, raw, state), do: cost_update(raw, state)
+  defp dispatch_event(:result, raw, state), do: result(raw, state)
+  defp dispatch_event(:approval_requested, raw, state), do: approval_requested(raw, state)
+  defp dispatch_event(:approval_resolved, raw, state), do: approval_resolved(raw, state)
+  defp dispatch_event(:cancelled, raw, state), do: cancelled(raw, state)
+  defp dispatch_event(:error_event, raw, state), do: error_event(raw, state)
 
-      "tool_use" ->
-        tool_use(raw, state)
-
-      "tool_call_started" ->
-        tool_use(raw, state)
-
-      "tool_result" ->
-        tool_result(raw, state, nil)
-
-      "tool_call_completed" ->
-        tool_result(raw, state, false)
-
-      "tool_call_failed" ->
-        tool_result(raw, state, true)
-
-      "token_usage_updated" ->
-        cost_update(raw, state)
-
-      "cost_update" ->
-        cost_update(raw, state)
-
-      "run_completed" ->
-        result(raw, state)
-
-      "result" ->
-        result(raw, state)
-
-      "approval_requested" ->
-        approval_requested(raw, state)
-
-      "approval_resolved" ->
-        approval_resolved(raw, state)
-
-      "run_cancelled" ->
-        cancelled(raw, state)
-
-      "run_failed" ->
-        error_event(raw, state)
-
-      "error_occurred" ->
-        error_event(raw, state)
-
-      "error" ->
-        error_event(raw, state)
-
-      _other ->
-        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
-    end
+  defp dispatch_event(nil, raw, state) do
+    Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
   end
 
   defp assistant_delta(raw, state) do

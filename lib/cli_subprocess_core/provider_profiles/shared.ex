@@ -12,6 +12,18 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :stderr_callback
   ]
 
+  @normalized_kinds %{
+    "approval_denied" => :approval_denied,
+    "auth_error" => :auth_error,
+    "cancelled" => :user_cancelled,
+    "parse_error" => :parse_error,
+    "rate_limit" => :rate_limit,
+    "timeout" => :timeout,
+    "tool_failed" => :tool_failed,
+    "transport_error" => :transport_error,
+    "user_cancelled" => :user_cancelled
+  }
+
   @type parser_state :: %{
           provider: atom(),
           emitted: non_neg_integer(),
@@ -238,18 +250,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   def normalize_kind(kind) when is_atom(kind), do: kind
 
   def normalize_kind(kind) when is_binary(kind) do
-    case String.downcase(kind) do
-      "user_cancelled" -> :user_cancelled
-      "cancelled" -> :user_cancelled
-      "parse_error" -> :parse_error
-      "timeout" -> :timeout
-      "tool_failed" -> :tool_failed
-      "approval_denied" -> :approval_denied
-      "rate_limit" -> :rate_limit
-      "transport_error" -> :transport_error
-      "auth_error" -> :auth_error
-      _ -> :unknown
-    end
+    Map.get(@normalized_kinds, String.downcase(kind), :unknown)
   end
 
   def normalize_kind(_kind), do: :unknown

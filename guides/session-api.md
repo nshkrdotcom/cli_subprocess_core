@@ -1,7 +1,5 @@
 # Session API
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/session-api.md`.
-
 `CliSubprocessCore.Session` is the common normalized runtime above the raw
 transport layer. It resolves a provider profile, builds the CLI invocation,
 owns parser state, and emits sequenced `CliSubprocessCore.Event` values to
@@ -130,3 +128,5 @@ end
 
 The session stops itself after the underlying provider subprocess exits and the
 profile has emitted any final normalized events.
+
+For profile implementation details, see `guides/custom-provider-profiles.md`.

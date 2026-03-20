@@ -9,6 +9,20 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["--output-format", "stream-json", "--verbose", "--print"]
+  @event_handlers %{
+    "assistant" => :assistant_message,
+    "assistant_delta" => :assistant_delta,
+    "assistant_message" => :assistant_message,
+    "approval_requested" => :approval_requested,
+    "approval_resolved" => :approval_resolved,
+    "cost_update" => :cost_update,
+    "error" => :error_event,
+    "result" => :result,
+    "text_delta" => :assistant_delta,
+    "thinking" => :thinking,
+    "tool_result" => :tool_result,
+    "tool_use" => :tool_use
+  }
 
   @impl true
   def id, do: :claude
@@ -80,46 +94,24 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   defp resume_args(_value), do: []
 
   defp decode_event(raw, state) do
-    case Shared.event_type(raw) do
-      "assistant" ->
-        assistant_message(raw, state)
+    @event_handlers
+    |> Map.get(Shared.event_type(raw))
+    |> dispatch_event(raw, state)
+  end
 
-      "assistant_message" ->
-        assistant_message(raw, state)
+  defp dispatch_event(:assistant_delta, raw, state), do: assistant_delta(raw, state)
+  defp dispatch_event(:assistant_message, raw, state), do: assistant_message(raw, state)
+  defp dispatch_event(:thinking, raw, state), do: thinking(raw, state)
+  defp dispatch_event(:tool_use, raw, state), do: tool_use(raw, state)
+  defp dispatch_event(:tool_result, raw, state), do: tool_result(raw, state)
+  defp dispatch_event(:approval_requested, raw, state), do: approval_requested(raw, state)
+  defp dispatch_event(:approval_resolved, raw, state), do: approval_resolved(raw, state)
+  defp dispatch_event(:cost_update, raw, state), do: cost_update(raw, state)
+  defp dispatch_event(:result, raw, state), do: result(raw, state)
+  defp dispatch_event(:error_event, raw, state), do: error_event(raw, state)
 
-      "assistant_delta" ->
-        assistant_delta(raw, state)
-
-      "text_delta" ->
-        assistant_delta(raw, state)
-
-      "thinking" ->
-        thinking(raw, state)
-
-      "tool_use" ->
-        tool_use(raw, state)
-
-      "tool_result" ->
-        tool_result(raw, state)
-
-      "approval_requested" ->
-        approval_requested(raw, state)
-
-      "approval_resolved" ->
-        approval_resolved(raw, state)
-
-      "cost_update" ->
-        cost_update(raw, state)
-
-      "result" ->
-        result(raw, state)
-
-      "error" ->
-        error_event(raw, state)
-
-      _other ->
-        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
-    end
+  defp dispatch_event(nil, raw, state) do
+    Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
   end
 
   defp assistant_delta(raw, state) do

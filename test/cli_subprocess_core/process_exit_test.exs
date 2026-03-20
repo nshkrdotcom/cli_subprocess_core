@@ -19,6 +19,14 @@ defmodule CliSubprocessCore.ProcessExitTest do
     refute ProcessExit.successful?(exit)
   end
 
+  test "normalizes shifted raw exit statuses from erlexec" do
+    exit = ProcessExit.from_reason(42 * 256)
+
+    assert exit.status == :exit
+    assert exit.code == 42
+    refute ProcessExit.successful?(exit)
+  end
+
   test "normalizes signal exits wrapped by shutdown" do
     exit = ProcessExit.from_reason({:shutdown, {:signal, :sigterm}})
 

@@ -380,14 +380,17 @@ defmodule CliSubprocessCore.Session do
   end
 
   defp put_subscriber(state, pid, tag) do
-    monitor_ref = Process.monitor(pid)
+    subscribers =
+      case Map.fetch(state.subscribers, pid) do
+        {:ok, %{monitor_ref: monitor_ref}} ->
+          Map.put(state.subscribers, pid, %{monitor_ref: monitor_ref, tag: tag})
 
-    subscriber_info = %{
-      monitor_ref: monitor_ref,
-      tag: tag
-    }
+        :error ->
+          monitor_ref = Process.monitor(pid)
+          Map.put(state.subscribers, pid, %{monitor_ref: monitor_ref, tag: tag})
+      end
 
-    %{state | subscribers: Map.put(state.subscribers, pid, subscriber_info)}
+    %{state | subscribers: subscribers}
   end
 
   defp remove_subscriber(state, pid) do

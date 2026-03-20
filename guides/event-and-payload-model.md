@@ -1,9 +1,7 @@
 # Event And Payload Model
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/event-and-payload-model.md`.
-
-The normalized runtime vocabulary in `/home/home/p/g/n/cli_subprocess_core`
-is the source of truth for provider CLI execution events.
+The normalized runtime vocabulary in `CliSubprocessCore` is the source of truth
+for provider CLI execution events.
 
 ## Event Envelope
 

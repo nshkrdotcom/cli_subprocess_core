@@ -1,7 +1,5 @@
 # Provider Profile Contract
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/provider-profile-contract.md`.
-
 `CliSubprocessCore.ProviderProfile` defines the contract every built-in or
 external provider CLI profile must implement.
 
@@ -76,3 +74,6 @@ Ad hoc registrations can also be added at runtime:
 Provider profiles should emit only `CliSubprocessCore.Event` values containing
 `CliSubprocessCore.Payload.*` structs. They should not invent competing
 normalized payload families in downstream repos.
+
+For a step-by-step implementation guide, see
+`guides/custom-provider-profiles.md`.

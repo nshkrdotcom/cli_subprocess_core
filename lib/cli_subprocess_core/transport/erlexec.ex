@@ -1,6 +1,10 @@
 defmodule CliSubprocessCore.Transport.Erlexec do
   @moduledoc """
   `erlexec`-backed raw subprocess transport.
+
+  This implementation owns subprocess startup, stdout line framing, realtime
+  stderr dispatch, subscriber fan-out, bounded call behavior, and final exit
+  flushing for late stdout/stderr fragments.
   """
 
   use GenServer
@@ -812,11 +816,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   end
 
   defp flush_stdout_fragment(state) do
-    line = trim_ascii(state.stdout_framer.buffer)
+    {[line], stdout_framer} = LineFraming.flush(state.stdout_framer)
 
     cond do
       line == "" ->
-        %{state | stdout_framer: LineFraming.new(), overflowed?: false, drain_scheduled?: false}
+        %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
 
       byte_size(line) > state.max_buffer_size ->
         send_event(
@@ -825,11 +829,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
           state.event_tag
         )
 
-        %{state | stdout_framer: LineFraming.new(), overflowed?: false, drain_scheduled?: false}
+        %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
 
       true ->
         send_event(state.subscribers, {:message, line}, state.event_tag)
-        %{state | stdout_framer: LineFraming.new(), overflowed?: false, drain_scheduled?: false}
+        %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
     end
   end
 
@@ -926,33 +930,6 @@ defmodule CliSubprocessCore.Transport.Erlexec do
           end
 
         {:rest, rest}
-    end
-  end
-
-  defp trim_ascii(data) when is_binary(data) do
-    data
-    |> trim_ascii_leading()
-    |> trim_ascii_trailing()
-  end
-
-  defp trim_ascii_leading(<<char, rest::binary>>) when char in [9, 10, 11, 12, 13, 32],
-    do: trim_ascii_leading(rest)
-
-  defp trim_ascii_leading(data), do: data
-
-  defp trim_ascii_trailing(data) when is_binary(data) do
-    do_trim_ascii_trailing(data, byte_size(data) - 1)
-  end
-
-  defp do_trim_ascii_trailing(_data, -1), do: ""
-
-  defp do_trim_ascii_trailing(data, idx) do
-    case :binary.at(data, idx) do
-      char when char in [9, 10, 11, 12, 13, 32] ->
-        do_trim_ascii_trailing(data, idx - 1)
-
-      _ ->
-        :binary.part(data, 0, idx + 1)
     end
   end
 

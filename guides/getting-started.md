@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/getting-started.md`.
-
-The project root is `/home/home/p/g/n/cli_subprocess_core`.
+This guide walks through the core modules you need first, when to use the raw
+transport versus the session layer, and how to wire in a custom provider
+profile.
 
 ## What Exists In The Foundation
 
@@ -152,10 +152,8 @@ receive do
 end
 ```
 
-See `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md` for the
-transport contract and
-`/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md` for
-shutdown and timeout behavior.
+See `guides/raw-transport.md` for the transport contract and
+`guides/shutdown-and-timeouts.md` for shutdown and timeout behavior.
 
 ## Start A Session
 
@@ -178,7 +176,6 @@ receive do
 end
 ```
 
-See `/home/home/p/g/n/cli_subprocess_core/guides/session-api.md` for the
-session contract and
-`/home/home/p/g/n/cli_subprocess_core/guides/built-in-provider-profiles.md`
-for the first-party profile catalog.
+See `guides/session-api.md` for the session contract,
+`guides/built-in-provider-profiles.md` for the first-party profile catalog, and
+`guides/custom-provider-profiles.md` for extension guidance.

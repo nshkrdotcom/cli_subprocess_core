@@ -16,6 +16,9 @@ defmodule CliSubprocessCore.ProcessExit do
 
   @doc """
   Normalizes raw subprocess exit reasons into a stable struct.
+
+  This includes integer exit statuses reported by `erlexec`, including the
+  shifted raw values some platforms report as `code * 256`.
   """
   @spec from_reason(term()) :: t()
   def from_reason(reason) do
@@ -36,10 +39,12 @@ defmodule CliSubprocessCore.ProcessExit do
 
   defp normalize_exit(:normal), do: %__MODULE__{status: :success, code: 0, reason: :normal}
   defp normalize_exit(0), do: %__MODULE__{status: :success, code: 0, reason: 0}
-  defp normalize_exit(code) when is_integer(code) and code > 0, do: exit_with_code(code, code)
+
+  defp normalize_exit(code) when is_integer(code) and code > 0,
+    do: exit_with_code(code, normalize_code(code))
 
   defp normalize_exit({:exit_status, code}) when is_integer(code) and code >= 0 do
-    exit_with_code({:exit_status, code}, code)
+    exit_with_code({:exit_status, code}, normalize_code(code))
   end
 
   defp normalize_exit({:signal, signal}) do
@@ -57,6 +62,9 @@ defmodule CliSubprocessCore.ProcessExit do
     do: %__MODULE__{status: :error, reason: {:command_not_found, :eacces}}
 
   defp normalize_exit(reason), do: %__MODULE__{status: :error, reason: reason}
+
+  defp normalize_code(code) when code > 255 and rem(code, 256) == 0, do: div(code, 256)
+  defp normalize_code(code), do: code
 
   defp exit_with_code(reason, 0), do: %__MODULE__{status: :success, code: 0, reason: reason}
   defp exit_with_code(reason, code), do: %__MODULE__{status: :exit, code: code, reason: reason}

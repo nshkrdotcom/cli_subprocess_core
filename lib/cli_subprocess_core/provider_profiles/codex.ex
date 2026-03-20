@@ -9,6 +9,19 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["exec", "--json"]
+  @event_handlers %{
+    "assistant_delta" => :assistant_delta,
+    "assistant_message" => :assistant_message,
+    "error" => :error_event,
+    "item.completed" => :completed_item,
+    "response.output_text.delta" => :assistant_delta,
+    "response.output_text.done" => :assistant_message,
+    "result" => {:result, :unknown},
+    "tool_call" => :tool_use,
+    "tool_result" => :tool_result,
+    "tool_use" => :tool_use,
+    "turn.completed" => {:result, :end_turn}
+  }
 
   @impl true
   def id, do: :codex
@@ -65,43 +78,23 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   end
 
   defp decode_event(raw, state) do
-    case Shared.event_type(raw) do
-      "response.output_text.delta" ->
-        assistant_delta(raw, state)
+    @event_handlers
+    |> Map.get(Shared.event_type(raw))
+    |> dispatch_event(raw, state)
+  end
 
-      "assistant_delta" ->
-        assistant_delta(raw, state)
+  defp dispatch_event(:assistant_delta, raw, state), do: assistant_delta(raw, state)
+  defp dispatch_event(:assistant_message, raw, state), do: assistant_message(raw, state)
+  defp dispatch_event(:completed_item, raw, state), do: completed_item(raw, state)
+  defp dispatch_event(:tool_use, raw, state), do: tool_use(raw, state)
+  defp dispatch_event(:tool_result, raw, state), do: tool_result(raw, state)
+  defp dispatch_event(:error_event, raw, state), do: error_event(raw, state)
 
-      "response.output_text.done" ->
-        assistant_message(raw, state)
+  defp dispatch_event({:result, default_stop_reason}, raw, state),
+    do: result(raw, state, default_stop_reason)
 
-      "assistant_message" ->
-        assistant_message(raw, state)
-
-      "item.completed" ->
-        completed_item(raw, state)
-
-      "tool_call" ->
-        tool_use(raw, state)
-
-      "tool_use" ->
-        tool_use(raw, state)
-
-      "tool_result" ->
-        tool_result(raw, state)
-
-      "turn.completed" ->
-        result(raw, state, :end_turn)
-
-      "result" ->
-        result(raw, state, :unknown)
-
-      "error" ->
-        error_event(raw, state)
-
-      _other ->
-        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
-    end
+  defp dispatch_event(nil, raw, state) do
+    Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
   end
 
   defp completed_item(raw, state) do

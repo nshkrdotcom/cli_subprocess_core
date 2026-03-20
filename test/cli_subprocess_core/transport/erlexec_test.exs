@@ -1,6 +1,8 @@
 defmodule CliSubprocessCore.Transport.ErlexecTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias CliSubprocessCore.ProcessExit
   alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.{Erlexec, Error}
@@ -41,18 +43,20 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
         "cli_subprocess_core_missing_#{System.unique_integer([:positive])}"
       )
 
-    assert {:ok, transport} =
-             Erlexec.start(
-               command: System.find_executable("cat") || "/bin/cat",
-               startup_mode: :lazy,
-               cwd: missing_cwd
-             )
+    capture_log(fn ->
+      assert {:ok, transport} =
+               Erlexec.start(
+                 command: System.find_executable("cat") || "/bin/cat",
+                 startup_mode: :lazy,
+                 cwd: missing_cwd
+               )
 
-    monitor = Process.monitor(transport)
+      monitor = Process.monitor(transport)
 
-    assert_receive {:DOWN, ^monitor, :process, ^transport,
-                    %Error{reason: {:cwd_not_found, ^missing_cwd}}},
-                   2_000
+      assert_receive {:DOWN, ^monitor, :process, ^transport,
+                      %Error{reason: {:cwd_not_found, ^missing_cwd}}},
+                     2_000
+    end)
   end
 
   test "send and end_input roundtrip with a custom event tag" do
@@ -203,6 +207,44 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     assert_receive {:cli_subprocess_core, ^ref, {:message, "after"}}, 5_000
   end
 
+  test "large stdout fragments below the buffer limit are flushed intact on exit" do
+    ref = make_ref()
+    large_line = String.duplicate("x", 262_144)
+
+    script =
+      create_test_script("""
+      python3 - <<'PY'
+      import sys
+      sys.stdout.write("x" * 262144)
+      PY
+      """)
+
+    assert {:ok, _transport} =
+             Erlexec.start(
+               command: script,
+               subscriber: {self(), ref},
+               max_buffer_size: byte_size(large_line) + 1_024
+             )
+
+    assert_receive {:cli_subprocess_core, ^ref, {:message, ^large_line}}, 5_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+                   5_000
+  end
+
+  test "post-exit stdout flush preserves the trailing fragment exactly" do
+    ref = make_ref()
+    fragment = "  trailing fragment  "
+    script = create_test_script("printf '#{fragment}'")
+
+    assert {:ok, _transport} = Erlexec.start(command: script, subscriber: {self(), ref})
+
+    assert_receive {:cli_subprocess_core, ^ref, {:message, ^fragment}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+                   2_000
+  end
+
   test "interrupt supports in-flight subprocesses and surfaces the resulting exit" do
     ref = make_ref()
 
@@ -218,6 +260,34 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
 
     assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{} = exit}}, 2_000
     refute ProcessExit.successful?(exit)
+  end
+
+  test "interrupt and close races complete without leaving the caller hanging" do
+    script =
+      create_test_script("""
+      trap 'exit 130' INT
+      sleep 60
+      """)
+
+    assert {:ok, transport} = Erlexec.start(command: script)
+
+    interrupt_task =
+      Task.async(fn ->
+        Transport.interrupt(transport)
+      end)
+
+    assert :ok = Transport.close(transport)
+
+    case Task.await(interrupt_task, 2_000) do
+      :ok ->
+        :ok
+
+      {:error, {:transport, %Error{reason: :not_connected}}} ->
+        :ok
+
+      {:error, {:transport, %Error{reason: :transport_stopped}}} ->
+        :ok
+    end
   end
 
   test "force_close stops the transport immediately" do

@@ -1,7 +1,5 @@
 # Built-In Provider Profiles
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/built-in-provider-profiles.md`.
-
 `CliSubprocessCore` ships four first-party provider profiles for the common CLI
 runtime lane:
 

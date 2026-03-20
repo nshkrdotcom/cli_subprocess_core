@@ -91,6 +91,70 @@ defmodule CliSubprocessCore.SessionTest do
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
   end
 
+  test "stderr-only provider output is normalized before the terminal error" do
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      printf 'stderr-only chunk' >&2
+      exit 42
+      """)
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "stderr only",
+               command: script,
+               subscriber: {self(), ref}
+             )
+
+    assert_receive {@session_event_tag, ^ref, {:event, run_started}}, 2_000
+    assert run_started.kind == :run_started
+
+    assert_receive {@session_event_tag, ^ref, {:event, stderr_event}}, 2_000
+    assert stderr_event.kind == :stderr
+    assert %Payload.Stderr{content: "stderr-only chunk"} = stderr_event.payload
+
+    assert_receive {@session_event_tag, ^ref, {:event, error_event}}, 2_000
+    assert error_event.kind == :error
+    assert %Payload.Error{message: message} = error_event.payload
+    assert message =~ "CLI exited with code 42"
+
+    monitor = Process.monitor(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 2_000
+    assert reason in [:normal, :noproc]
+  end
+
+  test "subscriber churn reuses the existing monitor for the same pid" do
+    script = create_test_script("sleep 60")
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "hold",
+               command: script
+             )
+
+    first_ref = make_ref()
+    second_ref = make_ref()
+
+    assert :ok = Session.subscribe(session, self(), first_ref)
+    assert {:monitors, monitors_after_first_subscribe} = Process.info(session, :monitors)
+    assert length(monitors_after_first_subscribe) == 1
+
+    assert :ok = Session.subscribe(session, self(), second_ref)
+    assert {:monitors, monitors_after_second_subscribe} = Process.info(session, :monitors)
+    assert length(monitors_after_second_subscribe) == 1
+
+    state = :sys.get_state(session)
+    assert %{tag: ^second_ref} = state.subscribers[self()]
+
+    assert :ok = Session.unsubscribe(session, self())
+    assert {:monitors, []} = Process.info(session, :monitors)
+
+    assert :ok = Session.close(session)
+  end
+
   defp assert_fixture_session(provider, profile, fixture_name, prompt, expected_event_count) do
     ref = make_ref()
     fixture_path = fixture_path(fixture_name)

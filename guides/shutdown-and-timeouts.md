@@ -1,7 +1,5 @@
 # Shutdown And Timeouts
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md`.
-
 `CliSubprocessCore.Transport.Erlexec` separates normal shutdown, escalated
 shutdown, and timeout behavior so callers can choose the right level of force.
 

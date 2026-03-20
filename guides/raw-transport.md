@@ -1,7 +1,5 @@
 # Raw Transport
 
-This guide lives at `/home/home/p/g/n/cli_subprocess_core/guides/raw-transport.md`.
-
 `CliSubprocessCore.Transport` is the provider-agnostic subprocess layer below
 the future session engine. It owns process startup, stdin writes, stdout line
 dispatch, realtime stderr dispatch, exit normalization, and shutdown.
@@ -120,5 +118,5 @@ The error struct carries:
 - `:message` – human-readable message
 - `:context` – extra debugging metadata such as cwd, preview, or size limits
 
-See `/home/home/p/g/n/cli_subprocess_core/guides/shutdown-and-timeouts.md` for
-close, force-close, interrupt, and timeout behavior.
+See `guides/shutdown-and-timeouts.md` for close, force-close, interrupt, and
+timeout behavior.

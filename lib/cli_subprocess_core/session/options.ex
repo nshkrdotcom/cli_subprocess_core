@@ -55,6 +55,12 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_session_event_tag, term()}
           | {:invalid_starter, term()}
 
+  @doc """
+  Builds a validated session options struct.
+
+  Reserved session keys stay on the struct while all remaining keys are passed
+  through to the selected provider profile as `provider_options`.
+  """
   @spec new(keyword()) :: {:ok, t()} | {:error, validation_error()}
   def new(opts) when is_list(opts) do
     provider_options = Keyword.drop(opts, @reserved_keys)
@@ -89,6 +95,9 @@ defmodule CliSubprocessCore.Session.Options do
     end
   end
 
+  @doc """
+  Builds a validated session options struct or raises.
+  """
   @spec new!(keyword()) :: t()
   def new!(opts) when is_list(opts) do
     case new(opts) do
