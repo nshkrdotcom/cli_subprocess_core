@@ -17,6 +17,15 @@ Add a custom profile when:
 If you only need raw subprocess ownership, use `CliSubprocessCore.Transport`
 directly and skip the profile layer.
 
+Phase 2B freezes the packaging rule for this layer:
+
+- first-party common profiles stay built into `cli_subprocess_core` through the
+  initial published stack cut
+- third-party/common custom profiles belong in external packages that implement
+  `CliSubprocessCore.ProviderProfile`
+- those external packages register explicitly at runtime or preload
+  intentionally at registry boot
+
 ## Behaviour Surface
 
 Every profile implements:
@@ -177,6 +186,9 @@ Or add it to the app config so the default registry boots with it:
 config :cli_subprocess_core,
   built_in_profile_modules: [MyApp.ProviderProfiles.Example]
 ```
+
+That preload hook only affects the local registry boot list. It does not turn
+your external package into a first-party built-in profile.
 
 Then start a session with either `provider: :example` or
 `profile: MyApp.ProviderProfiles.Example`.

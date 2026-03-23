@@ -15,6 +15,7 @@ defmodule CliSubprocessCore.MixProject do
       source_url: @source_url,
       docs: docs(),
       package: package(),
+      description: description(),
       dialyzer: dialyzer()
     ]
   end
@@ -55,6 +56,7 @@ defmodule CliSubprocessCore.MixProject do
   defp package do
     [
       name: "cli_subprocess_core",
+      description: description(),
       files: ~w(lib guides .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* assets),
       licenses: ["MIT"],
       links: %{
@@ -64,6 +66,10 @@ defmodule CliSubprocessCore.MixProject do
         "License" => "#{@source_url}/blob/main/LICENSE"
       }
     ]
+  end
+
+  defp description do
+    "Shared CLI subprocess runtime foundation with first-party common provider profiles."
   end
 
   # Run "mix help compile.app" to learn about applications.

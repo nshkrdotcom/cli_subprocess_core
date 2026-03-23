@@ -1,7 +1,7 @@
 # Provider Profile Contract
 
-`CliSubprocessCore.ProviderProfile` defines the contract every built-in or
-external provider CLI profile must implement.
+`CliSubprocessCore.ProviderProfile` defines the contract every first-party
+built-in or external provider CLI profile must implement.
 
 ## Behaviour Surface
 
@@ -57,7 +57,7 @@ That same invocation contract is reused by both:
 
 `CliSubprocessCore.ProviderRegistry` stores provider profile modules by id.
 
-Built-in registrations are supported at application boot:
+External preloads are supported at application boot:
 
 ```elixir
 config :cli_subprocess_core,
@@ -65,6 +65,10 @@ config :cli_subprocess_core,
     MyApp.ProviderProfiles.Example
   ]
 ```
+
+That preload hook only affects the default registry boot list. It does not make
+the external profile a first-party built-in shipped by
+`cli_subprocess_core`.
 
 Ad hoc registrations can also be added at runtime:
 

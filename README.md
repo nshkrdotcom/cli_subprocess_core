@@ -130,6 +130,18 @@ end
 
 ## Built-In Profiles
 
+Phase 2B freezes the initial publication story:
+
+- the first-party common profiles for Claude, Codex, Gemini, and Amp stay
+  built into `cli_subprocess_core`
+- third-party common profiles belong in external packages that implement
+  `CliSubprocessCore.ProviderProfile`
+- external profiles register explicitly at runtime or are preloaded through app
+  config; that preload does not make them first-party built-ins
+
+The shipped first-party modules are available through
+`CliSubprocessCore.first_party_profile_modules/0`.
+
 The default registry starts with these ids:
 
 - `:claude`
@@ -137,14 +149,17 @@ The default registry starts with these ids:
 - `:gemini`
 - `:amp`
 
-You can append additional built-in modules through application config:
+You can preload additional external profile modules through application config:
 
 ```elixir
 config :cli_subprocess_core,
   built_in_profile_modules: [MyApp.ProviderProfiles.Example]
 ```
 
-Ad hoc profiles can also be registered at runtime with
+That config only controls what the default registry boots with. It does not
+change first-party package ownership.
+
+Ad hoc external profiles can also be registered at runtime with
 `CliSubprocessCore.ProviderRegistry.register/2`.
 
 ## Guides

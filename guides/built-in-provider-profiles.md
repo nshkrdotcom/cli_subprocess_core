@@ -10,6 +10,10 @@ runtime lane:
 
 They are loaded into the default provider registry at application startup.
 
+Phase 2B freezes these as the initial published stack cut's first-party common
+profiles. They remain built into `cli_subprocess_core` rather than moving into
+separate profile packages during this cut.
+
 ## Registry Ids
 
 | Provider | Registry id | Default command |
@@ -31,6 +35,9 @@ All built-in profiles own:
 
 All provider-specific options live on the session startup keyword list and are
 passed through to the selected profile.
+
+If you need the shipped module list directly, call
+`CliSubprocessCore.first_party_profile_modules/0`.
 
 ## Claude
 
@@ -137,3 +144,12 @@ Examples:
 
 info.capabilities
 ```
+
+## Packaging Boundary
+
+The built-in status in this guide is a package ownership statement:
+
+- these four profiles ship with `cli_subprocess_core`
+- future third-party profiles belong in external packages
+- external profiles can still be preloaded into the default registry, but that
+  preload does not make them first-party built-ins

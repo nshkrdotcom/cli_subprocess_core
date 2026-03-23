@@ -80,7 +80,7 @@ Register a profile module in the default registry:
   CliSubprocessCore.ProviderRegistry.fetch(:example)
 ```
 
-Or preload it as a built-in profile:
+Or preload the external profile into the default registry at boot:
 
 ```elixir
 config :cli_subprocess_core,
@@ -88,6 +88,9 @@ config :cli_subprocess_core,
     MyApp.ProviderProfiles.Example
   ]
 ```
+
+That preload hook affects the boot registry list only. It does not make the
+external profile a first-party built-in shipped by `cli_subprocess_core`.
 
 ## Emit Sequenced Events
 
