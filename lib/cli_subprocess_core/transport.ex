@@ -8,6 +8,7 @@ defmodule CliSubprocessCore.Transport do
   Legacy subscribers receive bare transport tuples:
 
   - `{:transport_message, line}`
+  - `{:transport_data, chunk}`
   - `{:transport_error, %CliSubprocessCore.Transport.Error{}}`
   - `{:transport_stderr, chunk}`
   - `{:transport_exit, %CliSubprocessCore.ProcessExit{}}`
@@ -15,6 +16,7 @@ defmodule CliSubprocessCore.Transport do
   Tagged subscribers receive:
 
   - `{event_tag, ref, {:message, line}}`
+  - `{event_tag, ref, {:data, chunk}}`
   - `{event_tag, ref, {:error, %CliSubprocessCore.Transport.Error{}}}`
   - `{event_tag, ref, {:stderr, chunk}}`
   - `{event_tag, ref, {:exit, %CliSubprocessCore.ProcessExit{}}}`
@@ -22,6 +24,7 @@ defmodule CliSubprocessCore.Transport do
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
   alias CliSubprocessCore.Transport.Erlexec
+  alias CliSubprocessCore.Transport.Info
   alias CliSubprocessCore.Transport.RunResult
 
   @typedoc "Opaque transport reference."
@@ -36,10 +39,12 @@ defmodule CliSubprocessCore.Transport do
   @typedoc "Transport events delivered to subscribers."
   @type message ::
           {:transport_message, binary()}
+          | {:transport_data, binary()}
           | {:transport_error, Error.t()}
           | {:transport_stderr, binary()}
           | {:transport_exit, ProcessExit.t()}
           | {event_tag(), reference(), {:message, binary()}}
+          | {event_tag(), reference(), {:data, binary()}}
           | {event_tag(), reference(), {:error, Error.t()}}
           | {event_tag(), reference(), {:stderr, binary()}}
           | {event_tag(), reference(), {:exit, ProcessExit.t()}}
@@ -59,6 +64,7 @@ defmodule CliSubprocessCore.Transport do
   @callback status(t()) :: :connected | :disconnected | :error
   @callback end_input(t()) :: :ok | {:error, {:transport, Error.t()}}
   @callback stderr(t()) :: binary()
+  @callback info(t()) :: Info.t()
 
   @doc """
   Starts the default raw transport implementation.
@@ -138,4 +144,10 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec stderr(t()) :: binary()
   def stderr(transport), do: Erlexec.stderr(transport)
+
+  @doc """
+  Returns the current transport metadata snapshot.
+  """
+  @spec info(t()) :: Info.t()
+  def info(transport), do: Erlexec.info(transport)
 end

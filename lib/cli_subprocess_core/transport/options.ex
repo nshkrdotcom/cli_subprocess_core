@@ -11,6 +11,8 @@ defmodule CliSubprocessCore.Transport.Options do
   @default_max_stderr_buffer_size 262_144
   @default_startup_mode :eager
   @default_task_supervisor CliSubprocessCore.TaskSupervisor
+  @default_stdout_mode :line
+  @default_stdin_mode :line
 
   @enforce_keys [:command]
   defstruct [
@@ -18,7 +20,12 @@ defmodule CliSubprocessCore.Transport.Options do
     args: [],
     cwd: nil,
     env: %{},
+    clear_env?: false,
     user: nil,
+    stdout_mode: @default_stdout_mode,
+    stdin_mode: @default_stdin_mode,
+    pty?: false,
+    interrupt_mode: :signal,
     subscriber: nil,
     startup_mode: @default_startup_mode,
     task_supervisor: @default_task_supervisor,
@@ -36,7 +43,12 @@ defmodule CliSubprocessCore.Transport.Options do
           args: [String.t()],
           cwd: String.t() | nil,
           env: Command.env_map(),
+          clear_env?: boolean(),
           user: Command.user(),
+          stdout_mode: :line | :raw,
+          stdin_mode: :line | :raw,
+          pty?: boolean(),
+          interrupt_mode: :signal | {:stdin, binary()},
           subscriber: subscriber(),
           startup_mode: :eager | :lazy,
           task_supervisor: pid() | atom(),
@@ -53,7 +65,12 @@ defmodule CliSubprocessCore.Transport.Options do
           | {:invalid_args, term()}
           | {:invalid_cwd, term()}
           | {:invalid_env, term()}
+          | {:invalid_clear_env, term()}
           | {:invalid_user, term()}
+          | {:invalid_stdout_mode, term()}
+          | {:invalid_stdin_mode, term()}
+          | {:invalid_pty, term()}
+          | {:invalid_interrupt_mode, term()}
           | {:invalid_subscriber, term()}
           | {:invalid_startup_mode, term()}
           | {:invalid_task_supervisor, term()}
@@ -73,7 +90,12 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_args(normalized.args),
          :ok <- validate_cwd(normalized.cwd),
          :ok <- validate_env(normalized.env),
+         :ok <- validate_clear_env(normalized.clear_env?),
          :ok <- validate_user(normalized.user),
+         :ok <- validate_stdout_mode(normalized.stdout_mode),
+         :ok <- validate_stdin_mode(normalized.stdin_mode),
+         :ok <- validate_pty(normalized.pty?),
+         :ok <- validate_interrupt_mode(normalized.interrupt_mode),
          :ok <- validate_subscriber(normalized.subscriber),
          :ok <- validate_startup_mode(normalized.startup_mode),
          :ok <- validate_task_supervisor(normalized.task_supervisor),
@@ -126,7 +148,19 @@ defmodule CliSubprocessCore.Transport.Options do
            args: Keyword.get(opts, :args, command.args),
            cwd: Keyword.get(opts, :cwd, command.cwd),
            env: normalize_env(Keyword.get(opts, :env, command.env)),
+           clear_env?: Keyword.get(opts, :clear_env?, command.clear_env?),
            user: Keyword.get(opts, :user, command.user),
+           stdout_mode: Keyword.get(opts, :stdout_mode, @default_stdout_mode),
+           stdin_mode: Keyword.get(opts, :stdin_mode, @default_stdin_mode),
+           pty?: Keyword.get(opts, :pty?, false),
+           interrupt_mode:
+             normalize_interrupt_mode(
+               Keyword.get(
+                 opts,
+                 :interrupt_mode,
+                 default_interrupt_mode(Keyword.get(opts, :pty?, false))
+               )
+             ),
            subscriber: Keyword.get(opts, :subscriber),
            startup_mode: Keyword.get(opts, :startup_mode, @default_startup_mode),
            task_supervisor: Keyword.get(opts, :task_supervisor, @default_task_supervisor),
@@ -146,7 +180,19 @@ defmodule CliSubprocessCore.Transport.Options do
            args: Keyword.get(opts, :args, []),
            cwd: Keyword.get(opts, :cwd),
            env: normalize_env(Keyword.get(opts, :env, %{})),
+           clear_env?: Keyword.get(opts, :clear_env?, false),
            user: Keyword.get(opts, :user),
+           stdout_mode: Keyword.get(opts, :stdout_mode, @default_stdout_mode),
+           stdin_mode: Keyword.get(opts, :stdin_mode, @default_stdin_mode),
+           pty?: Keyword.get(opts, :pty?, false),
+           interrupt_mode:
+             normalize_interrupt_mode(
+               Keyword.get(
+                 opts,
+                 :interrupt_mode,
+                 default_interrupt_mode(Keyword.get(opts, :pty?, false))
+               )
+             ),
            subscriber: Keyword.get(opts, :subscriber),
            startup_mode: Keyword.get(opts, :startup_mode, @default_startup_mode),
            task_supervisor: Keyword.get(opts, :task_supervisor, @default_task_supervisor),
@@ -204,9 +250,30 @@ defmodule CliSubprocessCore.Transport.Options do
   end
 
   defp validate_env(env), do: {:error, {:invalid_env, env}}
+  defp validate_clear_env(value) when is_boolean(value), do: :ok
+  defp validate_clear_env(value), do: {:error, {:invalid_clear_env, value}}
   defp validate_user(nil), do: :ok
   defp validate_user(user) when is_binary(user) and user != "", do: :ok
   defp validate_user(user), do: {:error, {:invalid_user, user}}
+
+  defp validate_stdout_mode(mode) when mode in [:line, :raw], do: :ok
+  defp validate_stdout_mode(mode), do: {:error, {:invalid_stdout_mode, mode}}
+
+  defp validate_stdin_mode(mode) when mode in [:line, :raw], do: :ok
+  defp validate_stdin_mode(mode), do: {:error, {:invalid_stdin_mode, mode}}
+
+  defp validate_pty(value) when is_boolean(value), do: :ok
+  defp validate_pty(value), do: {:error, {:invalid_pty, value}}
+
+  defp validate_interrupt_mode({:invalid_interrupt_mode, mode}),
+    do: {:error, {:invalid_interrupt_mode, mode}}
+
+  defp validate_interrupt_mode(:signal), do: :ok
+
+  defp validate_interrupt_mode({:stdin, payload}) when is_binary(payload) and payload != "",
+    do: :ok
+
+  defp validate_interrupt_mode(mode), do: {:error, {:invalid_interrupt_mode, mode}}
 
   defp validate_subscriber(nil), do: :ok
   defp validate_subscriber(pid) when is_pid(pid), do: :ok
@@ -247,4 +314,24 @@ defmodule CliSubprocessCore.Transport.Options do
   defp validate_stderr_callback(nil), do: :ok
   defp validate_stderr_callback(callback) when is_function(callback, 1), do: :ok
   defp validate_stderr_callback(callback), do: {:error, {:invalid_stderr_callback, callback}}
+
+  defp default_interrupt_mode(true), do: {:stdin, <<3>>}
+  defp default_interrupt_mode(_pty?), do: :signal
+
+  defp normalize_interrupt_mode(:signal), do: :signal
+
+  defp normalize_interrupt_mode({:stdin, payload}) do
+    case normalize_interrupt_payload(payload) do
+      {:ok, normalized} -> {:stdin, normalized}
+      :error -> {:invalid_interrupt_mode, {:stdin, payload}}
+    end
+  end
+
+  defp normalize_interrupt_mode(other), do: other
+
+  defp normalize_interrupt_payload(payload) do
+    {:ok, IO.iodata_to_binary(payload)}
+  rescue
+    _error -> :error
+  end
 end

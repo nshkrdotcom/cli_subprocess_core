@@ -12,11 +12,13 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   import Kernel, except: [send: 2]
 
   alias CliSubprocessCore.{
+    Command,
     LineFraming,
     ProcessExit,
     TaskSupport,
     Transport,
     Transport.Error,
+    Transport.Info,
     Transport.Options,
     Transport.RunOptions,
     Transport.RunResult
@@ -33,7 +35,10 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   @run_stop_wait_ms 200
   @run_kill_wait_ms 500
 
+  @default_interrupt_mode :signal
+
   defstruct subprocess: nil,
+            invocation: nil,
             subscribers: %{},
             stdout_framer: %LineFraming{},
             pending_lines: :queue.new(),
@@ -50,6 +55,10 @@ defmodule CliSubprocessCore.Transport.Erlexec do
             headless_timer_ref: nil,
             task_supervisor: nil,
             event_tag: nil,
+            stdout_mode: :line,
+            stdin_mode: :line,
+            pty?: false,
+            interrupt_mode: @default_interrupt_mode,
             stderr_callback: nil,
             startup_options: nil
 
@@ -103,7 +112,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
              options.command.cwd,
              options.command.env,
              options.command.clear_env?,
-             options.command.user
+             options.command.user,
+             false
            ),
          argv <- normalize_command_argv(options.command.command, options.command.args),
          {:ok, pid, os_pid} <- exec_run(options.command.command, argv, exec_opts) do
@@ -206,6 +216,14 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
+  @impl Transport
+  def info(transport) when is_pid(transport) do
+    case safe_call(transport, :info) do
+      {:ok, %Info{} = info} -> info
+      _other -> Info.disconnected()
+    end
+  end
+
   @impl GenServer
   def init(%Options{} = options) do
     state = build_state(options)
@@ -243,7 +261,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   end
 
   def handle_call({:send, message}, from, %{subprocess: {pid, _os_pid}} = state) do
-    case start_io_task(state, fn -> send_payload(pid, message) end) do
+    case start_io_task(state, fn -> send_payload(pid, message, state.stdin_mode) end) do
       {:ok, task} ->
         {:noreply, put_pending_call(state, task.ref, from)}
 
@@ -260,6 +278,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   def handle_call(:stderr, _from, state), do: {:reply, state.stderr_buffer, state}
 
+  def handle_call(:info, _from, state), do: {:reply, transport_info(state), state}
+
   def handle_call(:end_input, from, %{subprocess: {pid, _os_pid}} = state) do
     case start_io_task(state, fn -> send_eof(pid) end) do
       {:ok, task} ->
@@ -274,8 +294,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     {:reply, transport_error(Error.not_connected()), state}
   end
 
-  def handle_call(:interrupt, from, %{subprocess: {_pid, os_pid}} = state) do
-    case start_io_task(state, fn -> interrupt_subprocess(os_pid) end) do
+  def handle_call(:interrupt, from, %{subprocess: {pid, os_pid}} = state) do
+    case start_io_task(state, fn -> interrupt_subprocess(pid, os_pid, state.interrupt_mode) end) do
       {:ok, task} ->
         {:noreply, put_pending_call(state, task.ref, from)}
 
@@ -291,6 +311,16 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   def handle_call(:force_close, _from, state) do
     state = force_stop_subprocess(state)
     {:stop, :normal, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_info(
+        {:stdout, os_pid, chunk},
+        %{subprocess: {_pid, os_pid}, stdout_mode: :raw} = state
+      ) do
+    data = IO.iodata_to_binary(chunk)
+    send_event(state.subscribers, {:data, data}, state.event_tag)
+    {:noreply, state}
   end
 
   @impl GenServer
@@ -410,12 +440,17 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp build_state(%Options{} = options) do
     %__MODULE__{
+      invocation: build_invocation(options),
       status: :disconnected,
       max_buffer_size: options.max_buffer_size,
       max_stderr_buffer_size: options.max_stderr_buffer_size,
       headless_timeout_ms: options.headless_timeout_ms,
       task_supervisor: options.task_supervisor,
       event_tag: options.event_tag,
+      stdout_mode: options.stdout_mode,
+      stdin_mode: options.stdin_mode,
+      pty?: options.pty?,
+      interrupt_mode: options.interrupt_mode,
       stderr_callback: options.stderr_callback,
       startup_options: options
     }
@@ -470,7 +505,14 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     with :ok <- validate_cwd_exists(options.cwd),
          :ok <- validate_command_exists(options.command),
          :ok <- ensure_erlexec_started(),
-         exec_opts <- build_exec_opts(options.cwd, options.env, false, options.user),
+         exec_opts <-
+           build_exec_opts(
+             options.cwd,
+             options.env,
+             options.clear_env?,
+             options.user,
+             options.pty?
+           ),
          argv <- normalize_command_argv(options.command, options.args),
          {:ok, pid, os_pid} <- exec_run(options.command, argv, exec_opts),
          {:ok, state} <-
@@ -581,11 +623,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
-  defp build_exec_opts(cwd, env, clear_env?, user) do
+  defp build_exec_opts(cwd, env, clear_env?, user, pty?) do
     []
     |> maybe_put_cwd(cwd)
     |> maybe_put_env(env, clear_env?)
     |> maybe_put_user(user)
+    |> maybe_put_pty(pty?)
     # Put each subprocess in its own process group so control signals and
     # force-close behavior reach shell wrappers and their active children.
     |> Kernel.++([{:group, 0}, :kill_group, :stdin, :stdout, :stderr, :monitor])
@@ -610,6 +653,9 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp maybe_put_user(opts, nil), do: opts
   defp maybe_put_user(opts, user), do: [{:user, to_charlist(user)} | opts]
+
+  defp maybe_put_pty(opts, true), do: [:pty | opts]
+  defp maybe_put_pty(opts, _pty?), do: opts
 
   defp normalize_command_argv(command, args) when is_binary(command) and is_list(args) do
     [command | args] |> Enum.map(&to_charlist/1)
@@ -870,6 +916,26 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     %{state | subprocess: {pid, os_pid}, status: :connected}
   end
 
+  defp transport_info(state) do
+    {pid, os_pid} =
+      case state.subprocess do
+        {subprocess_pid, subprocess_os_pid} -> {subprocess_pid, subprocess_os_pid}
+        _other -> {nil, nil}
+      end
+
+    %Info{
+      invocation: state.invocation,
+      pid: pid,
+      os_pid: os_pid,
+      status: state.status,
+      stdout_mode: state.stdout_mode,
+      stdin_mode: state.stdin_mode,
+      pty?: state.pty?,
+      interrupt_mode: state.interrupt_mode,
+      stderr: state.stderr_buffer
+    }
+  end
+
   defp add_bootstrap_subscriber(state, nil), do: {:ok, state}
 
   defp add_bootstrap_subscriber(state, pid) when is_pid(pid),
@@ -964,8 +1030,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     TaskSupport.async_nolink(state.task_supervisor, fun)
   end
 
-  defp send_payload(pid, message) do
-    payload = message |> normalize_payload() |> ensure_newline()
+  defp send_payload(pid, message, stdin_mode) do
+    payload =
+      message
+      |> normalize_payload()
+      |> maybe_ensure_newline(stdin_mode)
+
     :exec.send(pid, payload)
     :ok
   catch
@@ -981,7 +1051,16 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       transport_error(Error.send_failed({kind, reason}))
   end
 
-  defp interrupt_subprocess(os_pid) when is_integer(os_pid) and os_pid > 0 do
+  defp interrupt_subprocess(pid, _os_pid, {:stdin, payload})
+       when is_pid(pid) and is_binary(payload) do
+    :exec.send(pid, payload)
+    :ok
+  catch
+    kind, reason ->
+      transport_error(Error.send_failed({kind, reason}))
+  end
+
+  defp interrupt_subprocess(_pid, os_pid, :signal) when is_integer(os_pid) and os_pid > 0 do
     case System.find_executable("kill") do
       nil ->
         transport_error(Error.send_failed(:kill_command_not_found))
@@ -1010,6 +1089,9 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp dispatch_event(pid, %{tag: :legacy}, {:message, line}, _event_tag),
     do: Kernel.send(pid, {:transport_message, line})
+
+  defp dispatch_event(pid, %{tag: :legacy}, {:data, chunk}, _event_tag),
+    do: Kernel.send(pid, {:transport_data, chunk})
 
   defp dispatch_event(pid, %{tag: :legacy}, {:error, reason}, _event_tag),
     do: Kernel.send(pid, {:transport_error, reason})
@@ -1237,6 +1319,15 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
+  defp build_invocation(%Options{} = options) do
+    Command.new(options.command, options.args,
+      cwd: options.cwd,
+      env: options.env,
+      clear_env?: options.clear_env?,
+      user: options.user
+    )
+  end
+
   defp normalize_payload(message) when is_binary(message), do: message
   defp normalize_payload(message) when is_map(message), do: Jason.encode!(message)
 
@@ -1249,9 +1340,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp normalize_payload(message), do: to_string(message)
 
-  defp ensure_newline(payload) do
+  defp maybe_ensure_newline(payload, :line) do
     if String.ends_with?(payload, "\n"), do: payload, else: payload <> "\n"
   end
+
+  defp maybe_ensure_newline(payload, :raw), do: payload
 
   defp transport_error({:transport, %Error{}} = error), do: {:error, error}
   defp transport_error(%Error{} = error), do: {:error, {:transport, error}}

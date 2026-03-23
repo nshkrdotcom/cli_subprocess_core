@@ -43,6 +43,31 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
     assert options.max_stderr_buffer_size == 4_096
   end
 
+  test "accepts raw PTY lifecycle settings" do
+    command =
+      Command.new("cat", [],
+        env: %{"TERM" => "xterm-256color"},
+        clear_env?: true
+      )
+
+    assert {:ok, options} =
+             Options.new(
+               command: command,
+               stdout_mode: :raw,
+               stdin_mode: :raw,
+               pty?: true,
+               interrupt_mode: {:stdin, <<3>>}
+             )
+
+    assert options.command == "cat"
+    assert options.env == %{"TERM" => "xterm-256color"}
+    assert options.clear_env? == true
+    assert options.stdout_mode == :raw
+    assert options.stdin_mode == :raw
+    assert options.pty? == true
+    assert options.interrupt_mode == {:stdin, <<3>>}
+  end
+
   test "rejects invalid user settings" do
     assert {:error, {:invalid_transport_options, {:invalid_user, 123}}} =
              Options.new(command: "cat", user: 123)
@@ -56,5 +81,19 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
 
     assert {:error, {:invalid_transport_options, {:invalid_subscriber, :bad}}} =
              Options.new(command: "cat", subscriber: :bad)
+  end
+
+  test "rejects invalid raw lifecycle settings" do
+    assert {:error, {:invalid_transport_options, {:invalid_stdout_mode, :chunked}}} =
+             Options.new(command: "cat", stdout_mode: :chunked)
+
+    assert {:error, {:invalid_transport_options, {:invalid_stdin_mode, :bytes}}} =
+             Options.new(command: "cat", stdin_mode: :bytes)
+
+    assert {:error, {:invalid_transport_options, {:invalid_pty, :yes}}} =
+             Options.new(command: "cat", pty?: :yes)
+
+    assert {:error, {:invalid_transport_options, {:invalid_interrupt_mode, {:stdin, :bad}}}} =
+             Options.new(command: "cat", interrupt_mode: {:stdin, :bad})
   end
 end

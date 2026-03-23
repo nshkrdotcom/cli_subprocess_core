@@ -87,6 +87,68 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
                    2_000
   end
 
+  test "raw stdout mode preserves exact bytes and exposes transport metadata" do
+    ref = make_ref()
+    script = create_test_script("cat")
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               subscriber: {self(), ref},
+               stdout_mode: :raw,
+               stdin_mode: :raw
+             )
+
+    assert %Transport.Info{} = info = Transport.info(transport)
+    assert info.status == :connected
+    assert info.stdout_mode == :raw
+    assert info.stdin_mode == :raw
+    assert info.pty? == false
+    assert is_pid(info.pid)
+    assert is_integer(info.os_pid)
+    assert info.os_pid > 0
+
+    assert :ok = Transport.send(transport, "alpha")
+    assert :ok = Transport.end_input(transport)
+
+    assert_receive {:cli_subprocess_core, ^ref, {:data, "alpha"}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+                   2_000
+  end
+
+  test "configured stdin interrupt payloads are written exactly to stdin" do
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      IFS= read -r line
+
+      if [ "$line" = "quit" ]; then
+        exit 130
+      fi
+
+      exit 1
+      """)
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               subscriber: {self(), ref},
+               stdout_mode: :raw,
+               stdin_mode: :raw,
+               interrupt_mode: {:stdin, "quit\n"}
+             )
+
+    assert %Transport.Info{pty?: false, interrupt_mode: {:stdin, "quit\n"}} =
+             Transport.info(transport)
+
+    assert :ok = Transport.interrupt(transport)
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{code: 130}}},
+                   2_000
+  end
+
   test "last unsubscribe starts the headless timeout" do
     script =
       create_test_script("""

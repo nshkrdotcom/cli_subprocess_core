@@ -26,6 +26,8 @@ The library is designed for two consumers:
 
 - callers that only need process ownership and mailbox delivery through
   `CliSubprocessCore.Transport`
+- callers that need a provider-agnostic long-lived raw session handle through
+  `CliSubprocessCore.RawSession`
 - callers that need provider-aware one-shot command execution through
   `CliSubprocessCore.Command.run/1` or `run/2`
 - callers that want provider resolution, command construction, parsing, event
@@ -53,7 +55,12 @@ The library is designed for two consumers:
   Codex, Gemini, and Amp.
 - `CliSubprocessCore.Transport` and
   `CliSubprocessCore.Transport.Erlexec` own subprocess lifecycle, stdout/stderr
-  dispatch, synchronous `run/2`, interrupt, close, and force-close behavior.
+  dispatch, PTY startup, raw-byte versus line-oriented IO contracts,
+  synchronous `run/2`, interrupt, close, force-close behavior, and transport
+  metadata through `CliSubprocessCore.Transport.Info`.
+- `CliSubprocessCore.RawSession` owns the provider-agnostic raw-session handle
+  above the transport for long-lived subprocess families that need exact-byte
+  stdin/stdout defaults, optional PTY startup, and normalized collection.
 - `CliSubprocessCore.Session` adds provider-aware parsing, sequencing, and
   subscriber fan-out on top of the raw transport.
 - `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
@@ -92,6 +99,19 @@ ref = make_ref()
 receive do
   {:cli_subprocess_core, ^ref, {:message, "hello"}} -> :ok
 end
+```
+
+Use the raw session handle when you need long-lived exact-byte ownership:
+
+```elixir
+{:ok, session} =
+  CliSubprocessCore.RawSession.start("sh", ["-c", "cat"], stdin?: true)
+
+:ok = CliSubprocessCore.RawSession.send_input(session, "alpha")
+:ok = CliSubprocessCore.RawSession.close_input(session)
+
+{:ok, result} = CliSubprocessCore.RawSession.collect(session, 5_000)
+IO.inspect({result.stdout, result.exit.code})
 ```
 
 Use the command lane when you need one-shot non-PTY execution:
