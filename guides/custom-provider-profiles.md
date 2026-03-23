@@ -17,7 +17,7 @@ Add a custom profile when:
 If you only need raw subprocess ownership, use `CliSubprocessCore.Transport`
 directly and skip the profile layer.
 
-Phase 2B freezes the packaging rule for this layer:
+Phase 3 finalizes the packaging rule for this layer:
 
 - first-party common profiles stay built into `cli_subprocess_core` through the
   initial published stack cut

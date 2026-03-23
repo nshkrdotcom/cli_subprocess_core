@@ -13,6 +13,8 @@ defmodule CliSubprocessCore.RawSession do
   alias CliSubprocessCore.Transport.{Info, RunResult}
 
   @default_event_tag :cli_subprocess_core_raw_session
+  @transport_start_timeout_ms 5_000
+  @transport_start_poll_ms 10
   @reserved_keys [
     :receiver,
     :event_tag,
@@ -255,7 +257,8 @@ defmodule CliSubprocessCore.RawSession do
     interrupt_mode = Keyword.get(opts, :interrupt_mode, default_interrupt_mode(pty?))
     transport_ref = make_ref()
 
-    with :ok <- validate_receiver(receiver),
+    with {:ok, _started_apps} <- Application.ensure_all_started(:cli_subprocess_core),
+         :ok <- validate_receiver(receiver),
          :ok <- validate_event_tag(event_tag),
          :ok <- validate_transport_module(transport_module),
          :ok <- validate_stdin_available(stdin?) do
@@ -272,15 +275,25 @@ defmodule CliSubprocessCore.RawSession do
 
       case apply(transport_module, fun, [transport_opts]) do
         {:ok, transport} ->
-          build_session(
-            invocation,
-            receiver,
-            transport_module,
-            transport,
-            transport_ref,
-            event_tag,
-            stdin?
-          )
+          with :ok <- await_transport_started(transport_module, transport) do
+            build_session(
+              invocation,
+              receiver,
+              transport_module,
+              transport,
+              transport_ref,
+              event_tag,
+              stdin?,
+              stdout_mode,
+              stdin_mode,
+              interrupt_mode,
+              pty?
+            )
+          else
+            {:error, reason} ->
+              safe_close_transport(transport_module, transport)
+              {:error, reason}
+          end
 
         {:error, _reason} = error ->
           error
@@ -295,7 +308,11 @@ defmodule CliSubprocessCore.RawSession do
          transport,
          transport_ref,
          event_tag,
-         stdin?
+         stdin?,
+         stdout_mode,
+         stdin_mode,
+         interrupt_mode,
+         pty?
        ) do
     case transport_module.info(transport) do
       %Info{} = transport_info ->
@@ -307,10 +324,11 @@ defmodule CliSubprocessCore.RawSession do
            transport_ref: transport_ref,
            event_tag: event_tag,
            transport_module: transport_module,
-           stdout_mode: transport_info.stdout_mode,
-           stdin_mode: transport_info.stdin_mode,
-           interrupt_mode: transport_info.interrupt_mode,
-           pty?: transport_info.pty?,
+           stdout_mode: resolve_transport_contract(transport_info, :stdout_mode, stdout_mode),
+           stdin_mode: resolve_transport_contract(transport_info, :stdin_mode, stdin_mode),
+           interrupt_mode:
+             resolve_transport_contract(transport_info, :interrupt_mode, interrupt_mode),
+           pty?: resolve_transport_contract(transport_info, :pty?, pty?),
            stdin?: stdin?
          }}
 
@@ -366,6 +384,63 @@ defmodule CliSubprocessCore.RawSession do
 
   defp default_interrupt_mode(true), do: {:stdin, <<3>>}
   defp default_interrupt_mode(_pty?), do: :signal
+
+  defp await_transport_started(module, transport, timeout_ms \\ @transport_start_timeout_ms)
+       when is_atom(module) and is_pid(transport) and is_integer(timeout_ms) and timeout_ms > 0 do
+    monitor_ref = Process.monitor(transport)
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+
+    try do
+      do_await_transport_started(module, transport, monitor_ref, deadline_ms)
+    after
+      Process.demonitor(monitor_ref, [:flush])
+    end
+  end
+
+  defp do_await_transport_started(module, transport, monitor_ref, deadline_ms) do
+    case module.status(transport) do
+      :connected ->
+        :ok
+
+      _status ->
+        remaining_ms = deadline_ms - System.monotonic_time(:millisecond)
+
+        if remaining_ms <= 0 do
+          {:error, :transport_start_timeout}
+        else
+          receive do
+            {:DOWN, ^monitor_ref, :process, ^transport, reason} ->
+              normalize_transport_start_exit(reason)
+          after
+            min(@transport_start_poll_ms, remaining_ms) ->
+              do_await_transport_started(module, transport, monitor_ref, deadline_ms)
+          end
+        end
+    end
+  end
+
+  defp normalize_transport_start_exit({:transport, %CliSubprocessCore.Transport.Error{} = error}),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(%CliSubprocessCore.Transport.Error{} = error),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit({:shutdown, %CliSubprocessCore.Transport.Error{} = error}),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(:normal), do: :ok
+  defp normalize_transport_start_exit(reason), do: {:error, reason}
+
+  defp resolve_transport_contract(%Info{status: :connected} = transport_info, key, _fallback),
+    do: Map.fetch!(transport_info, key)
+
+  defp resolve_transport_contract(%Info{}, _key, fallback), do: fallback
+
+  defp safe_close_transport(module, transport) do
+    module.close(transport)
+  catch
+    :exit, _reason -> :ok
+  end
 
   defp validate_receiver(pid) when is_pid(pid), do: :ok
   defp validate_receiver(receiver), do: {:error, {:invalid_receiver, receiver}}

@@ -3,7 +3,8 @@
 `CliSubprocessCore.Transport` is the provider-agnostic subprocess layer below
 the shared command and session APIs. It owns process startup, stdin writes,
 stdout dispatch, realtime stderr dispatch, exit normalization, PTY startup,
-and shutdown.
+and shutdown. It is also the only public core layer that exposes lazy startup
+directly.
 
 ## Public Modules
 
@@ -77,7 +78,8 @@ Tagged subscribers receive:
 - `{event_tag, ref, {:exit, %CliSubprocessCore.ProcessExit{}}}`
 
 `event_tag` defaults to `:cli_subprocess_core`, but SDK wrappers can override it
-to preserve their historical mailbox shapes.
+to preserve their historical mailbox shapes while leaving lifecycle ownership
+in the core.
 
 Use `:line` mode for newline-framed stdout and `:raw` mode when later provider
 migrations need exact byte chunks.
@@ -153,6 +155,11 @@ stderr fragments are flushed through the callback during process finalization.
 - `:lazy` boots the `GenServer` first and starts the subprocess in
   `handle_continue/2`.
 
+`CliSubprocessCore.RawSession` and `CliSubprocessCore.Session` still wait for
+startup to either connect or fail before they return. Use the transport
+directly only when you intentionally want lazy-start semantics at the API
+boundary.
+
 ## Buffering
 
 Line-mode stdout is newline-framed and drained through an internal queue.
@@ -191,6 +198,9 @@ Use it when you need:
 
 `RawSession.collect/2` requires the configured receiver to be the calling
 process so the core can drain its own transport events deterministically.
+`RawSession.start/2`, `start/3`, and `start_link/2` do not report success until
+the underlying transport has either connected or returned a startup failure,
+even if the transport itself is configured with `startup_mode: :lazy`.
 
 ## Structured Errors
 

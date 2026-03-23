@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.SessionTest do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
   alias CliSubprocessCore.Session
+  alias CliSubprocessCore.Transport
 
   @session_event_tag :cli_subprocess_core_session
 
@@ -39,10 +40,25 @@ defmodule CliSubprocessCore.SessionTest do
              Session.start_session(
                provider: :claude,
                prompt: "ignored",
-               command: script
+               command: script,
+               startup_mode: :lazy
              )
 
+    {:links, links} = Process.info(self(), :links)
+    refute session in links
+
     ref = make_ref()
+
+    info = Session.info(session)
+    assert %Transport.Info{} = info.transport.info
+    assert info.transport.status == :connected
+    assert is_pid(info.transport.subprocess_pid)
+    assert is_integer(info.transport.os_pid)
+    assert info.transport.os_pid > 0
+    assert info.transport.stdout_mode == :line
+    assert info.transport.stdin_mode == :line
+    assert info.transport.pty? == false
+    assert info.transport.interrupt_mode == :signal
 
     assert :ok = Session.subscribe(session, self(), ref)
     assert :ok = Session.send(session, "hello")
@@ -154,6 +170,31 @@ defmodule CliSubprocessCore.SessionTest do
     assert {:monitors, []} = Process.info(session, :monitors)
 
     assert :ok = Session.close(session)
+  end
+
+  test "lazy transport startup errors return before the session reports run_started" do
+    missing_cwd =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_session_missing_#{System.unique_integer([:positive])}"
+      )
+
+    ref = make_ref()
+    script = create_test_script("printf 'never-runs\\n'")
+
+    assert {:error,
+            {:transport,
+             %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "missing cwd",
+               command: script,
+               cwd: missing_cwd,
+               startup_mode: :lazy,
+               subscriber: {self(), ref}
+             )
+
+    refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
   end
 
   defp assert_fixture_session(provider, profile, fixture_name, prompt, expected_event_count) do

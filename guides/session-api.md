@@ -3,7 +3,9 @@
 `CliSubprocessCore.Session` is the common normalized runtime above the raw
 transport layer. It resolves a provider profile, builds the CLI invocation,
 owns parser state, and emits sequenced `CliSubprocessCore.Event` values to
-subscribers.
+subscribers. Session startup waits for the underlying subprocess transport to
+either connect or fail before `start_session/1` returns, so the synthetic
+`:run_started` event only appears after spawn success.
 
 ## Start A Session
 
@@ -20,7 +22,8 @@ snapshot back together:
   )
 ```
 
-Use `start_link/1` when you want plain OTP startup semantics.
+`start_session/1` does not keep the caller linked to the session after startup.
+Use `start_link/1` when you want plain OTP linked-process semantics.
 
 Required startup input is either:
 
@@ -38,7 +41,9 @@ Common session-level options:
 - `:session_event_tag`
 
 All other options are passed through to the provider profile for command
-construction, parser initialization, and transport overrides.
+construction, parser initialization, and transport overrides. If the selected
+transport is configured for lazy startup, the session still waits for that
+startup to finish before returning.
 
 ## Lifecycle API
 
@@ -102,11 +107,23 @@ events in normalized runtime order.
   transport: %{
     module: CliSubprocessCore.Transport,
     pid: #PID<0.0.0>,
+    info: %CliSubprocessCore.Transport.Info{},
     status: :connected,
-    stderr: ""
+    stderr: "",
+    subprocess_pid: #PID<0.0.1>,
+    os_pid: 12_345,
+    stdout_mode: :line,
+    stdin_mode: :line,
+    pty?: false,
+    interrupt_mode: :signal
   }
 }
 ```
+
+When the selected transport module exports `info/1`, the session snapshot
+surfaces the full `%CliSubprocessCore.Transport.Info{}` under `transport.info`
+plus the most commonly consumed subprocess metadata as top-level transport map
+fields.
 
 ## Example
 

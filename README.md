@@ -20,7 +20,8 @@
 providers. It owns the raw subprocess transport, the normalized session/event
 model above that transport, the shared non-PTY command lane, and the built-in
 provider profiles that turn provider-specific JSONL streams into a stable core
-vocabulary.
+vocabulary. Within the runtime stack, it is the only repo that owns `erlexec`
+startup, `:exec.*`, and raw subprocess lifecycle state.
 
 The library is designed for two consumers:
 
@@ -63,6 +64,10 @@ The library is designed for two consumers:
   stdin/stdout defaults, optional PTY startup, and normalized collection.
 - `CliSubprocessCore.Session` adds provider-aware parsing, sequencing, and
   subscriber fan-out on top of the raw transport.
+- `CliSubprocessCore.Transport` is the only public layer that exposes lazy
+  startup directly. `CliSubprocessCore.RawSession` and
+  `CliSubprocessCore.Session` wait for subprocess startup to either succeed or
+  fail before returning.
 - `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
   `CliSubprocessCore.ProcessExit`, and `CliSubprocessCore.TaskSupport` support
   the transport and session layers.
@@ -153,7 +158,7 @@ end
 
 ## Built-In Profiles
 
-Phase 2B freezes the initial publication story:
+Phase 3 finalizes the publication story for the common provider-profile layer:
 
 - the first-party common profiles for Claude, Codex, Gemini, and Amp stay
   built into `cli_subprocess_core`

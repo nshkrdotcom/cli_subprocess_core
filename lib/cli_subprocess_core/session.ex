@@ -13,10 +13,13 @@ defmodule CliSubprocessCore.Session do
     ProviderProfile,
     ProviderRegistry,
     Runtime,
-    Session.Options
+    Session.Options,
+    Transport.Info
   }
 
   @transport_event_tag :cli_subprocess_core_session_transport
+  @transport_start_timeout_ms 5_000
+  @transport_start_poll_ms 10
 
   defstruct provider: nil,
             profile: nil,
@@ -63,9 +66,14 @@ defmodule CliSubprocessCore.Session do
   """
   @spec start_session(keyword()) :: {:ok, pid(), map()} | {:error, term()}
   def start_session(opts) when is_list(opts) do
+    Application.ensure_all_started(:cli_subprocess_core)
+
     ref = make_ref()
 
-    case start_link(Keyword.put(opts, :starter, {self(), ref})) do
+    {genserver_opts, init_opts} =
+      Keyword.split(Keyword.put(opts, :starter, {self(), ref}), [:name])
+
+    case GenServer.start(__MODULE__, init_opts, genserver_opts) do
       {:ok, pid} ->
         receive do
           {:cli_subprocess_core_session_started, ^ref, info} -> {:ok, pid, info}
@@ -318,8 +326,17 @@ defmodule CliSubprocessCore.Session do
       |> Keyword.put(:event_tag, @transport_event_tag)
 
     case options.transport_module.start(transport_opts) do
-      {:ok, transport_pid} -> {:ok, transport_pid, transport_ref}
-      {:error, reason} -> {:error, reason}
+      {:ok, transport_pid} ->
+        with :ok <- await_transport_started(options.transport_module, transport_pid) do
+          {:ok, transport_pid, transport_ref}
+        else
+          {:error, reason} ->
+            safe_close_transport(options.transport_module, transport_pid)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -347,6 +364,14 @@ defmodule CliSubprocessCore.Session do
   end
 
   defp session_info(state) do
+    transport_info = maybe_transport_info(state.transport_module, state.transport_pid)
+
+    transport_status =
+      transport_status(state.transport_module, state.transport_pid, transport_info)
+
+    transport_stderr =
+      transport_stderr(state.transport_module, state.transport_pid, transport_info)
+
     %{
       capabilities: state.profile.capabilities(),
       invocation: state.invocation,
@@ -356,12 +381,14 @@ defmodule CliSubprocessCore.Session do
       runtime: Runtime.info(state.runtime),
       session_event_tag: state.options.session_event_tag,
       subscribers: map_size(state.subscribers),
-      transport: %{
-        module: state.transport_module,
-        pid: state.transport_pid,
-        status: state.transport_module.status(state.transport_pid),
-        stderr: state.transport_module.stderr(state.transport_pid)
-      }
+      transport:
+        build_transport_snapshot(
+          state.transport_module,
+          state.transport_pid,
+          transport_status,
+          transport_stderr,
+          transport_info
+        )
     }
   end
 
@@ -422,5 +449,99 @@ defmodule CliSubprocessCore.Session do
       _other ->
         :ok
     end)
+  end
+
+  defp await_transport_started(module, transport, timeout_ms \\ @transport_start_timeout_ms)
+       when is_atom(module) and is_pid(transport) and is_integer(timeout_ms) and timeout_ms > 0 do
+    monitor_ref = Process.monitor(transport)
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+
+    try do
+      do_await_transport_started(module, transport, monitor_ref, deadline_ms)
+    after
+      Process.demonitor(monitor_ref, [:flush])
+    end
+  end
+
+  defp do_await_transport_started(module, transport, monitor_ref, deadline_ms) do
+    case module.status(transport) do
+      :connected ->
+        :ok
+
+      _status ->
+        remaining_ms = deadline_ms - System.monotonic_time(:millisecond)
+
+        if remaining_ms <= 0 do
+          {:error, :transport_start_timeout}
+        else
+          receive do
+            {:DOWN, ^monitor_ref, :process, ^transport, reason} ->
+              normalize_transport_start_exit(reason)
+          after
+            min(@transport_start_poll_ms, remaining_ms) ->
+              do_await_transport_started(module, transport, monitor_ref, deadline_ms)
+          end
+        end
+    end
+  end
+
+  defp normalize_transport_start_exit({:transport, %CliSubprocessCore.Transport.Error{} = error}),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(%CliSubprocessCore.Transport.Error{} = error),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit({:shutdown, %CliSubprocessCore.Transport.Error{} = error}),
+    do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(:normal), do: :ok
+  defp normalize_transport_start_exit(reason), do: {:error, reason}
+
+  defp maybe_transport_info(module, transport_pid) do
+    if function_exported?(module, :info, 1) do
+      case module.info(transport_pid) do
+        %Info{} = info -> info
+        _other -> nil
+      end
+    else
+      nil
+    end
+  end
+
+  defp transport_status(_module, _transport_pid, %Info{} = info), do: info.status
+  defp transport_status(module, transport_pid, nil), do: module.status(transport_pid)
+
+  defp transport_stderr(_module, _transport_pid, %Info{} = info), do: info.stderr
+  defp transport_stderr(module, transport_pid, nil), do: module.stderr(transport_pid)
+
+  defp build_transport_snapshot(module, transport_pid, status, stderr, nil) do
+    %{
+      module: module,
+      pid: transport_pid,
+      status: status,
+      stderr: stderr
+    }
+  end
+
+  defp build_transport_snapshot(module, transport_pid, status, stderr, %Info{} = info) do
+    %{
+      module: module,
+      pid: transport_pid,
+      status: status,
+      stderr: stderr,
+      info: info,
+      subprocess_pid: info.pid,
+      os_pid: info.os_pid,
+      stdout_mode: info.stdout_mode,
+      stdin_mode: info.stdin_mode,
+      pty?: info.pty?,
+      interrupt_mode: info.interrupt_mode
+    }
+  end
+
+  defp safe_close_transport(module, transport) do
+    module.close(transport)
+  catch
+    :exit, _reason -> :ok
   end
 end

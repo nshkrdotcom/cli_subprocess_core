@@ -7,13 +7,14 @@ defmodule CliSubprocessCore.RawSessionTest do
   test "raw sessions preserve exact stdin bytes and collect a normalized result" do
     script = create_test_script("cat")
 
-    assert {:ok, session} = RawSession.start(script, [], stdin?: true)
+    assert {:ok, session} = RawSession.start(script, [], stdin?: true, startup_mode: :lazy)
 
     assert session.receiver == self()
     assert session.stdout_mode == :raw
     assert session.stdin_mode == :raw
     assert session.pty? == false
     assert is_reference(session.transport_ref)
+    assert :connected == RawSession.status(session)
 
     assert :ok = RawSession.send_input(session, "alpha")
     assert :ok = RawSession.close_input(session)
@@ -43,6 +44,21 @@ defmodule CliSubprocessCore.RawSessionTest do
 
     assert :ok = RawSession.force_close(session)
     assert_receive {:DOWN, ^monitor, :process, ^transport, :normal}, 2_000
+  end
+
+  test "lazy startup surfaces subprocess spawn failures before returning a raw session" do
+    missing_cwd =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_raw_session_missing_#{System.unique_integer([:positive])}"
+      )
+
+    script = create_test_script("cat")
+
+    assert {:error,
+            {:transport,
+             %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+             RawSession.start(script, [], startup_mode: :lazy, cwd: missing_cwd)
   end
 
   defp create_test_script(body) do
