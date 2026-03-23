@@ -5,6 +5,12 @@ defmodule CliSubprocessCore do
 
   alias CliSubprocessCore.{Event, ProviderRegistry}
 
+  @type first_party_profile_module ::
+          CliSubprocessCore.ProviderProfiles.Claude
+          | CliSubprocessCore.ProviderProfiles.Codex
+          | CliSubprocessCore.ProviderProfiles.Gemini
+          | CliSubprocessCore.ProviderProfiles.Amp
+
   @first_party_profile_modules [
     CliSubprocessCore.ProviderProfiles.Claude,
     CliSubprocessCore.ProviderProfiles.Codex,
@@ -16,7 +22,7 @@ defmodule CliSubprocessCore do
   Returns the first-party provider profile modules shipped by
   `cli_subprocess_core`.
   """
-  @spec first_party_profile_modules() :: [module()]
+  @spec first_party_profile_modules() :: [first_party_profile_module(), ...]
   def first_party_profile_modules, do: @first_party_profile_modules
 
   @doc """

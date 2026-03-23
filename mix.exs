@@ -3,15 +3,19 @@ defmodule CliSubprocessCore.MixProject do
 
   @version "0.1.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
+  @homepage_url "https://hex.pm/packages/cli_subprocess_core"
+  @docs_url "https://hexdocs.pm/cli_subprocess_core"
 
   def project do
     [
       app: :cli_subprocess_core,
+      name: "CliSubprocessCore",
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      homepage_url: @homepage_url,
       source_url: @source_url,
       docs: docs(),
       package: package(),
@@ -26,6 +30,8 @@ defmodule CliSubprocessCore.MixProject do
   defp docs do
     [
       main: "readme",
+      source_ref: "v#{@version}",
+      homepage_url: @homepage_url,
       assets: %{"assets" => "assets"},
       logo: "assets/cli_subprocess_core.svg",
       extras: [
@@ -59,9 +65,11 @@ defmodule CliSubprocessCore.MixProject do
       description: description(),
       files: ~w(lib guides .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* assets),
       licenses: ["MIT"],
+      maintainers: ["nshkrdotcom"],
       links: %{
         "GitHub" => @source_url,
-        "HexDocs" => "https://hexdocs.pm/cli_subprocess_core",
+        "Hex" => @homepage_url,
+        "HexDocs" => @docs_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
         "License" => "#{@source_url}/blob/main/LICENSE"
       }

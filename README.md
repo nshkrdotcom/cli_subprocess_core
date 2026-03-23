@@ -67,10 +67,13 @@ Add the dependency and start the application normally:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, path: "../cli_subprocess_core"}
+    {:cli_subprocess_core, "~> 0.1.0"}
   ]
 end
 ```
+
+For local workspace development, replace the published requirement with a
+sibling `path:` override.
 
 Use the raw transport when you only need subprocess IO:
 
@@ -194,4 +197,5 @@ mix test
 mix credo --strict
 mix dialyzer
 mix docs
+mix hex.build
 ```

@@ -85,10 +85,12 @@ The full repo gate is:
 
 ```bash
 mix format --check-formatted
+mix compile --warnings-as-errors
 mix test
 mix credo --strict
 mix dialyzer
 mix docs
+mix hex.build
 ```
 
 Expected result:
@@ -99,6 +101,7 @@ Expected result:
 - no Credo issues
 - no Dialyzer findings
 - successful documentation generation
+- successful package build
 
 When changing transport or session behavior, rerun the full gate rather than
 only the targeted tests. Those layers are shared by every provider profile.
