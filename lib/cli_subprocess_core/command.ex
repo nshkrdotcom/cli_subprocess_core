@@ -69,9 +69,14 @@ defmodule CliSubprocessCore.Command do
   """
   @spec run(keyword()) :: {:ok, run_result()} | {:error, run_error()}
   def run(opts) when is_list(opts) do
-    with {:ok, options} <- Options.new(opts),
-         {:ok, invocation} <- resolve_invocation(options) do
-      do_run(invocation, options)
+    case Options.new(opts) do
+      {:ok, options} ->
+        with {:ok, invocation} <- resolve_invocation(options) do
+          do_run(invocation, options)
+        end
+
+      {:error, reason} ->
+        {:error, Error.invalid_options(reason)}
     end
   end
 
@@ -81,7 +86,13 @@ defmodule CliSubprocessCore.Command do
   """
   @spec run(t(), keyword()) :: {:ok, run_result()} | {:error, run_error()}
   def run(%__MODULE__{} = invocation, opts) when is_list(opts) do
-    with {:ok, options} <- Options.new(invocation, opts), do: do_run(invocation, options)
+    case Options.new(invocation, opts) do
+      {:ok, options} ->
+        do_run(invocation, options)
+
+      {:error, reason} ->
+        {:error, Error.invalid_options(reason, %{invocation: invocation})}
+    end
   end
 
   @doc """

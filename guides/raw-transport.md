@@ -1,8 +1,9 @@
 # Raw Transport
 
 `CliSubprocessCore.Transport` is the provider-agnostic subprocess layer below
-the future session engine. It owns process startup, stdin writes, stdout line
-dispatch, realtime stderr dispatch, exit normalization, and shutdown.
+the shared command and session APIs. It owns process startup, stdin writes,
+stdout line dispatch, realtime stderr dispatch, exit normalization, and
+shutdown.
 
 ## Public Modules
 

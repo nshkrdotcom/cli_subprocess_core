@@ -47,6 +47,12 @@ Non-zero exits still return `{:ok, result}`. The normalized
 `result.exit.status` and `result.exit.code` are what provider wrappers should
 map into provider-native public errors.
 
+Invalid command-lane options, provider lookup failures, profile command-plan
+failures, and wrapped transport failures return
+`{:error, %CliSubprocessCore.Command.Error{}}`. Provider wrappers should map
+that structured error instead of rebuilding a second common one-shot error
+contract.
+
 ## Provider-Aware Execution
 
 Use `run/1` when the core should resolve a provider profile and build the
@@ -94,5 +100,6 @@ Provider wrappers should stay thin:
 - call `CliSubprocessCore.Command.run/1` or `run/2`
 - map `%CliSubprocessCore.Transport.RunResult{}` into provider-native public
   result structs
+- map `%CliSubprocessCore.Command.Error{}` into provider-native public errors
 
 They should not keep a second `:exec.run` loop for common CLI flows.

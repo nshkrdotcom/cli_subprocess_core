@@ -84,6 +84,27 @@ defmodule CliSubprocessCore.CommandTest do
     assert error.context == %{provider: :missing_phase_2a_provider}
   end
 
+  test "run/1 wraps invalid command-lane options in Command.Error" do
+    assert {:error, %Error{} = error} =
+             Command.run(
+               profile: CommandRunner,
+               command: System.find_executable("sh") || "/bin/sh",
+               timeout: -1
+             )
+
+    assert error.reason == {:invalid_options, {:invalid_timeout, -1}}
+    assert error.message == "Invalid command options: {:invalid_timeout, -1}"
+  end
+
+  test "run/2 wraps invalid command-lane options in Command.Error with invocation context" do
+    invocation = Command.new("sh", ["-c", "printf ready"])
+
+    assert {:error, %Error{} = error} = Command.run(invocation, timeout: -1)
+
+    assert error.reason == {:invalid_options, {:invalid_timeout, -1}}
+    assert error.context == %{invocation: invocation}
+  end
+
   defp create_test_script(body) do
     dir =
       Path.join(
