@@ -204,8 +204,11 @@ ref = make_ref()
   )
 
 receive do
-  {:cli_subprocess_core_session, ^ref, {:event, event}} ->
-    IO.inspect({event.sequence, event.kind})
+  message ->
+    case CliSubprocessCore.Session.extract_event(message, ref) do
+      {:ok, event} -> IO.inspect({event.sequence, event.kind})
+      :error -> :ignore
+    end
 end
 ```
 

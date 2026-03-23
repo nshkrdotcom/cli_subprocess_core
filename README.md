@@ -103,7 +103,11 @@ ref = make_ref()
 :ok = CliSubprocessCore.Transport.end_input(transport)
 
 receive do
-  {:cli_subprocess_core, ^ref, {:message, "hello"}} -> :ok
+  message ->
+    case CliSubprocessCore.Transport.extract_event(message, ref) do
+      {:ok, {:message, "hello"}} -> :ok
+      _other -> :ignore
+    end
 end
 ```
 
@@ -150,12 +154,20 @@ ref = make_ref()
   )
 
 IO.inspect(info.capabilities)
+IO.inspect(info.delivery)
 
 receive do
-  {:cli_subprocess_core_session, ^ref, {:event, event}} ->
-    IO.inspect({event.sequence, event.kind})
+  message ->
+    case CliSubprocessCore.Session.extract_event(message, ref) do
+      {:ok, event} -> IO.inspect({event.sequence, event.kind})
+      :error -> :ignore
+    end
 end
 ```
+
+The `delivery` metadata returned by the core is the stable contract for direct
+adapter layers. Higher-level wrappers should prefer their own relay envelope or
+the extraction helpers over hard-coding the default core tag.
 
 ## Built-In Profiles
 

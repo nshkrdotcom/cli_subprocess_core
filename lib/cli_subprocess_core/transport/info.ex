@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.Transport.Info do
   """
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.Transport.Delivery
 
   defstruct invocation: nil,
             pid: nil,
@@ -13,7 +14,8 @@ defmodule CliSubprocessCore.Transport.Info do
             stdin_mode: :line,
             pty?: false,
             interrupt_mode: :signal,
-            stderr: ""
+            stderr: "",
+            delivery: nil
 
   @type t :: %__MODULE__{
           invocation: Command.t() | nil,
@@ -24,13 +26,14 @@ defmodule CliSubprocessCore.Transport.Info do
           stdin_mode: :line | :raw,
           pty?: boolean(),
           interrupt_mode: :signal | {:stdin, binary()},
-          stderr: binary()
+          stderr: binary(),
+          delivery: Delivery.t() | nil
         }
 
   @doc """
   Returns the default disconnected transport snapshot.
   """
   def disconnected do
-    %__MODULE__{}
+    %__MODULE__{delivery: Delivery.new(:cli_subprocess_core)}
   end
 end

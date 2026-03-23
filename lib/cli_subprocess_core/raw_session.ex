@@ -10,6 +10,7 @@ defmodule CliSubprocessCore.RawSession do
   """
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport}
+  alias CliSubprocessCore.RawSession.Delivery
   alias CliSubprocessCore.Transport.{Info, RunResult}
 
   @default_event_tag :cli_subprocess_core_raw_session
@@ -65,6 +66,20 @@ defmodule CliSubprocessCore.RawSession do
           interrupt_mode: :signal | {:stdin, binary()},
           pty?: boolean(),
           stdin?: boolean()
+        }
+
+  @type info_t :: %{
+          delivery: Delivery.t(),
+          invocation: Command.t(),
+          receiver: pid(),
+          transport_ref: reference(),
+          event_tag: atom(),
+          stdout_mode: :line | :raw,
+          stdin_mode: :line | :raw,
+          interrupt_mode: :signal | {:stdin, binary()},
+          pty?: boolean(),
+          stdin?: boolean(),
+          transport: term()
         }
 
   @doc """
@@ -205,11 +220,12 @@ defmodule CliSubprocessCore.RawSession do
   @doc """
   Returns the latest raw session metadata snapshot.
   """
-  @spec info(t()) :: map()
+  @spec info(t()) :: info_t()
   def info(%__MODULE__{} = session) do
     transport_info = session.transport_module.info(session.transport)
 
     %{
+      delivery: delivery_info(session),
       invocation: session.invocation,
       receiver: session.receiver,
       transport_ref: session.transport_ref,
@@ -221,6 +237,14 @@ defmodule CliSubprocessCore.RawSession do
       stdin?: session.stdin?,
       transport: transport_info
     }
+  end
+
+  @doc """
+  Returns stable mailbox-delivery metadata for the raw session.
+  """
+  @spec delivery_info(t()) :: Delivery.t()
+  def delivery_info(%__MODULE__{} = session) do
+    Delivery.new(session.receiver, session.transport_ref, session.event_tag)
   end
 
   @doc """
@@ -348,35 +372,37 @@ defmodule CliSubprocessCore.RawSession do
 
   defp do_collect(session, timeout, stdout, stderr) do
     receive do
-      {tag, ref, {:data, chunk}} when tag == session.event_tag and ref == session.transport_ref ->
-        do_collect(session, timeout, [chunk | stdout], stderr)
+      message ->
+        case Transport.extract_event(message, session.transport_ref) do
+          {:ok, {:data, chunk}} ->
+            do_collect(session, timeout, [chunk | stdout], stderr)
 
-      {tag, ref, {:message, line}}
-      when tag == session.event_tag and ref == session.transport_ref ->
-        do_collect(session, timeout, [line | stdout], stderr)
+          {:ok, {:message, line}} ->
+            do_collect(session, timeout, [line | stdout], stderr)
 
-      {tag, ref, {:stderr, chunk}}
-      when tag == session.event_tag and ref == session.transport_ref ->
-        do_collect(session, timeout, stdout, [chunk | stderr])
+          {:ok, {:stderr, chunk}} ->
+            do_collect(session, timeout, stdout, [chunk | stderr])
 
-      {tag, ref, {:error, reason}}
-      when tag == session.event_tag and ref == session.transport_ref ->
-        {:error, {:transport, reason}}
+          {:ok, {:error, reason}} ->
+            {:error, {:transport, reason}}
 
-      {tag, ref, {:exit, %ProcessExit{} = exit}}
-      when tag == session.event_tag and ref == session.transport_ref ->
-        stdout = stdout |> Enum.reverse() |> IO.iodata_to_binary()
-        stderr = stderr |> Enum.reverse() |> IO.iodata_to_binary()
+          {:ok, {:exit, %ProcessExit{} = exit}} ->
+            stdout = stdout |> Enum.reverse() |> IO.iodata_to_binary()
+            stderr = stderr |> Enum.reverse() |> IO.iodata_to_binary()
 
-        {:ok,
-         %RunResult{
-           invocation: session.invocation,
-           output: stdout,
-           stdout: stdout,
-           stderr: stderr,
-           exit: exit,
-           stderr_mode: :separate
-         }}
+            {:ok,
+             %RunResult{
+               invocation: session.invocation,
+               output: stdout,
+               stdout: stdout,
+               stderr: stderr,
+               exit: exit,
+               stderr_mode: :separate
+             }}
+
+          :error ->
+            do_collect(session, timeout, stdout, stderr)
+        end
     after
       timeout_after(timeout) ->
         {:error, {:timeout, session}}

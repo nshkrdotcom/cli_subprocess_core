@@ -71,14 +71,21 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
                event_tag: :custom_transport
              )
 
+    assert Transport.delivery_info(transport).tagged_event_tag == :custom_transport
+
     assert :ok = Transport.send(transport, ["hello"])
     assert :ok = Transport.end_input(transport)
 
-    assert_receive {:custom_transport, ^ref, {:message, "echo:hello"}}, 2_000
-    assert_receive {:custom_transport, ^ref, {:message, "done"}}, 2_000
+    assert_receive message, 2_000
+    assert {:ok, {:message, "echo:hello"}} = Transport.extract_event(message, ref)
 
-    assert_receive {:custom_transport, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
-                   2_000
+    assert_receive message, 2_000
+    assert {:ok, {:message, "done"}} = Transport.extract_event(message, ref)
+
+    assert_receive message, 2_000
+
+    assert {:ok, {:exit, %ProcessExit{status: :success, code: 0}}} =
+             Transport.extract_event(message, ref)
   end
 
   test "raw stdout mode preserves exact bytes and exposes transport metadata" do
@@ -101,6 +108,8 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     assert is_pid(info.pid)
     assert is_integer(info.os_pid)
     assert info.os_pid > 0
+    assert info.delivery.legacy? == true
+    assert info.delivery.tagged_event_tag == :cli_subprocess_core
 
     assert :ok = Transport.send(transport, "alpha")
     assert :ok = Transport.end_input(transport)
@@ -236,6 +245,11 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     assert_receive {:cli_subprocess_core, ^ref,
                     {:exit, %ProcessExit{status: :success, code: 0, stderr: "\nerr-two"}}},
                    2_000
+  end
+
+  test "extract_event unwraps legacy transport tuples" do
+    assert {:ok, {:message, "legacy"}} = Transport.extract_event({:transport_message, "legacy"})
+    assert :error = Transport.extract_event({:unexpected, :message})
   end
 
   test "late subscribers can receive the retained stderr tail from the core" do

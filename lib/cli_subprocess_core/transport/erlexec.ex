@@ -953,7 +953,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       stdin_mode: state.stdin_mode,
       pty?: state.pty?,
       interrupt_mode: state.interrupt_mode,
-      stderr: state.stderr_buffer
+      stderr: state.stderr_buffer,
+      delivery: Transport.Delivery.new(state.event_tag)
     }
   end
 

@@ -27,6 +27,7 @@ defmodule CliSubprocessCore.Transport do
   """
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
+  alias CliSubprocessCore.Transport.Delivery
   alias CliSubprocessCore.Transport.Erlexec
   alias CliSubprocessCore.Transport.Info
   alias CliSubprocessCore.Transport.RunResult
@@ -52,6 +53,14 @@ defmodule CliSubprocessCore.Transport do
           | {event_tag(), reference(), {:error, Error.t()}}
           | {event_tag(), reference(), {:stderr, binary()}}
           | {event_tag(), reference(), {:exit, ProcessExit.t()}}
+
+  @typedoc "Normalized transport event payload extracted from a mailbox message."
+  @type extracted_event ::
+          {:message, binary()}
+          | {:data, binary()}
+          | {:error, Error.t()}
+          | {:stderr, binary()}
+          | {:exit, ProcessExit.t()}
 
   @callback start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   @callback start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
@@ -154,4 +163,49 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec info(t()) :: Info.t()
   def info(transport), do: Erlexec.info(transport)
+
+  @doc """
+  Extracts a normalized transport event from a legacy mailbox message.
+
+  Tagged subscribers should use `extract_event/2` so their code does not depend
+  on a specific outer event tag.
+  """
+  @spec extract_event(term()) :: {:ok, extracted_event()} | :error
+  def extract_event({:transport_message, line}) when is_binary(line), do: {:ok, {:message, line}}
+  def extract_event({:transport_data, chunk}) when is_binary(chunk), do: {:ok, {:data, chunk}}
+  def extract_event({:transport_error, %Error{} = error}), do: {:ok, {:error, error}}
+  def extract_event({:transport_stderr, chunk}) when is_binary(chunk), do: {:ok, {:stderr, chunk}}
+  def extract_event({:transport_exit, %ProcessExit{} = exit}), do: {:ok, {:exit, exit}}
+  def extract_event(_message), do: :error
+
+  @doc """
+  Extracts a normalized transport event for a tagged subscriber reference.
+
+  This is the stable core-owned way for adapters to consume tagged transport
+  delivery without hard-coding the configured outer event atom.
+  """
+  @spec extract_event(term(), reference()) :: {:ok, extracted_event()} | :error
+  def extract_event({event_tag, ref, event}, ref) when is_atom(event_tag) do
+    extract_tagged_event(event)
+  end
+
+  def extract_event(message, _ref), do: extract_event(message)
+
+  @doc """
+  Returns stable mailbox-delivery metadata for the current transport snapshot.
+  """
+  @spec delivery_info(t()) :: Delivery.t()
+  def delivery_info(transport) do
+    case info(transport) do
+      %Info{delivery: %Delivery{} = delivery} -> delivery
+      _other -> Delivery.new(:cli_subprocess_core)
+    end
+  end
+
+  defp extract_tagged_event({:message, line}) when is_binary(line), do: {:ok, {:message, line}}
+  defp extract_tagged_event({:data, chunk}) when is_binary(chunk), do: {:ok, {:data, chunk}}
+  defp extract_tagged_event({:error, %Error{} = error}), do: {:ok, {:error, error}}
+  defp extract_tagged_event({:stderr, chunk}) when is_binary(chunk), do: {:ok, {:stderr, chunk}}
+  defp extract_tagged_event({:exit, %ProcessExit{} = exit}), do: {:ok, {:exit, exit}}
+  defp extract_tagged_event(_event), do: :error
 end

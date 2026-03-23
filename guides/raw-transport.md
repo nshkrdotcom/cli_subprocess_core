@@ -83,6 +83,21 @@ Tagged subscribers receive:
 to preserve their historical mailbox shapes while leaving lifecycle ownership
 in the core.
 
+Direct adapters should consume tagged delivery through
+`CliSubprocessCore.Transport.extract_event/2` rather than hard-coding the
+configured outer tag:
+
+```elixir
+receive do
+  message ->
+    case CliSubprocessCore.Transport.extract_event(message, ref) do
+      {:ok, {:message, line}} -> IO.puts(line)
+      {:ok, {:exit, exit}} -> IO.inspect(exit.code)
+      :error -> :ignore
+    end
+end
+```
+
 Use `:line` mode for newline-framed stdout and `:raw` mode when later provider
 migrations need exact byte chunks.
 
@@ -111,8 +126,14 @@ closure before producing a final result.
 ## Metadata
 
 `info/1` returns `%CliSubprocessCore.Transport.Info{}` with the normalized
-invocation, raw subprocess pid/os pid, current status, stderr tail, and the
-active `stdout_mode`, `stdin_mode`, `pty?`, and `interrupt_mode` contract.
+invocation, raw subprocess pid/os pid, current status, stderr tail, delivery
+metadata, and the active `stdout_mode`, `stdin_mode`, `pty?`, and
+`interrupt_mode` contract.
+
+`info.delivery.tagged_event_tag` exposes the actual tagged mailbox atom for
+direct adapter seams. Outside the core, do not inspect the global `:exec`
+worker or transport process state directly; `info/1` and `extract_event/2` are
+the supported public contract.
 
 ## One-Shot Command Execution
 
@@ -206,6 +227,8 @@ process so the core can drain its own transport events deterministically.
 `RawSession.start/2`, `start/3`, and `start_link/2` do not report success until
 the underlying transport has either connected or returned a startup failure,
 even if the transport itself is configured with `startup_mode: :lazy`.
+`RawSession.info/1` also returns `delivery` metadata with the configured
+receiver, tagged event atom, and transport ref for direct adapter code.
 
 ## Structured Errors
 

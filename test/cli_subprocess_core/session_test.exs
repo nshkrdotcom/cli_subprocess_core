@@ -61,6 +61,10 @@ defmodule CliSubprocessCore.SessionTest do
     assert info.transport.stdin_mode == :line
     assert info.transport.pty? == false
     assert info.transport.interrupt_mode == :signal
+    assert info.delivery.legacy_message == :session_event
+    assert info.delivery.tagged_event_tag == @session_event_tag
+    assert info.delivery.tagged_payload == :event
+    assert info.transport.delivery.tagged_event_tag == :cli_subprocess_core_session_transport
 
     assert :ok = Session.subscribe(session, self(), ref)
     assert :ok = Session.send(session, "hello")
@@ -199,6 +203,41 @@ defmodule CliSubprocessCore.SessionTest do
            end) == ""
 
     refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
+  end
+
+  test "extract_event unwraps tagged session delivery without depending on the outer atom" do
+    ref = make_ref()
+    script = create_test_script(~s|printf '{"type":"result"}\n'|)
+
+    assert {:ok, session, info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "custom tag",
+               command: script,
+               subscriber: {self(), ref},
+               session_event_tag: :custom_runtime_session
+             )
+
+    assert info.delivery.tagged_event_tag == :custom_runtime_session
+    assert Session.delivery_info(session).tagged_event_tag == :custom_runtime_session
+
+    assert_receive message, 2_000
+    assert {:ok, run_started} = Session.extract_event(message, ref)
+    assert run_started.kind == :run_started
+
+    assert_receive message, 2_000
+    assert {:ok, result_event} = Session.extract_event(message, ref)
+    assert result_event.kind == :result
+
+    monitor = Process.monitor(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
+  end
+
+  test "extract_event unwraps legacy session delivery" do
+    event = CliSubprocessCore.Event.new(:run_started)
+
+    assert {:ok, ^event} = Session.extract_event({:session_event, event})
+    assert :error = Session.extract_event({:unexpected, event})
   end
 
   defp assert_fixture_session(provider, profile, fixture_name, prompt, expected_event_count) do

@@ -17,6 +17,9 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert session.pty? == false
     assert is_reference(session.transport_ref)
     assert :connected == RawSession.status(session)
+    assert RawSession.delivery_info(session).receiver == self()
+    assert RawSession.delivery_info(session).transport_ref == session.transport_ref
+    assert RawSession.delivery_info(session).tagged_event_tag == session.event_tag
 
     assert :ok = RawSession.send_input(session, "alpha")
     assert :ok = RawSession.close_input(session)
@@ -39,7 +42,11 @@ defmodule CliSubprocessCore.RawSessionTest do
              )
 
     assert session.pty? == true
-    assert %{transport: %{pty?: true, interrupt_mode: {:stdin, <<3>>}}} = RawSession.info(session)
+
+    assert %{
+             delivery: %{tagged_event_tag: :cli_subprocess_core_raw_session},
+             transport: %{pty?: true, interrupt_mode: {:stdin, <<3>>}}
+           } = RawSession.info(session)
 
     transport = session.transport
     monitor = Process.monitor(transport)

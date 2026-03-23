@@ -13,6 +13,7 @@ defmodule CliSubprocessCore.Session do
     ProviderProfile,
     ProviderRegistry,
     Runtime,
+    Session.Delivery,
     Session.Options,
     Transport.Info
   }
@@ -172,6 +173,40 @@ defmodule CliSubprocessCore.Session do
     GenServer.call(session, :info)
   catch
     :exit, _reason -> %{}
+  end
+
+  @doc """
+  Extracts a normalized session event from a legacy mailbox message.
+
+  Tagged subscribers should use `extract_event/2` so their code does not
+  depend on a specific outer event atom.
+  """
+  @spec extract_event(term()) :: {:ok, Event.t()} | :error
+  def extract_event({:session_event, %Event{} = event}), do: {:ok, event}
+  def extract_event(_message), do: :error
+
+  @doc """
+  Extracts a normalized session event for a tagged subscriber reference.
+
+  This is the stable core-owned way for adapters to consume session delivery
+  without hard-coding the configured outer event atom.
+  """
+  @spec extract_event(term(), reference()) :: {:ok, Event.t()} | :error
+  def extract_event({event_tag, ref, {:event, %Event{} = event}}, ref) when is_atom(event_tag) do
+    {:ok, event}
+  end
+
+  def extract_event(message, _ref), do: extract_event(message)
+
+  @doc """
+  Returns stable mailbox-delivery metadata for the current session.
+  """
+  @spec delivery_info(pid()) :: Delivery.t() | nil
+  def delivery_info(session) when is_pid(session) do
+    case info(session) do
+      %{delivery: %Delivery{} = delivery} -> delivery
+      _other -> nil
+    end
   end
 
   @impl GenServer
@@ -375,6 +410,7 @@ defmodule CliSubprocessCore.Session do
 
     %{
       capabilities: state.profile.capabilities(),
+      delivery: Delivery.new(state.options.session_event_tag),
       invocation: state.invocation,
       metadata: state.options.metadata,
       profile: state.profile,
@@ -517,6 +553,7 @@ defmodule CliSubprocessCore.Session do
 
   defp build_transport_snapshot(module, transport_pid, status, stderr, nil) do
     %{
+      delivery: nil,
       module: module,
       pid: transport_pid,
       status: status,
@@ -526,6 +563,7 @@ defmodule CliSubprocessCore.Session do
 
   defp build_transport_snapshot(module, transport_pid, status, stderr, %Info{} = info) do
     %{
+      delivery: info.delivery,
       module: module,
       pid: transport_pid,
       status: status,

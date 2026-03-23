@@ -38,7 +38,7 @@ Common session-level options:
 - `:metadata`
 - `:registry`
 - `:transport_module`
-- `:session_event_tag`
+- `:session_event_tag` for low-level adapter-controlled tagged delivery
 
 All other options are passed through to the provider profile for command
 construction, parser initialization, and transport overrides. If the selected
@@ -79,7 +79,20 @@ Tagged subscribers receive:
 {:cli_subprocess_core_session, ref, {:event, %CliSubprocessCore.Event{}}}
 ```
 
-You can override the outer event atom with `:session_event_tag`.
+You can override the outer event atom with `:session_event_tag`, but direct
+adapters should consume tagged delivery through
+`CliSubprocessCore.Session.extract_event/2` instead of matching on a specific
+default atom:
+
+```elixir
+receive do
+  message ->
+    case CliSubprocessCore.Session.extract_event(message, ref) do
+      {:ok, event} -> IO.inspect(event.kind)
+      :error -> :ignore
+    end
+end
+```
 
 The session emits a synthetic `:run_started` event first, then provider-parsed
 events in normalized runtime order.
@@ -91,6 +104,11 @@ events in normalized runtime order.
 ```elixir
 %{
   capabilities: [:streaming, :interrupt],
+  delivery: %CliSubprocessCore.Session.Delivery{
+    legacy_message: :session_event,
+    tagged_event_tag: :cli_subprocess_core_session,
+    tagged_payload: :event
+  },
   invocation: %CliSubprocessCore.Command{},
   metadata: %{lane: :core},
   profile: CliSubprocessCore.ProviderProfiles.Claude,
@@ -125,6 +143,11 @@ surfaces the full `%CliSubprocessCore.Transport.Info{}` under `transport.info`
 plus the most commonly consumed subprocess metadata as top-level transport map
 fields.
 
+`session_event_tag` remains in the info map as a direct-adapter compatibility
+alias. `delivery.tagged_event_tag` is the explicit mailbox-delivery contract.
+Higher-level wrappers should set their own tag or relay into their own event
+envelope rather than requiring callers to know the default core tag.
+
 ## Example
 
 ```elixir
@@ -138,8 +161,11 @@ ref = make_ref()
   )
 
 receive do
-  {:cli_subprocess_core_session, ^ref, {:event, event}} ->
-    IO.inspect(event.kind)
+  message ->
+    case CliSubprocessCore.Session.extract_event(message, ref) do
+      {:ok, event} -> IO.inspect(event.kind)
+      :error -> :ignore
+    end
 end
 ```
 
