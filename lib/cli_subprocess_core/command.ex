@@ -11,18 +11,20 @@ defmodule CliSubprocessCore.Command do
   alias CliSubprocessCore.Transport.RunResult
 
   @enforce_keys [:command]
-  defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false
+  defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
 
   @type env_key :: String.t()
   @type env_value :: String.t()
   @type env_map :: %{optional(env_key()) => env_value()}
+  @type user :: String.t() | nil
 
   @type t :: %__MODULE__{
           command: String.t(),
           args: [String.t()],
           cwd: String.t() | nil,
           env: env_map(),
-          clear_env?: boolean()
+          clear_env?: boolean(),
+          user: user()
         }
 
   @type run_result :: RunResult.t()
@@ -31,15 +33,23 @@ defmodule CliSubprocessCore.Command do
   @doc """
   Builds a normalized invocation struct.
   """
-  @spec new(String.t(), [String.t()], keyword()) :: t()
+  @spec new(String.t(), [String.t()] | keyword(), keyword()) :: t()
   def new(command, args \\ [], opts \\ [])
       when is_binary(command) and is_list(args) and is_list(opts) do
+    {args, opts} =
+      if opts == [] and keyword_list?(args) do
+        {[], args}
+      else
+        {args, opts}
+      end
+
     %__MODULE__{
       command: command,
       args: args,
       cwd: Keyword.get(opts, :cwd),
       env: normalize_env(Keyword.get(opts, :env, %{})),
-      clear_env?: Keyword.get(opts, :clear_env?, false)
+      clear_env?: Keyword.get(opts, :clear_env?, false),
+      user: normalize_user(Keyword.get(opts, :user))
     }
   end
 
@@ -127,19 +137,22 @@ defmodule CliSubprocessCore.Command do
           | {:error, {:invalid_cwd, term()}}
           | {:error, {:invalid_env, term()}}
           | {:error, {:invalid_clear_env, term()}}
+          | {:error, {:invalid_user, term()}}
   def validate(%__MODULE__{
         command: command,
         args: args,
         cwd: cwd,
         env: env,
-        clear_env?: clear_env?
+        clear_env?: clear_env?,
+        user: user
       }) do
     validators = [
       fn -> validate_command(command) end,
       fn -> validate_args(args) end,
       fn -> validate_cwd(cwd) end,
       fn -> validate_env(env) end,
-      fn -> validate_clear_env(clear_env?) end
+      fn -> validate_clear_env(clear_env?) end,
+      fn -> validate_user(user) end
     ]
 
     Enum.reduce_while(validators, :ok, fn validator, :ok ->
@@ -246,4 +259,21 @@ defmodule CliSubprocessCore.Command do
   defp validate_env(env), do: {:error, {:invalid_env, env}}
   defp validate_clear_env(value) when is_boolean(value), do: :ok
   defp validate_clear_env(value), do: {:error, {:invalid_clear_env, value}}
+
+  defp keyword_list?([]), do: true
+
+  defp keyword_list?(list) when is_list(list) do
+    Enum.all?(list, fn
+      {key, _value} when is_atom(key) -> true
+      _other -> false
+    end)
+  end
+
+  defp normalize_user(nil), do: nil
+  defp normalize_user(user) when is_binary(user), do: user
+  defp normalize_user(user), do: to_string(user)
+
+  defp validate_user(nil), do: :ok
+  defp validate_user(user) when is_binary(user) and user != "", do: :ok
+  defp validate_user(user), do: {:error, {:invalid_user, user}}
 end

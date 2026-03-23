@@ -10,7 +10,8 @@ defmodule CliSubprocessCore.CommandTest do
       Command.new("codex", ["exec", "--json"],
         cwd: "/tmp/work",
         env: %{"OPENAI_API_KEY" => "redacted"},
-        clear_env?: true
+        clear_env?: true,
+        user: "runner"
       )
 
     assert command.command == "codex"
@@ -18,6 +19,7 @@ defmodule CliSubprocessCore.CommandTest do
     assert command.cwd == "/tmp/work"
     assert command.env == %{"OPENAI_API_KEY" => "redacted"}
     assert command.clear_env? == true
+    assert command.user == "runner"
     assert Command.argv(command) == ["codex", "exec", "--json"]
   end
 
@@ -43,6 +45,16 @@ defmodule CliSubprocessCore.CommandTest do
                cwd: nil,
                env: %{},
                clear_env?: :invalid
+             })
+
+    assert {:error, {:invalid_user, 123}} ==
+             Command.validate(%Command{
+               command: "amp",
+               args: [],
+               cwd: nil,
+               env: %{},
+               clear_env?: false,
+               user: 123
              })
   end
 

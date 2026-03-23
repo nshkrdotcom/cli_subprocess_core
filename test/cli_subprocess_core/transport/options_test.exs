@@ -7,7 +7,8 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
     command =
       Command.new("echo", ["hello"],
         cwd: "/tmp/work",
-        env: %{"TERM" => "xterm-256color"}
+        env: %{"TERM" => "xterm-256color"},
+        user: "runner"
       )
 
     assert {:ok, options} = Options.new(command: command, startup_mode: :lazy)
@@ -16,6 +17,7 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
     assert options.args == ["hello"]
     assert options.cwd == "/tmp/work"
     assert options.env == %{"TERM" => "xterm-256color"}
+    assert options.user == "runner"
     assert options.startup_mode == :lazy
     assert options.event_tag == :cli_subprocess_core
     assert options.task_supervisor == CliSubprocessCore.TaskSupervisor
@@ -39,6 +41,11 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
     assert options.headless_timeout_ms == :infinity
     assert options.max_buffer_size == 8_192
     assert options.max_stderr_buffer_size == 4_096
+  end
+
+  test "rejects invalid user settings" do
+    assert {:error, {:invalid_transport_options, {:invalid_user, 123}}} =
+             Options.new(command: "cat", user: 123)
   end
 
   test "rejects invalid startup and subscriber settings" do

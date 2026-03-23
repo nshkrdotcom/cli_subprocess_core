@@ -50,6 +50,7 @@ defmodule CliSubprocessCore.Command.Options do
           | {:invalid_cwd, term()}
           | {:invalid_env, term()}
           | {:invalid_clear_env, term()}
+          | {:invalid_user, term()}
           | {:invalid_provider, term()}
           | {:invalid_profile, term()}
           | {:provider_profile_mismatch, atom(), atom()}

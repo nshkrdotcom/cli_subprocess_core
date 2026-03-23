@@ -18,6 +18,7 @@ defmodule CliSubprocessCore.Transport.Options do
     args: [],
     cwd: nil,
     env: %{},
+    user: nil,
     subscriber: nil,
     startup_mode: @default_startup_mode,
     task_supervisor: @default_task_supervisor,
@@ -35,6 +36,7 @@ defmodule CliSubprocessCore.Transport.Options do
           args: [String.t()],
           cwd: String.t() | nil,
           env: Command.env_map(),
+          user: Command.user(),
           subscriber: subscriber(),
           startup_mode: :eager | :lazy,
           task_supervisor: pid() | atom(),
@@ -51,6 +53,7 @@ defmodule CliSubprocessCore.Transport.Options do
           | {:invalid_args, term()}
           | {:invalid_cwd, term()}
           | {:invalid_env, term()}
+          | {:invalid_user, term()}
           | {:invalid_subscriber, term()}
           | {:invalid_startup_mode, term()}
           | {:invalid_task_supervisor, term()}
@@ -70,6 +73,7 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_args(normalized.args),
          :ok <- validate_cwd(normalized.cwd),
          :ok <- validate_env(normalized.env),
+         :ok <- validate_user(normalized.user),
          :ok <- validate_subscriber(normalized.subscriber),
          :ok <- validate_startup_mode(normalized.startup_mode),
          :ok <- validate_task_supervisor(normalized.task_supervisor),
@@ -122,6 +126,7 @@ defmodule CliSubprocessCore.Transport.Options do
            args: Keyword.get(opts, :args, command.args),
            cwd: Keyword.get(opts, :cwd, command.cwd),
            env: normalize_env(Keyword.get(opts, :env, command.env)),
+           user: Keyword.get(opts, :user, command.user),
            subscriber: Keyword.get(opts, :subscriber),
            startup_mode: Keyword.get(opts, :startup_mode, @default_startup_mode),
            task_supervisor: Keyword.get(opts, :task_supervisor, @default_task_supervisor),
@@ -141,6 +146,7 @@ defmodule CliSubprocessCore.Transport.Options do
            args: Keyword.get(opts, :args, []),
            cwd: Keyword.get(opts, :cwd),
            env: normalize_env(Keyword.get(opts, :env, %{})),
+           user: Keyword.get(opts, :user),
            subscriber: Keyword.get(opts, :subscriber),
            startup_mode: Keyword.get(opts, :startup_mode, @default_startup_mode),
            task_supervisor: Keyword.get(opts, :task_supervisor, @default_task_supervisor),
@@ -198,6 +204,9 @@ defmodule CliSubprocessCore.Transport.Options do
   end
 
   defp validate_env(env), do: {:error, {:invalid_env, env}}
+  defp validate_user(nil), do: :ok
+  defp validate_user(user) when is_binary(user) and user != "", do: :ok
+  defp validate_user(user), do: {:error, {:invalid_user, user}}
 
   defp validate_subscriber(nil), do: :ok
   defp validate_subscriber(pid) when is_pid(pid), do: :ok

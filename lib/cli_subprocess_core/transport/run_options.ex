@@ -30,6 +30,7 @@ defmodule CliSubprocessCore.Transport.RunOptions do
           | {:invalid_cwd, term()}
           | {:invalid_env, term()}
           | {:invalid_clear_env, term()}
+          | {:invalid_user, term()}
           | {:invalid_timeout, term()}
           | {:invalid_stderr, term()}
           | {:invalid_close_stdin, term()}
