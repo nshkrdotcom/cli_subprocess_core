@@ -168,6 +168,8 @@ end
 The `delivery` metadata returned by the core is the stable contract for direct
 adapter layers. Higher-level wrappers should prefer their own relay envelope or
 the extraction helpers over hard-coding the default core tag.
+Use `CliSubprocessCore.Session.start_link_session/1` when a direct adapter
+needs the initial info snapshot but must keep the session linked to the caller.
 
 ## Built-In Profiles
 

@@ -82,6 +82,27 @@ defmodule CliSubprocessCore.SessionTest do
     refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
   end
 
+  test "start_link_session returns linked startup info through a public API" do
+    script = create_test_script("sleep 60")
+
+    assert {:ok, session, info} =
+             Session.start_link_session(
+               provider: :claude,
+               prompt: "linked start",
+               command: script
+             )
+
+    {:links, links} = Process.info(self(), :links)
+    assert session in links
+    assert info.delivery.tagged_event_tag == @session_event_tag
+    assert info.transport.delivery.tagged_event_tag == :cli_subprocess_core_session_transport
+    assert Session.delivery_info(session).tagged_event_tag == @session_event_tag
+
+    monitor = Process.monitor(session)
+    assert :ok = Session.close(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
+  end
+
   test "interrupt requests propagate through the session and surface a terminal error" do
     ref = make_ref()
 

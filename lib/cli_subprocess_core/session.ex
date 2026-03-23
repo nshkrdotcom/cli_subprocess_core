@@ -18,6 +18,7 @@ defmodule CliSubprocessCore.Session do
     Transport.Info
   }
 
+  @session_start_timeout_ms 5_000
   @transport_event_tag :cli_subprocess_core_session_transport
   @transport_start_timeout_ms 5_000
   @transport_start_poll_ms 10
@@ -63,29 +64,20 @@ defmodule CliSubprocessCore.Session do
   end
 
   @doc """
+  Starts a linked session and returns the pid together with its initial info
+  snapshot.
+  """
+  @spec start_link_session(keyword()) :: {:ok, pid(), map()} | {:error, term()}
+  def start_link_session(opts) when is_list(opts) do
+    with_trap_exit(fn -> start_with_info(:start_link, opts) end)
+  end
+
+  @doc """
   Starts a session and returns the pid together with its initial info snapshot.
   """
   @spec start_session(keyword()) :: {:ok, pid(), map()} | {:error, term()}
   def start_session(opts) when is_list(opts) do
-    Application.ensure_all_started(:cli_subprocess_core)
-
-    ref = make_ref()
-
-    {genserver_opts, init_opts} =
-      Keyword.split(Keyword.put(opts, :starter, {self(), ref}), [:name])
-
-    case GenServer.start(__MODULE__, init_opts, genserver_opts) do
-      {:ok, pid} ->
-        receive do
-          {:cli_subprocess_core_session_started, ^ref, info} -> {:ok, pid, info}
-        after
-          5_000 ->
-            {:error, :session_start_timeout}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    start_with_info(:start, opts)
   end
 
   @doc """
@@ -349,6 +341,47 @@ defmodule CliSubprocessCore.Session do
     :exit, reason -> {:error, reason}
   end
 
+  defp start_with_info(start_fun, opts) when start_fun in [:start, :start_link] do
+    Application.ensure_all_started(:cli_subprocess_core)
+
+    ref = make_ref()
+
+    {genserver_opts, init_opts} =
+      Keyword.split(Keyword.put(opts, :starter, {self(), ref}), [:name])
+
+    case apply(GenServer, start_fun, [__MODULE__, init_opts, genserver_opts]) do
+      {:ok, pid} ->
+        await_started_session(pid, ref)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp await_started_session(pid, ref, timeout_ms \\ @session_start_timeout_ms) do
+    receive do
+      {:cli_subprocess_core_session_started, ^ref, info} ->
+        {:ok, pid, info}
+
+      {:EXIT, ^pid, reason} ->
+        {:error, reason}
+    after
+      timeout_ms ->
+        safe_stop_started_session(pid)
+        {:error, :session_start_timeout}
+    end
+  end
+
+  defp with_trap_exit(fun) when is_function(fun, 0) do
+    previous_trap_exit? = Process.flag(:trap_exit, true)
+
+    try do
+      fun.()
+    after
+      Process.flag(:trap_exit, previous_trap_exit?)
+    end
+  end
+
   defp start_transport(options, profile, invocation) do
     transport_ref = make_ref()
 
@@ -580,6 +613,13 @@ defmodule CliSubprocessCore.Session do
 
   defp safe_close_transport(module, transport) do
     module.close(transport)
+  catch
+    :exit, _reason -> :ok
+  end
+
+  defp safe_stop_started_session(pid) when is_pid(pid) do
+    Process.exit(pid, :normal)
+    :ok
   catch
     :exit, _reason -> :ok
   end

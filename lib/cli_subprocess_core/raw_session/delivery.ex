@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.RawSession.Delivery do
   Stable mailbox-delivery metadata for raw-session consumers.
 
   Raw sessions are a direct adapter surface above the transport. This metadata
-  exposes the configured receiver, subscription ref, and tagged event atom
+  exposes the effective receiver, subscription ref, and tagged event atom
   without requiring callers to infer them from transport internals.
   """
 

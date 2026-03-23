@@ -23,7 +23,10 @@ snapshot back together:
 ```
 
 `start_session/1` does not keep the caller linked to the session after startup.
-Use `start_link/1` when you want plain OTP linked-process semantics.
+Use `start_link/1` when you want plain OTP linked-process semantics. Use
+`start_link_session/1` when you want the same initial info snapshot as
+`start_session/1` while keeping the session linked to the caller without
+depending on the internal startup handshake.
 
 Required startup input is either:
 
@@ -50,6 +53,7 @@ startup to finish before returning.
 `CliSubprocessCore.Session` exposes:
 
 - `start_session/1`
+- `start_link_session/1`
 - `start_link/1`
 - `send/2`
 - `send_input/3`

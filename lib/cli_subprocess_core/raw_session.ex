@@ -11,6 +11,7 @@ defmodule CliSubprocessCore.RawSession do
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport}
   alias CliSubprocessCore.RawSession.Delivery
+  alias CliSubprocessCore.Transport.Delivery, as: TransportDelivery
   alias CliSubprocessCore.Transport.{Info, RunResult}
 
   @default_event_tag :cli_subprocess_core_raw_session
@@ -354,7 +355,7 @@ defmodule CliSubprocessCore.RawSession do
            receiver: receiver,
            transport: transport,
            transport_ref: transport_ref,
-           event_tag: event_tag,
+           event_tag: resolve_delivery_event_tag(transport_info, event_tag),
            transport_module: transport_module,
            stdout_mode: resolve_transport_contract(transport_info, :stdout_mode, stdout_mode),
            stdin_mode: resolve_transport_contract(transport_info, :stdin_mode, stdin_mode),
@@ -469,6 +470,15 @@ defmodule CliSubprocessCore.RawSession do
     do: Map.fetch!(transport_info, key)
 
   defp resolve_transport_contract(%Info{}, _key, fallback), do: fallback
+
+  defp resolve_delivery_event_tag(
+         %Info{delivery: %TransportDelivery{tagged_event_tag: tagged_event_tag}},
+         _fallback
+       )
+       when is_atom(tagged_event_tag),
+       do: tagged_event_tag
+
+  defp resolve_delivery_event_tag(%Info{}, fallback), do: fallback
 
   defp safe_close_transport(module, transport) do
     module.close(transport)
