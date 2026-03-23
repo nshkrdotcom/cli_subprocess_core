@@ -1,6 +1,8 @@
 defmodule CliSubprocessCore.SessionTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
   alias CliSubprocessCore.Session
@@ -182,17 +184,19 @@ defmodule CliSubprocessCore.SessionTest do
     ref = make_ref()
     script = create_test_script("printf 'never-runs\\n'")
 
-    assert {:error,
-            {:transport,
-             %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
-             Session.start_session(
-               provider: :claude,
-               prompt: "missing cwd",
-               command: script,
-               cwd: missing_cwd,
-               startup_mode: :lazy,
-               subscriber: {self(), ref}
-             )
+    assert capture_log(fn ->
+             assert {:error,
+                     {:transport,
+                      %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+                      Session.start_session(
+                        provider: :claude,
+                        prompt: "missing cwd",
+                        command: script,
+                        cwd: missing_cwd,
+                        startup_mode: :lazy,
+                        subscriber: {self(), ref}
+                      )
+           end) == ""
 
     refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
   end

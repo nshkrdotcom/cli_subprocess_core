@@ -1,6 +1,8 @@
 defmodule CliSubprocessCore.RawSessionTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias CliSubprocessCore.RawSession
   alias CliSubprocessCore.Transport.RunResult
 
@@ -55,10 +57,12 @@ defmodule CliSubprocessCore.RawSessionTest do
 
     script = create_test_script("cat")
 
-    assert {:error,
-            {:transport,
-             %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
-             RawSession.start(script, [], startup_mode: :lazy, cwd: missing_cwd)
+    assert capture_log(fn ->
+             assert {:error,
+                     {:transport,
+                      %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+                      RawSession.start(script, [], startup_mode: :lazy, cwd: missing_cwd)
+           end) == ""
   end
 
   defp create_test_script(body) do

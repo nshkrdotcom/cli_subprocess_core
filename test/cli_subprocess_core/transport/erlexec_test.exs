@@ -36,27 +36,21 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
              Erlexec.start(command: "/tmp/definitely_missing")
   end
 
-  test "lazy startup defers subprocess failures until continue" do
+  test "lazy startup returns deterministic preflight failures without booting the transport" do
     missing_cwd =
       Path.join(
         System.tmp_dir!(),
         "cli_subprocess_core_missing_#{System.unique_integer([:positive])}"
       )
 
-    capture_log(fn ->
-      assert {:ok, transport} =
-               Erlexec.start(
-                 command: System.find_executable("cat") || "/bin/cat",
-                 startup_mode: :lazy,
-                 cwd: missing_cwd
-               )
-
-      monitor = Process.monitor(transport)
-
-      assert_receive {:DOWN, ^monitor, :process, ^transport,
-                      %Error{reason: {:cwd_not_found, ^missing_cwd}}},
-                     2_000
-    end)
+    assert capture_log(fn ->
+             assert {:error, {:transport, %Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+                      Erlexec.start(
+                        command: System.find_executable("cat") || "/bin/cat",
+                        startup_mode: :lazy,
+                        cwd: missing_cwd
+                      )
+           end) == ""
   end
 
   test "send and end_input roundtrip with a custom event tag" do

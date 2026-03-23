@@ -156,7 +156,8 @@ stderr fragments are flushed through the callback during process finalization.
 
 - `:eager` starts the subprocess during `init/1`. Startup failures return from
   `start/1` or `start_link/1` immediately.
-- `:lazy` boots the `GenServer` first and starts the subprocess in
+- `:lazy` still performs deterministic startup preflight during
+  `start/1` or `start_link/1` and only defers the actual subprocess launch to
   `handle_continue/2`.
 
 `CliSubprocessCore.RawSession` and `CliSubprocessCore.Session` still wait for

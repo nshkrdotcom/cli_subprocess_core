@@ -72,8 +72,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   def start(opts) when is_list(opts) do
     case Options.new(opts) do
       {:ok, options} ->
-        case GenServer.start(__MODULE__, options) do
-          {:ok, pid} -> {:ok, pid}
+        with :ok <- maybe_preflight_startup(options),
+             {:ok, pid} <- GenServer.start(__MODULE__, options) do
+          {:ok, pid}
+        else
+          {:error, %Error{} = error} -> transport_error(error)
           {:error, reason} -> transport_error(reason)
         end
 
@@ -89,8 +92,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   def start_link(opts) when is_list(opts) do
     case Options.new(opts) do
       {:ok, options} ->
-        case GenServer.start_link(__MODULE__, options) do
-          {:ok, pid} -> {:ok, pid}
+        with :ok <- maybe_preflight_startup(options),
+             {:ok, pid} <- GenServer.start_link(__MODULE__, options) do
+          {:ok, pid}
+        else
+          {:error, %Error{} = error} -> transport_error(error)
           {:error, reason} -> transport_error(reason)
         end
 
@@ -506,10 +512,13 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   defp normalize_call_result(other),
     do: transport_error(Error.transport_error({:unexpected_task_result, other}))
 
+  defp maybe_preflight_startup(%Options{startup_mode: :lazy} = options),
+    do: preflight_startup(options)
+
+  defp maybe_preflight_startup(%Options{}), do: :ok
+
   defp start_subprocess(state, %Options{} = options) do
-    with :ok <- validate_cwd_exists(options.cwd),
-         :ok <- validate_command_exists(options.command),
-         :ok <- ensure_erlexec_started(),
+    with :ok <- preflight_startup(options),
          exec_opts <-
            build_exec_opts(
              options.cwd,
@@ -523,6 +532,13 @@ defmodule CliSubprocessCore.Transport.Erlexec do
          {:ok, state} <-
            add_bootstrap_subscriber(connected_state(state, pid, os_pid), options.subscriber) do
       {:ok, maybe_schedule_headless_timer(%{state | startup_options: nil})}
+    end
+  end
+
+  defp preflight_startup(%Options{} = options) do
+    with :ok <- validate_cwd_exists(options.cwd),
+         :ok <- validate_command_exists(options.command) do
+      ensure_erlexec_started()
     end
   end
 

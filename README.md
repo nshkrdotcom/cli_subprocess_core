@@ -67,7 +67,8 @@ The library is designed for two consumers:
 - `CliSubprocessCore.Transport` is the only public layer that exposes lazy
   startup directly. `CliSubprocessCore.RawSession` and
   `CliSubprocessCore.Session` wait for subprocess startup to either succeed or
-  fail before returning.
+  fail before returning. Deterministic startup validation still happens before
+  a lazy transport pid is returned.
 - `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
   `CliSubprocessCore.ProcessExit`, and `CliSubprocessCore.TaskSupport` support
   the transport and session layers.
