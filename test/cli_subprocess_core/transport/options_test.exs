@@ -33,7 +33,8 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
                event_tag: :custom_transport,
                headless_timeout_ms: :infinity,
                max_buffer_size: 8_192,
-               max_stderr_buffer_size: 4_096
+               max_stderr_buffer_size: 4_096,
+               replay_stderr_on_subscribe?: true
              )
 
     assert options.subscriber == {self(), ref}
@@ -41,6 +42,7 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
     assert options.headless_timeout_ms == :infinity
     assert options.max_buffer_size == 8_192
     assert options.max_stderr_buffer_size == 4_096
+    assert options.replay_stderr_on_subscribe? == true
   end
 
   test "accepts raw PTY lifecycle settings" do
@@ -81,6 +83,10 @@ defmodule CliSubprocessCore.Transport.OptionsTest do
 
     assert {:error, {:invalid_transport_options, {:invalid_subscriber, :bad}}} =
              Options.new(command: "cat", subscriber: :bad)
+
+    assert {:error,
+            {:invalid_transport_options, {:invalid_replay_stderr_on_subscribe, :sometimes}}} =
+             Options.new(command: "cat", replay_stderr_on_subscribe?: :sometimes)
   end
 
   test "rejects invalid raw lifecycle settings" do

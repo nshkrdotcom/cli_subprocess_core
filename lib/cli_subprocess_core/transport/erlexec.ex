@@ -60,6 +60,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
             pty?: false,
             interrupt_mode: @default_interrupt_mode,
             stderr_callback: nil,
+            replay_stderr_on_subscribe?: false,
             startup_options: nil
 
   @type subscriber_info :: %{
@@ -172,8 +173,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   @impl Transport
   def force_close(transport) when is_pid(transport) do
     case safe_call(transport, :force_close, @default_force_close_timeout_ms) do
-      {:ok, :ok} ->
-        :ok
+      {:ok, result} ->
+        normalize_call_result(result)
 
       {:error, reason} ->
         transport_error(reason)
@@ -183,8 +184,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   @impl Transport
   def interrupt(transport) when is_pid(transport) do
     case safe_call(transport, :interrupt) do
-      {:ok, :ok} ->
-        :ok
+      {:ok, result} ->
+        normalize_call_result(result)
 
       {:error, reason} ->
         transport_error(reason)
@@ -253,7 +254,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   @impl GenServer
   def handle_call({:subscribe, pid, tag}, _from, state) do
-    {:reply, :ok, put_subscriber(state, pid, tag)}
+    state =
+      state
+      |> put_subscriber(pid, tag)
+      |> maybe_replay_stderr_to_subscriber(pid)
+
+    {:reply, :ok, state}
   end
 
   def handle_call({:unsubscribe, pid}, _from, state) do
@@ -318,16 +324,14 @@ defmodule CliSubprocessCore.Transport.Erlexec do
         {:stdout, os_pid, chunk},
         %{subprocess: {_pid, os_pid}, stdout_mode: :raw} = state
       ) do
-    data = IO.iodata_to_binary(chunk)
-    send_event(state.subscribers, {:data, data}, state.event_tag)
-    {:noreply, state}
+    {:noreply, append_stdout_chunk(state, IO.iodata_to_binary(chunk))}
   end
 
   @impl GenServer
   def handle_info({:stdout, os_pid, chunk}, %{subprocess: {_pid, os_pid}} = state) do
     state =
       state
-      |> append_stdout_data(IO.iodata_to_binary(chunk))
+      |> append_stdout_chunk(IO.iodata_to_binary(chunk))
       |> drain_stdout_lines(@default_max_lines_per_batch)
       |> maybe_schedule_drain()
 
@@ -335,14 +339,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   end
 
   def handle_info({:stderr, os_pid, chunk}, %{subprocess: {_pid, os_pid}} = state) do
-    data = IO.iodata_to_binary(chunk)
-    stderr_buffer = append_stderr_data(state.stderr_buffer, data, state.max_stderr_buffer_size)
-    {stderr_lines, stderr_framer} = LineFraming.push(state.stderr_framer, data)
-
-    dispatch_stderr_callback(state.stderr_callback, stderr_lines)
-    send_event(state.subscribers, {:stderr, data}, state.event_tag)
-
-    {:noreply, %{state | stderr_buffer: stderr_buffer, stderr_framer: stderr_framer}}
+    {:noreply, append_stderr_chunk(state, IO.iodata_to_binary(chunk))}
   end
 
   def handle_info({ref, result}, %{pending_calls: pending_calls} = state)
@@ -376,6 +373,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       state
       |> Map.put(:finalize_timer_ref, nil)
       |> Map.put(:drain_scheduled?, false)
+      |> flush_exit_mailbox(pid, os_pid)
       |> drain_stdout_lines(@default_max_lines_per_batch)
 
     if :queue.is_empty(state.pending_lines) do
@@ -458,6 +456,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       pty?: options.pty?,
       interrupt_mode: options.interrupt_mode,
       stderr_callback: options.stderr_callback,
+      replay_stderr_on_subscribe?: options.replay_stderr_on_subscribe?,
       startup_options: options
     }
   end
@@ -945,11 +944,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   defp add_bootstrap_subscriber(state, nil), do: {:ok, state}
 
   defp add_bootstrap_subscriber(state, pid) when is_pid(pid),
-    do: {:ok, put_subscriber(state, pid, :legacy)}
+    do: {:ok, state |> put_subscriber(pid, :legacy) |> maybe_replay_stderr_to_subscriber(pid)}
 
   defp add_bootstrap_subscriber(state, {pid, tag})
        when is_pid(pid) and (tag == :legacy or is_reference(tag)) do
-    {:ok, put_subscriber(state, pid, tag)}
+    {:ok, state |> put_subscriber(pid, tag) |> maybe_replay_stderr_to_subscriber(pid)}
   end
 
   defp add_bootstrap_subscriber(_state, subscriber) do
@@ -984,6 +983,23 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
+  defp maybe_replay_stderr_to_subscriber(
+         %{replay_stderr_on_subscribe?: true, stderr_buffer: stderr_buffer} = state,
+         pid
+       )
+       when is_pid(pid) and is_binary(stderr_buffer) and stderr_buffer != "" do
+    case Map.fetch(state.subscribers, pid) do
+      {:ok, subscriber_info} ->
+        dispatch_event(pid, subscriber_info, {:stderr, stderr_buffer}, state.event_tag)
+        state
+
+      :error ->
+        state
+    end
+  end
+
+  defp maybe_replay_stderr_to_subscriber(state, _pid), do: state
+
   defp handle_subscriber_down(ref, pid, state) do
     subscribers =
       case Map.pop(state.subscribers, pid) do
@@ -993,6 +1009,26 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
     %{state | subscribers: subscribers}
     |> maybe_schedule_headless_timer()
+  end
+
+  defp flush_exit_mailbox(state, pid, os_pid) do
+    receive do
+      {:stdout, ^os_pid, chunk} ->
+        state
+        |> append_stdout_chunk(IO.iodata_to_binary(chunk))
+        |> flush_exit_mailbox(pid, os_pid)
+
+      {:stderr, ^os_pid, chunk} ->
+        state
+        |> append_stderr_chunk(IO.iodata_to_binary(chunk))
+        |> flush_exit_mailbox(pid, os_pid)
+
+      {:DOWN, ^os_pid, :process, ^pid, _reason} ->
+        flush_exit_mailbox(state, pid, os_pid)
+    after
+      0 ->
+        state
+    end
   end
 
   defp maybe_schedule_headless_timer(%{headless_timer_ref: ref} = state) when not is_nil(ref),
@@ -1034,6 +1070,25 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp start_io_task(state, fun) when is_function(fun, 0) do
     TaskSupport.async_nolink(state.task_supervisor, fun)
+  end
+
+  defp append_stdout_chunk(%{stdout_mode: :raw} = state, data) when is_binary(data) do
+    send_event(state.subscribers, {:data, data}, state.event_tag)
+    state
+  end
+
+  defp append_stdout_chunk(state, data) when is_binary(data) do
+    append_stdout_data(state, data)
+  end
+
+  defp append_stderr_chunk(state, data) when is_binary(data) do
+    stderr_buffer = append_stderr_data(state.stderr_buffer, data, state.max_stderr_buffer_size)
+    {stderr_lines, stderr_framer} = LineFraming.push(state.stderr_framer, data)
+
+    dispatch_stderr_callback(state.stderr_callback, stderr_lines)
+    send_event(state.subscribers, {:stderr, data}, state.event_tag)
+
+    %{state | stderr_buffer: stderr_buffer, stderr_framer: stderr_framer}
   end
 
   defp send_payload(pid, message, stdin_mode) do

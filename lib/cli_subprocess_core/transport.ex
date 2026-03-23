@@ -20,6 +20,10 @@ defmodule CliSubprocessCore.Transport do
   - `{event_tag, ref, {:error, %CliSubprocessCore.Transport.Error{}}}`
   - `{event_tag, ref, {:stderr, chunk}}`
   - `{event_tag, ref, {:exit, %CliSubprocessCore.ProcessExit{}}}`
+
+  When `:replay_stderr_on_subscribe?` is enabled at startup, newly attached
+  subscribers also receive the retained stderr tail immediately after
+  subscription.
   """
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}

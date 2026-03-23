@@ -58,6 +58,8 @@ Supported options are normalized by `CliSubprocessCore.Transport.Options`:
 - `:max_buffer_size` – stdout partial-line limit, default `1_048_576`
 - `:max_stderr_buffer_size` – stderr ring-buffer limit, default `262_144`
 - `:stderr_callback` – optional per-line callback for stderr
+- `:replay_stderr_on_subscribe?` – replays the retained stderr tail to newly
+  attached subscribers, default `false`
 
 ## Event Model
 
@@ -144,6 +146,8 @@ stderr is handled in two ways at once:
 
 - raw stderr chunks are dispatched to subscribers immediately
 - the transport keeps a tail ring buffer retrievable via `stderr/1`
+- when `:replay_stderr_on_subscribe?` is enabled, late subscribers receive the
+  currently retained stderr tail immediately after they subscribe
 
 Optional `:stderr_callback` receives complete stderr lines. Partial trailing
 stderr fragments are flushed through the callback during process finalization.

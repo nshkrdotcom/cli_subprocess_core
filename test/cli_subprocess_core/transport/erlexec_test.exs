@@ -244,6 +244,51 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
                    2_000
   end
 
+  test "late subscribers can receive the retained stderr tail from the core" do
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      printf 'late stderr' >&2
+      sleep 0.1
+      """)
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               replay_stderr_on_subscribe?: true
+             )
+
+    Process.sleep(20)
+
+    assert :ok = Transport.subscribe(transport, self(), ref)
+
+    assert_receive {:cli_subprocess_core, ^ref, {:stderr, "late stderr"}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref,
+                    {:exit, %ProcessExit{status: :success, code: 0, stderr: "late stderr"}}},
+                   2_000
+  end
+
+  test "fast-exit stderr is retained for late subscribers" do
+    ref = make_ref()
+    script = create_test_script("printf 'fast stderr' >&2")
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               replay_stderr_on_subscribe?: true
+             )
+
+    assert :ok = Transport.subscribe(transport, self(), ref)
+
+    assert_receive {:cli_subprocess_core, ^ref, {:stderr, "fast stderr"}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref,
+                    {:exit, %ProcessExit{status: :success, code: 0, stderr: "fast stderr"}}},
+                   2_000
+  end
+
   test "oversized stdout emits a structured overflow error and recovers at the next newline" do
     ref = make_ref()
 

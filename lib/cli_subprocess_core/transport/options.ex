@@ -33,7 +33,8 @@ defmodule CliSubprocessCore.Transport.Options do
     headless_timeout_ms: @default_headless_timeout_ms,
     max_buffer_size: @default_max_buffer_size,
     max_stderr_buffer_size: @default_max_stderr_buffer_size,
-    stderr_callback: nil
+    stderr_callback: nil,
+    replay_stderr_on_subscribe?: false
   ]
 
   @type subscriber :: pid() | {pid(), Transport.subscription_tag()} | nil
@@ -56,7 +57,8 @@ defmodule CliSubprocessCore.Transport.Options do
           headless_timeout_ms: pos_integer() | :infinity,
           max_buffer_size: pos_integer(),
           max_stderr_buffer_size: pos_integer(),
-          stderr_callback: (binary() -> any()) | nil
+          stderr_callback: (binary() -> any()) | nil,
+          replay_stderr_on_subscribe?: boolean()
         }
 
   @type validation_error ::
@@ -79,6 +81,7 @@ defmodule CliSubprocessCore.Transport.Options do
           | {:invalid_max_buffer_size, term()}
           | {:invalid_max_stderr_buffer_size, term()}
           | {:invalid_stderr_callback, term()}
+          | {:invalid_replay_stderr_on_subscribe, term()}
 
   @doc """
   Builds a validated transport options struct.
@@ -103,7 +106,8 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_headless_timeout_ms(normalized.headless_timeout_ms),
          :ok <- validate_max_buffer_size(normalized.max_buffer_size),
          :ok <- validate_max_stderr_buffer_size(normalized.max_stderr_buffer_size),
-         :ok <- validate_stderr_callback(normalized.stderr_callback) do
+         :ok <- validate_stderr_callback(normalized.stderr_callback),
+         :ok <- validate_replay_stderr_on_subscribe(normalized.replay_stderr_on_subscribe?) do
       {:ok, struct!(__MODULE__, normalized)}
     else
       {:error, reason} -> {:error, {:invalid_transport_options, reason}}
@@ -170,7 +174,8 @@ defmodule CliSubprocessCore.Transport.Options do
            max_buffer_size: Keyword.get(opts, :max_buffer_size, @default_max_buffer_size),
            max_stderr_buffer_size:
              Keyword.get(opts, :max_stderr_buffer_size, @default_max_stderr_buffer_size),
-           stderr_callback: Keyword.get(opts, :stderr_callback)
+           stderr_callback: Keyword.get(opts, :stderr_callback),
+           replay_stderr_on_subscribe?: Keyword.get(opts, :replay_stderr_on_subscribe?, false)
          }}
 
       command ->
@@ -202,7 +207,8 @@ defmodule CliSubprocessCore.Transport.Options do
            max_buffer_size: Keyword.get(opts, :max_buffer_size, @default_max_buffer_size),
            max_stderr_buffer_size:
              Keyword.get(opts, :max_stderr_buffer_size, @default_max_stderr_buffer_size),
-           stderr_callback: Keyword.get(opts, :stderr_callback)
+           stderr_callback: Keyword.get(opts, :stderr_callback),
+           replay_stderr_on_subscribe?: Keyword.get(opts, :replay_stderr_on_subscribe?, false)
          }}
     end
   end
@@ -314,6 +320,11 @@ defmodule CliSubprocessCore.Transport.Options do
   defp validate_stderr_callback(nil), do: :ok
   defp validate_stderr_callback(callback) when is_function(callback, 1), do: :ok
   defp validate_stderr_callback(callback), do: {:error, {:invalid_stderr_callback, callback}}
+
+  defp validate_replay_stderr_on_subscribe(value) when is_boolean(value), do: :ok
+
+  defp validate_replay_stderr_on_subscribe(value),
+    do: {:error, {:invalid_replay_stderr_on_subscribe, value}}
 
   defp default_interrupt_mode(true), do: {:stdin, <<3>>}
   defp default_interrupt_mode(_pty?), do: :signal
