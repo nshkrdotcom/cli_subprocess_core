@@ -86,6 +86,7 @@ defmodule CliSubprocessCore.ProviderProfile do
           | {:error, {:invalid_args, term()}}
           | {:error, {:invalid_cwd, term()}}
           | {:error, {:invalid_env, term()}}
+          | {:error, {:invalid_clear_env, term()}}
   def validate_invocation(%Command{} = invocation) do
     Command.validate(invocation)
   end

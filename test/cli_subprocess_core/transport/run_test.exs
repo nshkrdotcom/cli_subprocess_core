@@ -81,6 +81,39 @@ defmodule CliSubprocessCore.Transport.RunTest do
     assert wait_until(fn -> not os_process_alive?(os_pid) end, 2_500) == :ok
   end
 
+  test "run/2 can clear inherited environment while keeping explicit overrides" do
+    env_key = "CLI_SUBPROCESS_CORE_PHASE2A_ENV"
+    previous = System.get_env(env_key)
+    System.put_env(env_key, "present")
+
+    on_exit(fn ->
+      case previous do
+        nil -> System.delete_env(env_key)
+        value -> System.put_env(env_key, value)
+      end
+    end)
+
+    script =
+      create_test_script("""
+      if [ -n "${#{env_key}:-}" ]; then
+        printf 'present'
+      else
+        printf 'missing'
+      fi
+      """)
+
+    assert {:ok, %RunResult{} = result} =
+             Transport.run(
+               Command.new(script,
+                 env: %{"PATH" => System.get_env("PATH") || ""},
+                 clear_env?: true
+               )
+             )
+
+    assert result.stdout == "missing"
+    assert RunResult.success?(result)
+  end
+
   defp wait_until(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
     do_wait_until(fun, deadline)

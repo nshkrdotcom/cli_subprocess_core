@@ -11,7 +11,7 @@ defmodule CliSubprocessCore.Command do
   alias CliSubprocessCore.Transport.RunResult
 
   @enforce_keys [:command]
-  defstruct command: nil, args: [], cwd: nil, env: %{}
+  defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false
 
   @type env_key :: String.t()
   @type env_value :: String.t()
@@ -21,7 +21,8 @@ defmodule CliSubprocessCore.Command do
           command: String.t(),
           args: [String.t()],
           cwd: String.t() | nil,
-          env: env_map()
+          env: env_map(),
+          clear_env?: boolean()
         }
 
   @type run_result :: RunResult.t()
@@ -37,7 +38,8 @@ defmodule CliSubprocessCore.Command do
       command: command,
       args: args,
       cwd: Keyword.get(opts, :cwd),
-      env: normalize_env(Keyword.get(opts, :env, %{}))
+      env: normalize_env(Keyword.get(opts, :env, %{})),
+      clear_env?: Keyword.get(opts, :clear_env?, false)
     }
   end
 
@@ -124,12 +126,20 @@ defmodule CliSubprocessCore.Command do
           | {:error, {:invalid_args, term()}}
           | {:error, {:invalid_cwd, term()}}
           | {:error, {:invalid_env, term()}}
-  def validate(%__MODULE__{command: command, args: args, cwd: cwd, env: env}) do
+          | {:error, {:invalid_clear_env, term()}}
+  def validate(%__MODULE__{
+        command: command,
+        args: args,
+        cwd: cwd,
+        env: env,
+        clear_env?: clear_env?
+      }) do
     validators = [
       fn -> validate_command(command) end,
       fn -> validate_args(args) end,
       fn -> validate_cwd(cwd) end,
-      fn -> validate_env(env) end
+      fn -> validate_env(env) end,
+      fn -> validate_clear_env(clear_env?) end
     ]
 
     Enum.reduce_while(validators, :ok, fn validator, :ok ->
@@ -234,4 +244,6 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp validate_env(env), do: {:error, {:invalid_env, env}}
+  defp validate_clear_env(value) when is_boolean(value), do: :ok
+  defp validate_clear_env(value), do: {:error, {:invalid_clear_env, value}}
 end

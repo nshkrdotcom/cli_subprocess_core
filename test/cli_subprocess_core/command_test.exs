@@ -9,13 +9,15 @@ defmodule CliSubprocessCore.CommandTest do
     command =
       Command.new("codex", ["exec", "--json"],
         cwd: "/tmp/work",
-        env: %{"OPENAI_API_KEY" => "redacted"}
+        env: %{"OPENAI_API_KEY" => "redacted"},
+        clear_env?: true
       )
 
     assert command.command == "codex"
     assert command.args == ["exec", "--json"]
     assert command.cwd == "/tmp/work"
     assert command.env == %{"OPENAI_API_KEY" => "redacted"}
+    assert command.clear_env? == true
     assert Command.argv(command) == ["codex", "exec", "--json"]
   end
 
@@ -33,6 +35,15 @@ defmodule CliSubprocessCore.CommandTest do
 
     assert {:error, {:invalid_env, [bad: "env"]}} ==
              Command.validate(%Command{command: "amp", args: [], cwd: nil, env: [bad: "env"]})
+
+    assert {:error, {:invalid_clear_env, :invalid}} ==
+             Command.validate(%Command{
+               command: "amp",
+               args: [],
+               cwd: nil,
+               env: %{},
+               clear_env?: :invalid
+             })
   end
 
   test "merges environment data immutably" do

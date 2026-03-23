@@ -98,7 +98,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
          :ok <- validate_cwd_exists(options.command.cwd),
          :ok <- validate_command_exists(options.command.command),
          :ok <- ensure_erlexec_started(),
-         exec_opts <- build_exec_opts(options.command.cwd, options.command.env),
+         exec_opts <-
+           build_exec_opts(
+             options.command.cwd,
+             options.command.env,
+             options.command.clear_env?
+           ),
          argv <- normalize_command_argv(options.command.command, options.command.args),
          {:ok, pid, os_pid} <- exec_run(options.command.command, argv, exec_opts) do
       run_started_exec(pid, os_pid, options)
@@ -575,10 +580,10 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
-  defp build_exec_opts(cwd, env) do
+  defp build_exec_opts(cwd, env, clear_env? \\ false) do
     []
     |> maybe_put_cwd(cwd)
-    |> maybe_put_env(env)
+    |> maybe_put_env(env, clear_env?)
     # Put each subprocess in its own process group so control signals and
     # force-close behavior reach shell wrappers and their active children.
     |> Kernel.++([{:group, 0}, :kill_group, :stdin, :stdout, :stderr, :monitor])
@@ -587,11 +592,19 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   defp maybe_put_cwd(opts, nil), do: opts
   defp maybe_put_cwd(opts, cwd), do: [{:cd, to_charlist(cwd)} | opts]
 
-  defp maybe_put_env(opts, env) when map_size(env) == 0, do: opts
+  defp maybe_put_env(opts, env, false) when map_size(env) == 0, do: opts
 
-  defp maybe_put_env(opts, env) do
-    [{:env, Enum.map(env, fn {key, value} -> {key, value} end)} | opts]
+  defp maybe_put_env(opts, env, clear_env?) do
+    env =
+      env
+      |> Enum.map(fn {key, value} -> {key, value} end)
+      |> maybe_clear_env(clear_env?)
+
+    [{:env, env} | opts]
   end
+
+  defp maybe_clear_env(env, true), do: [:clear | env]
+  defp maybe_clear_env(env, false), do: env
 
   defp normalize_command_argv(command, args) when is_binary(command) and is_list(args) do
     [command | args] |> Enum.map(&to_charlist/1)
