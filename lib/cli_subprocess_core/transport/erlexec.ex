@@ -381,7 +381,13 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     if :queue.is_empty(state.pending_lines) do
       state = flush_stdout_fragment(state)
       state = flush_stderr_fragment(state)
-      send_event(state.subscribers, {:exit, ProcessExit.from_reason(reason)}, state.event_tag)
+
+      send_event(
+        state.subscribers,
+        {:exit, ProcessExit.from_reason(reason, stderr: state.stderr_buffer)},
+        state.event_tag
+      )
+
       {:stop, :normal, %{state | status: :disconnected, subprocess: nil}}
     else
       Kernel.send(self(), {:finalize_exit, os_pid, pid, reason})
@@ -797,7 +803,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     {stdout, stderr, output} =
       flush_run_messages(pid, os_pid, options.stderr, stdout, stderr, output)
 
-    exit = ProcessExit.from_reason(reason)
+    exit = ProcessExit.from_reason(reason, stderr: chunks_to_binary(stderr))
     {:ok, build_run_result(options.command, options.stderr, stdout, stderr, output, exit)}
   end
 

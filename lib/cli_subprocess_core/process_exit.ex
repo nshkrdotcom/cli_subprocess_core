@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.ProcessExit do
   Normalized process exit information shared by the runtime and provider profiles.
   """
 
-  defstruct status: :error, code: nil, signal: nil, reason: nil
+  defstruct status: :error, code: nil, signal: nil, reason: nil, stderr: nil
 
   @type status :: :success | :exit | :signal | :error
 
@@ -11,7 +11,8 @@ defmodule CliSubprocessCore.ProcessExit do
           status: status(),
           code: non_neg_integer() | nil,
           signal: atom() | integer() | nil,
-          reason: term()
+          reason: term(),
+          stderr: binary() | nil
         }
 
   @doc """
@@ -20,11 +21,12 @@ defmodule CliSubprocessCore.ProcessExit do
   This includes integer exit statuses reported by `erlexec`, including the
   shifted raw values some platforms report as `code * 256`.
   """
-  @spec from_reason(term()) :: t()
-  def from_reason(reason) do
+  @spec from_reason(term(), keyword()) :: t()
+  def from_reason(reason, opts \\ []) do
     reason
     |> unwrap_shutdown()
     |> normalize_exit()
+    |> put_stderr(Keyword.get(opts, :stderr))
   end
 
   @doc """
@@ -68,4 +70,7 @@ defmodule CliSubprocessCore.ProcessExit do
 
   defp exit_with_code(reason, 0), do: %__MODULE__{status: :success, code: 0, reason: reason}
   defp exit_with_code(reason, code), do: %__MODULE__{status: :exit, code: code, reason: reason}
+
+  defp put_stderr(%__MODULE__{} = exit, nil), do: exit
+  defp put_stderr(%__MODULE__{} = exit, stderr), do: %__MODULE__{exit | stderr: stderr}
 end

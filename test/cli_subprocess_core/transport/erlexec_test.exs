@@ -239,7 +239,8 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     assert_receive {:cli_subprocess_core, ^ref, {:message, "out"}}, 2_000
     assert_receive {:stderr_line, "err-two"}, 2_000
 
-    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+    assert_receive {:cli_subprocess_core, ^ref,
+                    {:exit, %ProcessExit{status: :success, code: 0, stderr: "\nerr-two"}}},
                    2_000
   end
 
