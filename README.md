@@ -18,13 +18,16 @@
 
 `CliSubprocessCore` is the shared runtime foundation for first-party CLI
 providers. It owns the raw subprocess transport, the normalized session/event
-model above that transport, and the built-in provider profiles that turn
-provider-specific JSONL streams into a stable core vocabulary.
+model above that transport, the shared non-PTY command lane, and the built-in
+provider profiles that turn provider-specific JSONL streams into a stable core
+vocabulary.
 
 The library is designed for two consumers:
 
 - callers that only need process ownership and mailbox delivery through
   `CliSubprocessCore.Transport`
+- callers that need provider-aware one-shot command execution through
+  `CliSubprocessCore.Command.run/1` or `run/2`
 - callers that want provider resolution, command construction, parsing, event
   sequencing, and normalized payloads through `CliSubprocessCore.Session`
 
@@ -42,13 +45,15 @@ The library is designed for two consumers:
 
 - `CliSubprocessCore.Event` and `CliSubprocessCore.Payload.*` define the shared
   runtime event vocabulary.
+- `CliSubprocessCore.Command` owns normalized invocations and the provider-aware
+  one-shot command boundary for common non-PTY CLI flows.
 - `CliSubprocessCore.ProviderProfile` and `CliSubprocessCore.ProviderRegistry`
   define and manage provider profile modules.
 - `CliSubprocessCore.ProviderProfiles.*` ships first-party profiles for Claude,
   Codex, Gemini, and Amp.
 - `CliSubprocessCore.Transport` and
   `CliSubprocessCore.Transport.Erlexec` own subprocess lifecycle, stdout/stderr
-  dispatch, interrupt, close, and force-close behavior.
+  dispatch, synchronous `run/2`, interrupt, close, and force-close behavior.
 - `CliSubprocessCore.Session` adds provider-aware parsing, sequencing, and
   subscriber fan-out on top of the raw transport.
 - `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
@@ -84,6 +89,21 @@ ref = make_ref()
 receive do
   {:cli_subprocess_core, ^ref, {:message, "hello"}} -> :ok
 end
+```
+
+Use the command lane when you need one-shot non-PTY execution:
+
+```elixir
+invocation =
+  CliSubprocessCore.Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
+
+{:ok, result} =
+  CliSubprocessCore.Command.run(invocation,
+    stderr: :stdout,
+    timeout: 5_000
+  )
+
+IO.inspect({result.output, result.exit.code})
 ```
 
 Use the session layer when you want provider command building and normalized
@@ -134,6 +154,7 @@ Ad hoc profiles can also be registered at runtime with
 - `guides/provider-profile-contract.md`
 - `guides/custom-provider-profiles.md`
 - `guides/built-in-provider-profiles.md`
+- `guides/command-api.md`
 - `guides/raw-transport.md`
 - `guides/session-api.md`
 - `guides/testing-and-conformance.md`
@@ -153,6 +174,7 @@ The repo-local quality gate is:
 
 ```bash
 mix format --check-formatted
+mix compile --warnings-as-errors
 mix test
 mix credo --strict
 mix dialyzer

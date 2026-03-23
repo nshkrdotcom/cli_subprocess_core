@@ -1,7 +1,9 @@
 defmodule CliSubprocessCore.CommandTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.Command.Error
+  alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
 
   test "builds normalized invocations" do
     command =
@@ -47,5 +49,80 @@ defmodule CliSubprocessCore.CommandTest do
              "HOME" => "/opt/work",
              "TERM" => "xterm-256color"
            }
+  end
+
+  test "run/1 resolves a provider profile and executes through the shared transport lane" do
+    stdin_path = temp_path!("stdin.txt")
+
+    script =
+      create_test_script("""
+      cat > "#{stdin_path}"
+      printf 'runner-ok'
+      """)
+
+    assert {:ok, result} =
+             Command.run(
+               profile: CommandRunner,
+               command: script,
+               args: ["--ignored"],
+               stdin: "payload-without-newline"
+             )
+
+    assert result.invocation.command == script
+    assert result.invocation.args == ["--ignored"]
+    assert result.stdout == "runner-ok"
+    assert result.stderr == ""
+    assert result.output == "runner-ok"
+    assert result.exit.status == :success
+    assert File.read!(stdin_path) == "payload-without-newline"
+  end
+
+  test "run/1 returns a structured error when the provider cannot be resolved" do
+    assert {:error, %Error{} = error} = Command.run(provider: :missing_phase_2a_provider)
+
+    assert error.reason == {:provider_not_found, :missing_phase_2a_provider}
+    assert error.context == %{provider: :missing_phase_2a_provider}
+  end
+
+  defp create_test_script(body) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_command_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    path = Path.join(dir, "fixture.sh")
+
+    File.write!(path, """
+    #!/usr/bin/env bash
+    set -euo pipefail
+    #{body}
+    """)
+
+    File.chmod!(path, 0o755)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+    end)
+
+    path
+  end
+
+  defp temp_path!(name) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_command_tmp_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+    end)
+
+    Path.join(dir, name)
   end
 end

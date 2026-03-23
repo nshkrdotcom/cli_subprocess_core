@@ -1,7 +1,14 @@
 defmodule CliSubprocessCore.Command do
   @moduledoc """
   Normalized subprocess invocation data shared by provider profiles.
+
+  The module also exposes the shared provider-aware one-shot command lane
+  through `run/1` and `run/2`.
   """
+
+  alias CliSubprocessCore.Command.{Error, Options}
+  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.Transport.RunResult
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}
@@ -16,6 +23,9 @@ defmodule CliSubprocessCore.Command do
           cwd: String.t() | nil,
           env: env_map()
         }
+
+  @type run_result :: RunResult.t()
+  @type run_error :: CliSubprocessCore.Command.Error.t()
 
   @doc """
   Builds a normalized invocation struct.
@@ -37,6 +47,41 @@ defmodule CliSubprocessCore.Command do
   @spec argv(t()) :: [String.t()]
   def argv(%__MODULE__{} = command) do
     [command.command | command.args]
+  end
+
+  @doc """
+  Runs a provider-aware one-shot command through the shared transport-owned
+  non-PTY lane.
+
+  Reserved command-lane options are:
+
+  - `:provider`
+  - `:profile`
+  - `:registry`
+  - `:transport_module`
+  - `:stdin`
+  - `:timeout`
+  - `:stderr`
+  - `:close_stdin`
+
+  All remaining options are passed through to the resolved provider profile's
+  `build_invocation/1` callback.
+  """
+  @spec run(keyword()) :: {:ok, run_result()} | {:error, run_error()}
+  def run(opts) when is_list(opts) do
+    with {:ok, options} <- Options.new(opts),
+         {:ok, invocation} <- resolve_invocation(options) do
+      do_run(invocation, options)
+    end
+  end
+
+  @doc """
+  Runs a prebuilt normalized invocation through the shared non-PTY command
+  lane.
+  """
+  @spec run(t(), keyword()) :: {:ok, run_result()} | {:error, run_error()}
+  def run(%__MODULE__{} = invocation, opts) when is_list(opts) do
+    with {:ok, options} <- Options.new(invocation, opts), do: do_run(invocation, options)
   end
 
   @doc """
@@ -82,6 +127,56 @@ defmodule CliSubprocessCore.Command do
         {:error, _reason} = error -> {:halt, error}
       end
     end)
+  end
+
+  defp resolve_invocation(%Options{profile: profile} = options)
+       when is_atom(profile) and not is_nil(profile) do
+    build_invocation(profile, options.provider_options, options.provider)
+  end
+
+  defp resolve_invocation(%Options{provider: provider, registry: registry} = options) do
+    case ProviderRegistry.fetch(provider, registry) do
+      {:ok, profile} ->
+        build_invocation(profile, options.provider_options, provider)
+
+      :error ->
+        {:error, Error.provider_not_found(provider)}
+    end
+  catch
+    :exit, reason ->
+      {:error, Error.command_plan_failed(reason, %{provider: provider, registry: registry})}
+  end
+
+  defp build_invocation(profile, provider_options, provider) do
+    with {:ok, invocation} <- profile.build_invocation(provider_options),
+         :ok <- ProviderProfile.validate_invocation(invocation) do
+      {:ok, invocation}
+    else
+      {:error, reason} ->
+        {:error, Error.command_plan_failed(reason, %{provider: provider, profile: profile})}
+    end
+  end
+
+  defp do_run(invocation, %Options{} = options) do
+    case options.transport_module.run(invocation,
+           stdin: options.stdin,
+           timeout: options.timeout,
+           stderr: options.stderr,
+           close_stdin: options.close_stdin
+         ) do
+      {:ok, %RunResult{} = result} ->
+        {:ok, result}
+
+      {:error, {:transport, %CliSubprocessCore.Transport.Error{} = error}} ->
+        {:error, Error.transport_error(error, %{invocation: invocation})}
+
+      other ->
+        {:error,
+         Error.command_plan_failed(
+           {:unexpected_transport_run_result, other},
+           %{invocation: invocation}
+         )}
+    end
   end
 
   defp normalize_env(env) when is_map(env) do

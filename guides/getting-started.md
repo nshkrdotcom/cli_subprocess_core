@@ -9,6 +9,7 @@ profile.
 The current foundation gives downstream repos a stable starting point for:
 
 - normalized subprocess command data with `CliSubprocessCore.Command`
+- provider-aware one-shot execution with `CliSubprocessCore.Command.run/1,2`
 - normalized runtime events with `CliSubprocessCore.Event`
 - normalized payload structs with `CliSubprocessCore.Payload.*`
 - provider profile validation with `CliSubprocessCore.ProviderProfile`
@@ -155,6 +156,35 @@ end
 See `guides/raw-transport.md` for the transport contract and
 `guides/shutdown-and-timeouts.md` for shutdown and timeout behavior.
 
+## Run A One-Shot Command
+
+Use the command lane when you need exact stdin/stdout/stderr capture without a
+long-lived session:
+
+```elixir
+invocation =
+  CliSubprocessCore.Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
+
+{:ok, result} =
+  CliSubprocessCore.Command.run(invocation,
+    stderr: :stdout,
+    timeout: 5_000
+  )
+```
+
+Or let the core resolve a provider profile and build the invocation:
+
+```elixir
+{:ok, result} =
+  CliSubprocessCore.Command.run(
+    provider: :claude,
+    prompt: "Summarize the repo"
+  )
+```
+
+See `guides/command-api.md` for the provider-aware boundary and
+`guides/raw-transport.md` for the lower transport-owned execution contract.
+
 ## Start A Session
 
 Use the session layer when you want provider command construction, parsing, and
@@ -177,5 +207,6 @@ end
 ```
 
 See `guides/session-api.md` for the session contract,
+`guides/command-api.md` for the one-shot command lane,
 `guides/built-in-provider-profiles.md` for the first-party profile catalog, and
 `guides/custom-provider-profiles.md` for extension guidance.

@@ -2,6 +2,9 @@ defmodule CliSubprocessCore.Transport do
   @moduledoc """
   Behaviour for the raw subprocess transport layer.
 
+  In addition to the long-lived subscriber-driven transport API, the transport
+  layer also owns synchronous non-PTY command execution through `run/2`.
+
   Legacy subscribers receive bare transport tuples:
 
   - `{:transport_message, line}`
@@ -17,8 +20,9 @@ defmodule CliSubprocessCore.Transport do
   - `{event_tag, ref, {:exit, %CliSubprocessCore.ProcessExit{}}}`
   """
 
-  alias CliSubprocessCore.{ProcessExit, Transport.Error}
+  alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
   alias CliSubprocessCore.Transport.Erlexec
+  alias CliSubprocessCore.Transport.RunResult
 
   @typedoc "Opaque transport reference."
   @type t :: pid()
@@ -42,6 +46,8 @@ defmodule CliSubprocessCore.Transport do
 
   @callback start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   @callback start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
+  @callback run(Command.t(), keyword()) ::
+              {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
   @callback send(t(), iodata() | map() | list()) :: :ok | {:error, {:transport, Error.t()}}
   @callback subscribe(t(), pid()) :: :ok | {:error, {:transport, Error.t()}}
   @callback subscribe(t(), pid(), subscription_tag()) ::
@@ -65,6 +71,13 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start_link(opts), do: Erlexec.start_link(opts)
+
+  @doc """
+  Runs a one-shot non-PTY command and captures exact stdout, stderr, and exit
+  data.
+  """
+  @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
+  def run(%Command{} = command, opts \\ []) when is_list(opts), do: Erlexec.run(command, opts)
 
   @doc """
   Sends data to the subprocess stdin.

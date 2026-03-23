@@ -9,6 +9,8 @@ dispatch, realtime stderr dispatch, exit normalization, and shutdown.
 - `CliSubprocessCore.Transport` – public behaviour and default facade
 - `CliSubprocessCore.Transport.Erlexec` – erlexec-backed implementation
 - `CliSubprocessCore.Transport.Options` – validated startup options
+- `CliSubprocessCore.Transport.RunOptions` – validated one-shot execution options
+- `CliSubprocessCore.Transport.RunResult` – captured one-shot execution result
 - `CliSubprocessCore.Transport.Error` – structured transport failures
 
 ## Start A Transport
@@ -79,6 +81,32 @@ writes through erlexec under a task-wrapped `GenServer.call`.
 `end_input/1` closes stdin with `:eof`. Use it for EOF-driven CLIs such as
 non-streaming `cat`, `python`, or provider commands that wait for stdin
 closure before producing a final result.
+
+## One-Shot Command Execution
+
+`run/2` owns exact non-PTY command execution below the provider-aware command
+lane:
+
+```elixir
+invocation =
+  CliSubprocessCore.Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
+
+{:ok, result} =
+  CliSubprocessCore.Transport.run(invocation,
+    stderr: :stdout,
+    timeout: 5_000
+  )
+```
+
+Supported run options are:
+
+- `:stdin` – exact stdin payload written before optional EOF
+- `:timeout` – execution timeout in milliseconds or `:infinity`
+- `:stderr` – `:separate` or `:stdout`
+- `:close_stdin` – whether to send EOF after writing stdin, default `true`
+
+The return value is `%CliSubprocessCore.Transport.RunResult{}` with captured
+`stdout`, `stderr`, `output`, and normalized `exit` data.
 
 ## Stderr
 

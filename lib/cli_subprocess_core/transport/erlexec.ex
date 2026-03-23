@@ -17,7 +17,9 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     TaskSupport,
     Transport,
     Transport.Error,
-    Transport.Options
+    Transport.Options,
+    Transport.RunOptions,
+    Transport.RunResult
   }
 
   @behaviour Transport
@@ -28,6 +30,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   @default_max_lines_per_batch 200
   @exec_wait_attempts 20
   @exec_wait_delay_ms 50
+  @run_stop_wait_ms 200
+  @run_kill_wait_ms 500
 
   defstruct subprocess: nil,
             subscribers: %{},
@@ -86,6 +90,25 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   catch
     :exit, reason ->
       transport_error(reason)
+  end
+
+  @impl Transport
+  def run(%CliSubprocessCore.Command{} = command, opts) when is_list(opts) do
+    with {:ok, options} <- RunOptions.new(command, opts),
+         :ok <- validate_cwd_exists(options.command.cwd),
+         :ok <- validate_command_exists(options.command.command),
+         :ok <- ensure_erlexec_started(),
+         exec_opts <- build_exec_opts(options.command.cwd, options.command.env),
+         argv <- normalize_command_argv(options.command.command, options.command.args),
+         {:ok, pid, os_pid} <- exec_run(options.command.command, argv, exec_opts) do
+      run_started_exec(pid, os_pid, options)
+    else
+      {:error, {:invalid_run_options, reason}} ->
+        transport_error(Error.invalid_options(reason))
+
+      {:error, %Error{} = error} ->
+        transport_error(error)
+    end
   end
 
   @impl Transport
@@ -441,7 +464,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     with :ok <- validate_cwd_exists(options.cwd),
          :ok <- validate_command_exists(options.command),
          :ok <- ensure_erlexec_started(),
-         exec_opts <- build_exec_opts(options),
+         exec_opts <- build_exec_opts(options.cwd, options.env),
          argv <- normalize_command_argv(options.command, options.args),
          {:ok, pid, os_pid} <- exec_run(options.command, argv, exec_opts),
          {:ok, state} <-
@@ -552,10 +575,10 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end
   end
 
-  defp build_exec_opts(%Options{} = options) do
+  defp build_exec_opts(cwd, env) do
     []
-    |> maybe_put_cwd(options.cwd)
-    |> maybe_put_env(options.env)
+    |> maybe_put_cwd(cwd)
+    |> maybe_put_env(env)
     # Put each subprocess in its own process group so control signals and
     # force-close behavior reach shell wrappers and their active children.
     |> Kernel.++([{:group, 0}, :kill_group, :stdin, :stdout, :stderr, :monitor])
@@ -585,6 +608,244 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       {:error, reason} ->
         {:error, Error.startup_failed(reason)}
     end
+  end
+
+  defp run_started_exec(pid, os_pid, %RunOptions{} = options) do
+    case maybe_send_run_input(pid, options.stdin, options.close_stdin) do
+      :ok ->
+        collect_run_output(
+          pid,
+          os_pid,
+          options,
+          timeout_deadline(options.timeout),
+          [],
+          [],
+          []
+        )
+
+      {:error, {:transport, %Error{}} = error} ->
+        stop_run_exec_and_confirm_down(pid, os_pid)
+        _ = flush_run_messages(pid, os_pid, options.stderr, [], [], [])
+        {:error, error}
+    end
+  end
+
+  defp maybe_send_run_input(pid, nil, true), do: send_run_eof(pid)
+  defp maybe_send_run_input(_pid, nil, false), do: :ok
+
+  defp maybe_send_run_input(pid, stdin, close_stdin) do
+    with {:ok, payload} <- normalize_run_input(stdin),
+         :ok <- send_run_payload(pid, payload) do
+      maybe_send_run_eof(pid, close_stdin)
+    end
+  end
+
+  defp maybe_send_run_eof(_pid, false), do: :ok
+  defp maybe_send_run_eof(pid, true), do: send_run_eof(pid)
+
+  defp normalize_run_input(stdin) do
+    {:ok, normalize_payload(stdin)}
+  rescue
+    error ->
+      transport_error(Error.send_failed({:invalid_input, error}))
+  catch
+    kind, reason ->
+      transport_error(Error.send_failed({kind, reason}))
+  end
+
+  defp send_run_payload(pid, payload) when is_binary(payload) do
+    :exec.send(pid, payload)
+    :ok
+  catch
+    kind, reason ->
+      transport_error(Error.send_failed({kind, reason}))
+  end
+
+  defp send_run_eof(pid) do
+    :exec.send(pid, :eof)
+    :ok
+  catch
+    kind, reason ->
+      transport_error(Error.send_failed({kind, reason}))
+  end
+
+  defp collect_run_output(pid, os_pid, options, :infinity, stdout, stderr, output) do
+    receive do
+      {:stdout, ^os_pid, data} ->
+        data = IO.iodata_to_binary(data)
+
+        collect_run_output(
+          pid,
+          os_pid,
+          options,
+          :infinity,
+          [data | stdout],
+          stderr,
+          [data | output]
+        )
+
+      {:stderr, ^os_pid, data} ->
+        data = IO.iodata_to_binary(data)
+        output = merge_stderr_output(data, output, options.stderr)
+        collect_run_output(pid, os_pid, options, :infinity, stdout, [data | stderr], output)
+
+      {:DOWN, ^os_pid, :process, ^pid, reason} ->
+        build_run_result_after_down(pid, os_pid, reason, options, stdout, stderr, output)
+    end
+  end
+
+  defp collect_run_output(pid, os_pid, options, deadline_ms, stdout, stderr, output)
+       when is_integer(deadline_ms) do
+    case timeout_remaining(deadline_ms) do
+      :expired ->
+        handle_run_timeout(pid, os_pid, options, stdout, stderr, output)
+
+      remaining_timeout ->
+        receive do
+          {:stdout, ^os_pid, data} ->
+            data = IO.iodata_to_binary(data)
+
+            collect_run_output(
+              pid,
+              os_pid,
+              options,
+              deadline_ms,
+              [data | stdout],
+              stderr,
+              [data | output]
+            )
+
+          {:stderr, ^os_pid, data} ->
+            data = IO.iodata_to_binary(data)
+            output = merge_stderr_output(data, output, options.stderr)
+            collect_run_output(pid, os_pid, options, deadline_ms, stdout, [data | stderr], output)
+
+          {:DOWN, ^os_pid, :process, ^pid, reason} ->
+            build_run_result_after_down(pid, os_pid, reason, options, stdout, stderr, output)
+        after
+          remaining_timeout ->
+            handle_run_timeout(pid, os_pid, options, stdout, stderr, output)
+        end
+    end
+  end
+
+  defp build_run_result_after_down(pid, os_pid, reason, options, stdout, stderr, output) do
+    {stdout, stderr, output} =
+      flush_run_messages(pid, os_pid, options.stderr, stdout, stderr, output)
+
+    exit = ProcessExit.from_reason(reason)
+    {:ok, build_run_result(options.command, options.stderr, stdout, stderr, output, exit)}
+  end
+
+  defp handle_run_timeout(pid, os_pid, options, stdout, stderr, output) do
+    stop_run_exec_and_confirm_down(pid, os_pid)
+
+    {stdout, stderr, output} =
+      flush_run_messages(pid, os_pid, options.stderr, stdout, stderr, output)
+
+    transport_error(
+      Error.transport_error(:timeout, %{
+        command: options.command.command,
+        args: options.command.args,
+        stdout: chunks_to_binary(stdout),
+        stderr: chunks_to_binary(stderr),
+        output: chunks_to_binary(output)
+      })
+    )
+  end
+
+  defp build_run_result(command, stderr_mode, stdout, stderr, output, %ProcessExit{} = exit) do
+    %RunResult{
+      invocation: command,
+      stdout: chunks_to_binary(stdout),
+      stderr: chunks_to_binary(stderr),
+      output: chunks_to_binary(output),
+      exit: exit,
+      stderr_mode: stderr_mode
+    }
+  end
+
+  defp merge_stderr_output(data, output, :stdout), do: [data | output]
+  defp merge_stderr_output(_data, output, :separate), do: output
+
+  defp chunks_to_binary(chunks) when is_list(chunks) do
+    chunks
+    |> Enum.reverse()
+    |> IO.iodata_to_binary()
+  end
+
+  defp flush_run_messages(pid, os_pid, stderr_mode, stdout, stderr, output) do
+    receive do
+      {:stdout, ^os_pid, data} ->
+        flush_run_messages(
+          pid,
+          os_pid,
+          stderr_mode,
+          [IO.iodata_to_binary(data) | stdout],
+          stderr,
+          [IO.iodata_to_binary(data) | output]
+        )
+
+      {:stderr, ^os_pid, data} ->
+        data = IO.iodata_to_binary(data)
+        output = merge_stderr_output(data, output, stderr_mode)
+        flush_run_messages(pid, os_pid, stderr_mode, stdout, [data | stderr], output)
+
+      {:DOWN, ^os_pid, :process, ^pid, _reason} ->
+        flush_run_messages(pid, os_pid, stderr_mode, stdout, stderr, output)
+    after
+      0 ->
+        {stdout, stderr, output}
+    end
+  end
+
+  defp timeout_deadline(:infinity), do: :infinity
+  defp timeout_deadline(timeout_ms), do: System.monotonic_time(:millisecond) + timeout_ms
+
+  defp timeout_remaining(deadline_ms) do
+    remaining = deadline_ms - System.monotonic_time(:millisecond)
+
+    if remaining <= 0 do
+      :expired
+    else
+      remaining
+    end
+  end
+
+  defp stop_run_exec_and_confirm_down(pid, os_pid) do
+    stop_exec(pid)
+
+    case await_down(pid, os_pid, @run_stop_wait_ms) do
+      :down ->
+        :ok
+
+      :timeout ->
+        kill_exec(pid)
+        _ = await_down(pid, os_pid, @run_kill_wait_ms)
+        :ok
+    end
+  end
+
+  defp await_down(pid, os_pid, timeout_ms) do
+    receive do
+      {:DOWN, ^os_pid, :process, ^pid, _reason} -> :down
+    after
+      timeout_ms -> :timeout
+    end
+  end
+
+  defp stop_exec(pid) do
+    :exec.stop(pid)
+    :ok
+  catch
+    _, _ -> :ok
+  end
+
+  defp kill_exec(pid) do
+    :exec.kill(pid, 9)
+    :ok
+  catch
+    _, _ -> :ok
   end
 
   defp connected_state(state, pid, os_pid) do

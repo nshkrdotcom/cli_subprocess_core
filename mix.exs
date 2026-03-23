@@ -36,6 +36,7 @@ defmodule CliSubprocessCore.MixProject do
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
+        "guides/command-api.md": [title: "Command API"],
         "guides/raw-transport.md": [title: "Raw Transport"],
         "guides/session-api.md": [title: "Session API"],
         "guides/testing-and-conformance.md": [title: "Testing And Conformance"],

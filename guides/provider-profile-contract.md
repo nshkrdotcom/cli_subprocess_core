@@ -26,7 +26,8 @@ Each profile owns:
 
 - the normalized provider id
 - the capability list exposed to downstream consumers
-- CLI command construction for that provider
+- CLI command construction for that provider across both
+  `CliSubprocessCore.Command.run/1` and `CliSubprocessCore.Session`
 - stdout parsing into normalized core events
 - stderr parsing into normalized core events
 - exit handling into normalized terminal events
@@ -46,6 +47,11 @@ exports the required callbacks.
 
 `validate_invocation/1` verifies that the profile returned a valid
 `CliSubprocessCore.Command` struct.
+
+That same invocation contract is reused by both:
+
+- `CliSubprocessCore.Command.run/1` for one-shot non-PTY execution
+- `CliSubprocessCore.Session.start_session/1` for long-lived normalized sessions
 
 ## Registry Integration
 
