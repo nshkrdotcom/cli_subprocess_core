@@ -275,25 +275,20 @@ defmodule CliSubprocessCore.RawSession do
 
       case apply(transport_module, fun, [transport_opts]) do
         {:ok, transport} ->
-          with :ok <- await_transport_started(transport_module, transport) do
-            build_session(
-              invocation,
-              receiver,
-              transport_module,
-              transport,
-              transport_ref,
-              event_tag,
-              stdin?,
-              stdout_mode,
-              stdin_mode,
-              interrupt_mode,
-              pty?
-            )
-          else
-            {:error, reason} ->
-              safe_close_transport(transport_module, transport)
-              {:error, reason}
-          end
+          session_config = %{
+            event_tag: event_tag,
+            interrupt_mode: interrupt_mode,
+            invocation: invocation,
+            pty?: pty?,
+            receiver: receiver,
+            stdin?: stdin?,
+            stdin_mode: stdin_mode,
+            stdout_mode: stdout_mode,
+            transport_module: transport_module,
+            transport_ref: transport_ref
+          }
+
+          start_transport_session(session_config, transport)
 
         {:error, _reason} = error ->
           error
@@ -301,18 +296,31 @@ defmodule CliSubprocessCore.RawSession do
     end
   end
 
+  defp start_transport_session(%{transport_module: transport_module} = session_config, transport) do
+    case await_transport_started(transport_module, transport) do
+      :ok ->
+        build_session(session_config, transport)
+
+      {:error, reason} ->
+        safe_close_transport(transport_module, transport)
+        {:error, reason}
+    end
+  end
+
   defp build_session(
-         invocation,
-         receiver,
-         transport_module,
-         transport,
-         transport_ref,
-         event_tag,
-         stdin?,
-         stdout_mode,
-         stdin_mode,
-         interrupt_mode,
-         pty?
+         %{
+           event_tag: event_tag,
+           interrupt_mode: interrupt_mode,
+           invocation: invocation,
+           pty?: pty?,
+           receiver: receiver,
+           stdin?: stdin?,
+           stdin_mode: stdin_mode,
+           stdout_mode: stdout_mode,
+           transport_module: transport_module,
+           transport_ref: transport_ref
+         },
+         transport
        ) do
     case transport_module.info(transport) do
       %Info{} = transport_info ->

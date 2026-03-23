@@ -327,9 +327,10 @@ defmodule CliSubprocessCore.Session do
 
     case options.transport_module.start(transport_opts) do
       {:ok, transport_pid} ->
-        with :ok <- await_transport_started(options.transport_module, transport_pid) do
-          {:ok, transport_pid, transport_ref}
-        else
+        case await_transport_started(options.transport_module, transport_pid) do
+          :ok ->
+            {:ok, transport_pid, transport_ref}
+
           {:error, reason} ->
             safe_close_transport(options.transport_module, transport_pid)
             {:error, reason}
