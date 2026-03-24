@@ -18,7 +18,8 @@ snapshot back together:
     provider: :claude,
     prompt: "Summarize the repo",
     subscriber: {self(), make_ref()},
-    metadata: %{lane: :core}
+    metadata: %{lane: :core},
+    session_event_tag: :sdk_runtime_session
   )
 ```
 
@@ -41,7 +42,8 @@ Common session-level options:
 - `:metadata`
 - `:registry`
 - `:transport_module`
-- `:session_event_tag` for low-level adapter-controlled tagged delivery
+- `:session_event_tag` for low-level adapter-controlled tagged delivery; higher-level
+  callers should keep that raw tag below their projected public event surface
 
 All other options are passed through to the provider profile for command
 construction, parser initialization, and transport overrides. If the selected
@@ -77,10 +79,11 @@ Legacy subscribers receive:
 {:session_event, %CliSubprocessCore.Event{}}
 ```
 
-Tagged subscribers receive:
+If an adapter sets `session_event_tag: :sdk_runtime_session`, tagged
+subscribers receive:
 
 ```elixir
-{:cli_subprocess_core_session, ref, {:event, %CliSubprocessCore.Event{}}}
+{:sdk_runtime_session, ref, {:event, %CliSubprocessCore.Event{}}}
 ```
 
 You can override the outer event atom with `:session_event_tag`, but direct
@@ -103,6 +106,7 @@ events in normalized runtime order.
 
 ## Info Snapshot
 
+For a session started with `session_event_tag: :sdk_runtime_session`,
 `info/1` returns a map shaped like:
 
 ```elixir
@@ -110,7 +114,7 @@ events in normalized runtime order.
   capabilities: [:streaming, :interrupt],
   delivery: %CliSubprocessCore.Session.Delivery{
     legacy_message: :session_event,
-    tagged_event_tag: :cli_subprocess_core_session,
+    tagged_event_tag: :sdk_runtime_session,
     tagged_payload: :event
   },
   invocation: %CliSubprocessCore.Command{},
@@ -124,7 +128,7 @@ events in normalized runtime order.
     provider_session_id: nil,
     sequence: 0
   },
-  session_event_tag: :cli_subprocess_core_session,
+  session_event_tag: :sdk_runtime_session,
   subscribers: 1,
   transport: %{
     module: CliSubprocessCore.Transport,
@@ -150,7 +154,7 @@ fields.
 `session_event_tag` remains in the info map as a direct-adapter compatibility
 alias. `delivery.tagged_event_tag` is the explicit mailbox-delivery contract.
 Higher-level wrappers should set their own tag or relay into their own event
-envelope rather than requiring callers to know the default core tag.
+envelope rather than requiring callers to know a default core tag.
 
 ## Example
 
