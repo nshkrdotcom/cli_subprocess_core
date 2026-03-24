@@ -173,7 +173,7 @@ needs the initial info snapshot but must keep the session linked to the caller.
 
 ## Built-In Profiles
 
-Phase 3 finalizes the publication story for the common provider-profile layer:
+Phase 4 finalizes the publication story for the common provider-profile layer:
 
 - the first-party common profiles for Claude, Codex, Gemini, and Amp stay
   built into `cli_subprocess_core`

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Release docs and package notes now describe the final Phase 3 stack boundary
+- Release docs and package notes now describe the final Phase 4 stack boundary
   explicitly: `cli_subprocess_core` is the sole `erlexec` owner and the home of
   the shared provider-profile publication surface.
 
