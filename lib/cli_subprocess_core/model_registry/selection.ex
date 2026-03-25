@@ -1,5 +1,7 @@
 defmodule CliSubprocessCore.ModelRegistry.Selection do
-  @moduledoc false
+  @moduledoc """
+  Resolved model selection returned by `CliSubprocessCore.ModelRegistry`.
+  """
 
   @type resolution_source :: :explicit | :env | :default | :remote
 

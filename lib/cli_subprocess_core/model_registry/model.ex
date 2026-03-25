@@ -1,5 +1,7 @@
 defmodule CliSubprocessCore.ModelRegistry.Model do
-  @moduledoc false
+  @moduledoc """
+  Canonical model metadata loaded by `CliSubprocessCore.ModelRegistry`.
+  """
 
   @type visibility :: :public | :private | :internal | :restricted
 
