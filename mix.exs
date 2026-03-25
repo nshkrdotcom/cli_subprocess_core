@@ -63,7 +63,8 @@ defmodule CliSubprocessCore.MixProject do
     [
       name: "cli_subprocess_core",
       description: description(),
-      files: ~w(lib guides .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* assets),
+      files:
+        ~w(lib priv guides scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{

@@ -10,6 +10,9 @@ defmodule CliSubprocessCore.ModelRegistry do
           | {:model_unavailable, atom(), term()}
           | {:empty_or_invalid_model, String.t(), atom()}
 
+  @type selection :: Selection.t()
+  @type model :: Model.t()
+
   @invalid_model_inputs ["", "nil", "null"]
   @all_visibilities [:public, :private, :internal, :restricted]
 

@@ -30,8 +30,8 @@ Usage: model_selection_ci.sh [TASK] [--repo <repo>[,<repo>...]] [--tag <tag>[,<t
 
 TASK:
   format     -> mix format --check-formatted
-  compile    -> mix compile
-  test       -> mix test
+  compile    -> mix compile --force --warnings-as-errors
+  test       -> mix test --warnings-as-errors
   credo      -> MIX_ENV=test mix credo --strict
   dialyzer   -> MIX_ENV=dev mix dialyzer
   all        -> run all five checks in order
@@ -192,10 +192,10 @@ run_task() {
       command="mix format --check-formatted"
       ;;
     compile)
-      command="mix compile"
+      command="mix compile --force --warnings-as-errors"
       ;;
     test)
-      command="mix test"
+      command="mix test --warnings-as-errors"
       ;;
     credo)
       command="MIX_ENV=test mix credo --strict"
