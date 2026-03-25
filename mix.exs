@@ -43,6 +43,11 @@ defmodule CliSubprocessCore.MixProject do
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
+        "guides/developer-guide-model-registry.md": [title: "Developer Guide: Model Registry"],
+        "guides/developer-guide-provider-profiles.md": [
+          title: "Developer Guide: Provider Profiles"
+        ],
+        "guides/developer-guide-runtime-layers.md": [title: "Developer Guide: Runtime Layers"],
         "guides/command-api.md": [title: "Command API"],
         "guides/raw-transport.md": [title: "Raw Transport"],
         "guides/session-api.md": [title: "Session API"],
@@ -50,9 +55,29 @@ defmodule CliSubprocessCore.MixProject do
         "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"]
       ],
       groups_for_extras: [
-        "Project Overview": ~r"README\.md",
-        "Project Reference": ~r"CHANGELOG\.md|LICENSE",
-        Guides: ~r"guides/"
+        "Project Overview": ["README.md"],
+        "Provider Profiles": [
+          "guides/provider-profile-contract.md",
+          "guides/custom-provider-profiles.md",
+          "guides/built-in-provider-profiles.md"
+        ],
+        "Developer Guides": [
+          "guides/developer-guide-model-registry.md",
+          "guides/developer-guide-provider-profiles.md",
+          "guides/developer-guide-runtime-layers.md"
+        ],
+        "Runtime & APIs": [
+          "guides/getting-started.md",
+          "guides/event-and-payload-model.md",
+          "guides/command-api.md",
+          "guides/raw-transport.md",
+          "guides/session-api.md"
+        ],
+        "Operations & Conformance": [
+          "guides/testing-and-conformance.md",
+          "guides/shutdown-and-timeouts.md"
+        ],
+        "Project Reference": ["CHANGELOG.md", "LICENSE"]
       ],
       formatters: ["html", "epub", "markdown"],
       source_url: @source_url

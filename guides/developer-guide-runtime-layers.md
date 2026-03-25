@@ -1,0 +1,120 @@
+# Developer Guide: Runtime Layers and Core Boundaries
+
+This guide explains the internal layer boundaries in `cli_subprocess_core`.
+
+It is intended for people reviewing the core architecture, extending the core,
+or trying to understand where a change should land.
+
+## The Core Layers
+
+`cli_subprocess_core` has a small set of important layers:
+
+1. model policy
+2. provider profile adaptation
+3. command/session normalization
+4. raw transport execution
+5. normalized event and payload emission
+
+These layers exist so the runtime can stay consistent while still supporting
+multiple external CLI families.
+
+## Layer 1: Model Policy
+
+Owned by:
+
+- `CliSubprocessCore.ModelCatalog`
+- `CliSubprocessCore.ModelRegistry`
+
+This layer answers:
+
+- which models exist
+- which model should be used
+- whether the request is valid
+- which reasoning values are allowed
+
+## Layer 2: Provider Profile Adaptation
+
+Owned by:
+
+- `CliSubprocessCore.ProviderProfile`
+- built-in provider profile modules
+
+This layer answers:
+
+- how to translate normalized intent into provider-specific CLI behavior
+- how to interpret provider-specific output inside the shared runtime
+
+## Layer 3: Command and Session Normalization
+
+Owned by modules such as:
+
+- `CliSubprocessCore.Command`
+- `CliSubprocessCore.Command.Options`
+- `CliSubprocessCore.Session`
+- `CliSubprocessCore.Session.Options`
+
+This layer gives the core a provider-agnostic API for one-shot commands and
+longer-lived sessions.
+
+## Layer 4: Raw Transport Execution
+
+Owned by:
+
+- `CliSubprocessCore.Transport`
+- `CliSubprocessCore.Transport.Erlexec`
+
+This layer starts the external process, manages stdin/stdout/stderr, and
+captures process exit information.
+
+It should remain blind to provider policy.
+
+## Layer 5: Event and Payload Emission
+
+Owned by:
+
+- `CliSubprocessCore.Event`
+- `CliSubprocessCore.Payload.*`
+- `CliSubprocessCore.Runtime`
+
+This layer turns provider/runtime activity into the shared event model that the
+rest of the stack consumes.
+
+## The Practical Boundary Rule
+
+When deciding where a change belongs, use this rule:
+
+- if the change affects model choice, put it in the registry/catalog
+- if the change affects provider CLI syntax, put it in the provider profile
+- if the change affects subprocess lifecycle, put it in transport/session
+- if the change affects normalized output shape, put it in payload/runtime
+
+That rule prevents policy leakage across layers.
+
+## Example Integration Shape
+
+External repos should consume the core in this order:
+
+1. prepare normalized options
+2. call the core’s model registry
+3. pass the resolved selection into provider-facing command building
+4. let the core transport/session runtime execute the process
+
+The core is therefore both:
+
+- a policy owner
+- and a subprocess runtime owner
+
+But those are still separate internal responsibilities.
+
+## What Reviewers Should Watch For
+
+Architecture drift usually shows up as one of these mistakes:
+
+- a provider profile starts choosing fallback models
+- transport code learns provider policy
+- consumer-facing behavior bypasses normalized payloads
+- multiple layers define overlapping defaults
+
+If one layer can be removed without changing the others, the boundaries are
+probably healthy. If a small change requires editing policy, profile, and
+transport logic together, the responsibilities are probably leaking.

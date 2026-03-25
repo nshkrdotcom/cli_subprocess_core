@@ -337,12 +337,11 @@ run_repo() {
 
   for step in "${steps[@]}"; do
     printf '  - %-10s ... ' "$step"
-    if run_task "$repo" "$step" >/tmp/model_selection_ci_${repo}_${step}.log 2>&1; then
+    if run_task "$repo" "$step"; then
       echo "PASS"
     else
       local rc=$?
       echo "FAIL"
-      cat "/tmp/model_selection_ci_${repo}_${step}.log" >&2
       return $rc
     fi
   done

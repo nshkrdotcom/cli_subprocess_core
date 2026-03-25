@@ -1,0 +1,147 @@
+# Developer Guide: Model Registry and Provider Catalogs
+
+This guide explains how model selection works inside `cli_subprocess_core`.
+It is written for maintainers and technical reviewers of the core itself.
+
+## Why the Model Registry Exists
+
+`cli_subprocess_core` owns model policy for the shared CLI stack.
+
+That means the core decides:
+
+- which provider catalog is authoritative
+- how requested models are resolved
+- how provider defaults are chosen
+- how reasoning effort is validated
+- which visible error contract downstream code receives
+
+Consumer repos should not re-implement any of those decisions.
+
+## The Core Files
+
+The model-selection internals live in:
+
+- `lib/cli_subprocess_core/model_catalog.ex`
+- `lib/cli_subprocess_core/model_registry.ex`
+- `lib/cli_subprocess_core/model_registry/model.ex`
+- `lib/cli_subprocess_core/model_registry/selection.ex`
+- `priv/models/codex.json`
+- `priv/models/claude.json`
+- `priv/models/gemini.json`
+- `priv/models/amp.json`
+
+## What the Catalogs Contain
+
+Each provider catalog is a static JSON file owned by the core repo.
+
+The catalog defines, per model:
+
+- `id`
+- `aliases`
+- `visibility`
+- `family`
+- whether it is the provider default
+- optional reasoning-effort mappings
+- provider metadata
+
+This gives the core one place to answer:
+
+- “is this model known?”
+- “what is the default?”
+- “what visibilities are exposed?”
+- “which reasoning values are valid for this model?”
+
+## Resolution Sequence
+
+The authoritative resolution order is:
+
+1. explicit request
+2. environment override
+3. provider default
+4. remote default
+5. hard failure
+
+That resolution happens in `CliSubprocessCore.ModelRegistry.resolve/3`.
+
+The output is a resolved selection that includes:
+
+- provider
+- requested model
+- resolved model
+- resolution source
+- reasoning and normalized reasoning effort
+- model family
+- catalog version
+- visibility
+- error list
+
+## Validation Responsibilities
+
+The registry has separate responsibilities that should stay separate:
+
+- `resolve/3` chooses the final model
+- `validate/2` checks whether a requested model is valid
+- `default_model/2` reads the effective provider default
+- `normalize_reasoning_effort/3` validates reasoning input against the chosen
+  model
+- `build_arg_payload/3` returns the resolved selection used by provider command
+  builders
+
+That separation matters because downstream code often needs one of those steps
+without needing the entire resolution flow.
+
+## Error Contract
+
+The core exposes a single visible error vocabulary:
+
+- `{:error, {:unknown_model, requested_model, suggestions, provider}}`
+- `{:error, {:invalid_reasoning_effort, requested, allowed, provider}}`
+- `{:error, {:model_unavailable, provider, reason}}`
+- `{:error, {:empty_or_invalid_model, reason, provider}}`
+
+This is important for maintainability. The provider profiles and consumer repos
+can handle a stable contract instead of inventing provider-specific error rules.
+
+## Where the Selection Is Used
+
+After the registry resolves the model, the built-in provider profiles read that
+selection and format CLI arguments.
+
+The provider profiles are:
+
+- `lib/cli_subprocess_core/provider_profiles/codex.ex`
+- `lib/cli_subprocess_core/provider_profiles/claude.ex`
+- `lib/cli_subprocess_core/provider_profiles/gemini.ex`
+- `lib/cli_subprocess_core/provider_profiles/amp.ex`
+
+Those modules should not make a second policy decision. Their job is to turn
+the resolved selection into transport arguments such as `--model ...`.
+
+## Minimal Integration Example
+
+An integrating caller should do this:
+
+```elixir
+{:ok, selection} =
+  CliSubprocessCore.ModelRegistry.build_arg_payload(
+    :codex,
+    "gpt-5.4",
+    reasoning_effort: :medium
+  )
+
+selection.resolved_model
+# => "gpt-5.4"
+```
+
+After that, provider-specific command building can safely use the resolved
+selection without re-deciding the model.
+
+## Reviewer Checklist
+
+When reviewing model-selection changes in core, verify these invariants:
+
+- the provider catalogs remain core-owned
+- new provider/model policy enters through the registry, not a profile
+- provider profiles only format arguments from resolved state
+- no placeholder, blank, or invalid model silently falls through
+- the visible error contract remains stable
