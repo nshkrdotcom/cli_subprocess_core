@@ -22,8 +22,8 @@ multiple external CLI families.
 
 Owned by:
 
-- `CliSubprocessCore.ModelCatalog`
 - `CliSubprocessCore.ModelRegistry`
+- the internal model catalog loader and catalog data under `priv/models`
 
 This layer answers:
 
