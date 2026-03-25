@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
+  alias CliSubprocessCore.ProviderProfiles.Shared
 
   describe "build_invocation/1" do
     test "Claude builds the expected CLI invocation" do
@@ -157,6 +158,37 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
              ]
 
       assert command.cwd == "/tmp/amp"
+    end
+  end
+
+  describe "shared option helpers" do
+    test "drops placeholder values in maybe_add_pair/3" do
+      assert Shared.maybe_add_pair([], "--color", "nil") == []
+      assert Shared.maybe_add_pair([], "--color", nil) == []
+      assert Shared.maybe_add_pair([], "--color", "null") == []
+      assert Shared.maybe_add_pair([], "--color", "") == []
+    end
+
+    test "drops placeholder values in maybe_add_repeat/3" do
+      assert Shared.maybe_add_repeat([], "--tool", ["bash", "", "nil", "edit"]) == [
+               "--tool",
+               "bash",
+               "--tool",
+               "edit"
+             ]
+    end
+
+    test "drops placeholder values in maybe_add_delimited/3" do
+      assert Shared.maybe_add_delimited([], "--extensions", ["fs", "null", "git", ""]) == [
+               "--extensions",
+               "fs,git"
+             ]
+    end
+
+    test "serializes scalar pair values safely" do
+      assert Shared.maybe_add_pair([], "--threads", 3) == ["--threads", "3"]
+      assert Shared.maybe_add_pair([], "--timeout", 3.5) == ["--timeout", "3.5"]
+      assert Shared.maybe_add_pair([], "--auto", true) == ["--auto", "true"]
     end
   end
 

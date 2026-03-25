@@ -83,9 +83,32 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     Keyword.get(opts, :provider_permission_mode, Keyword.get(opts, :permission_mode, default))
   end
 
+  @invalid_pair_values ["nil", "null", ""]
+
   @spec maybe_add_pair([String.t()], String.t(), term()) :: [String.t()]
   def maybe_add_pair(args, _flag, nil), do: args
-  def maybe_add_pair(args, flag, value), do: args ++ [flag, to_string(value)]
+
+  def maybe_add_pair(args, flag, value) when is_atom(value),
+    do: maybe_add_pair(args, flag, Atom.to_string(value))
+
+  def maybe_add_pair(args, flag, value) when is_binary(value) do
+    case normalize_option_value(value) do
+      {:ok, normalized} -> args ++ [flag, normalized]
+      :skip -> args
+    end
+  end
+
+  def maybe_add_pair(args, flag, value) when is_integer(value),
+    do: maybe_add_pair(args, flag, Integer.to_string(value))
+
+  def maybe_add_pair(args, flag, value) when is_float(value),
+    do: maybe_add_pair(args, flag, Float.to_string(value))
+
+  def maybe_add_pair(args, flag, value) when is_boolean(value),
+    do: args ++ [flag, to_string(value)]
+
+  def maybe_add_pair(_args, flag, value),
+    do: raise(ArgumentError, "invalid #{inspect(flag)} value #{inspect(value)}")
 
   @spec maybe_add_flag([String.t()], String.t(), term()) :: [String.t()]
   def maybe_add_flag(args, _flag, false), do: args
@@ -105,8 +128,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @spec maybe_add_repeat([String.t()], String.t(), term()) :: [String.t()]
   def maybe_add_repeat(args, flag, values) when is_list(values) do
     Enum.reduce(values, args, fn
-      value, acc when is_binary(value) and value != "" -> acc ++ [flag, value]
-      _value, acc -> acc
+      value, acc when is_binary(value) ->
+        case normalize_option_value(value) do
+          {:ok, normalized} -> acc ++ [flag, normalized]
+          :skip -> acc
+        end
+
+      _value, acc ->
+        acc
     end)
   end
 
@@ -116,7 +145,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   def maybe_add_delimited(args, flag, values) when is_list(values) do
     normalized =
       values
-      |> Enum.filter(&(is_binary(&1) and &1 != ""))
+      |> Enum.reduce([], fn
+        value, acc when is_binary(value) ->
+          case normalize_option_value(value) do
+            {:ok, normalized} -> acc ++ [normalized]
+            :skip -> acc
+          end
+
+        _value, acc ->
+          acc
+      end)
       |> Enum.join(",")
 
     if normalized == "" do
@@ -127,6 +165,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   end
 
   def maybe_add_delimited(args, _flag, _values), do: args
+
+  defp normalize_option_value(value) when is_binary(value) do
+    normalized = value |> String.trim() |> String.downcase()
+
+    if normalized in @invalid_pair_values do
+      :skip
+    else
+      {:ok, value |> String.trim()}
+    end
+  end
 
   @spec decode_json_stdout(binary(), parser_state(), (map(), parser_state() ->
                                                         {[Event.t()], parser_state()})) ::
