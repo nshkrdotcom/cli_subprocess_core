@@ -67,6 +67,11 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:error, {:invalid_reasoning_effort, :unsupported, _, :amp}} =
                ModelRegistry.resolve(:amp, "amp-1", reasoning_effort: :unsupported)
     end
+
+    test "rejects unsupported low reasoning for gpt-5.4-mini" do
+      assert {:error, {:invalid_reasoning_effort, :low, ["high", "medium"], :codex}} =
+               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :low)
+    end
   end
 
   describe "ModelRegistry.list_visible/2" do
@@ -124,6 +129,14 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.resolved_model == "amp-1"
       assert payload.provider == :amp
       assert payload.visibility == :public
+    end
+
+    test "uses the model default reasoning when reasoning is omitted" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.build_arg_payload(:codex, "gpt-5.4-mini", [])
+
+      assert payload.resolved_model == "gpt-5.4-mini"
+      assert payload.reasoning == "medium"
     end
   end
 end
