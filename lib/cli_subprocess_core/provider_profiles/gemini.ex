@@ -46,7 +46,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Gemini do
 
   defp option_flags(opts) do
     []
-    |> Shared.maybe_add_pair("--model", Keyword.get(opts, :model))
+    |> Shared.maybe_add_pair("--model", model_value(opts))
     |> Shared.maybe_add_flag("--sandbox", Keyword.get(opts, :sandbox, false))
     |> Shared.maybe_add_delimited("--extensions", Keyword.get(opts, :extensions, []))
     |> Kernel.++(permission_flags(opts))
@@ -60,6 +60,18 @@ defmodule CliSubprocessCore.ProviderProfiles.Gemini do
       _ -> []
     end
   end
+
+  defp model_value(opts) do
+    Keyword.get(opts, :model_payload, %{})
+    |> model_payload_value(:resolved_model)
+  end
+
+  defp model_payload_value(%{resolved_model: value}, _key), do: value
+
+  defp model_payload_value(payload, key) when is_map(payload),
+    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
+
+  defp model_payload_value(_payload, _key), do: nil
 
   defp decode_event(raw, state) do
     case Shared.event_type(raw) do

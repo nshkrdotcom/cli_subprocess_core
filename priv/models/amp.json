@@ -1,0 +1,19 @@
+{
+  "provider": "amp",
+  "catalog_version": "2026-03-25",
+  "remote_default": "amp-1",
+  "models": [
+    {
+      "id": "amp-1",
+      "aliases": [
+        "default"
+      ],
+      "visibility": "public",
+      "family": "amp",
+      "default": true,
+      "metadata": {
+        "description": "Default Amp model."
+      }
+    }
+  ]
+}

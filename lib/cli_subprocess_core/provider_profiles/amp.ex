@@ -68,7 +68,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
 
   defp option_flags(opts) do
     []
-    |> Shared.maybe_add_pair("--model", Keyword.get(opts, :model))
+    |> Shared.maybe_add_pair("--model", model_value(opts))
     |> Shared.maybe_add_pair("--mode", Keyword.get(opts, :mode))
     |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
     |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
@@ -100,6 +100,18 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
         []
     end
   end
+
+  defp model_value(opts) do
+    Keyword.get(opts, :model_payload, %{})
+    |> model_payload_value(:resolved_model)
+  end
+
+  defp model_payload_value(%{resolved_model: value}, _key), do: value
+
+  defp model_payload_value(payload, key) when is_map(payload),
+    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
+
+  defp model_payload_value(_payload, _key), do: nil
 
   defp decode_event(raw, state) do
     @event_handlers

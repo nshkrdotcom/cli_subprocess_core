@@ -1,0 +1,75 @@
+{
+  "provider": "claude",
+  "catalog_version": "2026-03-25",
+  "remote_default": "opus",
+  "models": [
+    {
+      "id": "opus",
+      "aliases": [
+        "default",
+        "claude-opus-4-6"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "default": true,
+      "metadata": {
+        "description": "Default Claude model."
+      }
+    },
+    {
+      "id": "sonnet",
+      "aliases": [
+        "claude-sonnet-4-6"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "description": "Balanced Claude model."
+      }
+    },
+    {
+      "id": "haiku",
+      "aliases": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "description": "Fast Claude model."
+      }
+    },
+    {
+      "id": "opus[1m]",
+      "aliases": [
+        "claude-opus-4-6[1m]"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "description": "Extended Opus context window."
+      }
+    },
+    {
+      "id": "sonnet[1m]",
+      "aliases": [
+        "claude-sonnet-4-6[1m]"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "description": "Extended Sonnet context window."
+      }
+    },
+    {
+      "id": "legacy-sonnet",
+      "aliases": [
+        "claude-3-7-sonnet-legacy"
+      ],
+      "visibility": "private",
+      "family": "claude",
+      "metadata": {
+        "description": "Private legacy model."
+      }
+    }
+  ]
+}

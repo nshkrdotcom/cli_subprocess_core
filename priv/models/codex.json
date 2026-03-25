@@ -1,0 +1,212 @@
+{
+  "provider": "codex",
+  "catalog_version": "2026-03-25",
+  "remote_default": "gpt-5-codex",
+  "models": [
+    {
+      "id": "gpt-5-codex",
+      "aliases": [
+        "codex",
+        "latest",
+        "default"
+      ],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default": true,
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1,
+        "minimal": 0.5
+      },
+      "metadata": {
+        "description": "Default Codex-capable model."
+      }
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "aliases": [
+        "gpt-5.3"
+      ],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "high",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "Alternate Codex model."
+      }
+    },
+    {
+      "id": "gpt-5.4",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "Latest frontier agentic coding model."
+      }
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "medium": 1.0,
+        "high": 1.4
+      },
+      "metadata": {
+        "description": "Smaller frontier agentic coding model."
+      }
+    },
+    {
+      "id": "gpt-5.3-codex-spark",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "high",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "Ultra-fast coding model."
+      }
+    },
+    {
+      "id": "gpt-5.2-codex",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "Frontier agentic coding model."
+      }
+    },
+    {
+      "id": "gpt-5.2",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "General frontier model."
+      }
+    },
+    {
+      "id": "gpt-5.1-codex-max",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "description": "Codex-optimized flagship for deep and fast reasoning."
+      }
+    },
+    {
+      "id": "gpt-5.1-codex-mini",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "medium": 1.0,
+        "high": 1.4
+      },
+      "metadata": {
+        "description": "Cheaper, faster Codex model."
+      }
+    },
+    {
+      "id": "gpt-5.1-codex",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4
+      },
+      "metadata": {
+        "description": "Codex-optimized model."
+      }
+    },
+    {
+      "id": "gpt-5",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "minimal": 0.5,
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4
+      },
+      "metadata": {
+        "description": "Broad world knowledge with strong general reasoning."
+      }
+    },
+    {
+      "id": "gpt-5.1",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1.0,
+        "high": 1.4
+      },
+      "metadata": {
+        "description": "General purpose frontier model."
+      }
+    },
+    {
+      "id": "gpt-5-codex-internal",
+      "aliases": [
+        "codex-internal"
+      ],
+      "visibility": "internal",
+      "family": "gpt-5",
+      "metadata": {
+        "description": "Reserved for internal integrations."
+      }
+    }
+  ]
+}

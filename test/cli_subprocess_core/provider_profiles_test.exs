@@ -14,7 +14,19 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  prompt: "solve this",
                  cwd: "/tmp/claude",
                  env: %{"CLAUDE_ENV" => "1"},
-                 model: "claude-3-7-sonnet",
+                 model_payload: %{
+                   provider: :claude,
+                   requested_model: "claude-3-7-sonnet",
+                   resolved_model: "claude-3-7-sonnet",
+                   resolution_source: :explicit,
+                   reasoning: nil,
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "sonnet",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
                  max_turns: 5,
                  append_system_prompt: "stay terse",
                  permission_mode: :accept_edits,
@@ -55,8 +67,19 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  command: "codex-bin",
                  prompt: "review this diff",
                  cwd: "/tmp/codex",
-                 model: "gpt-5-codex",
-                 reasoning_effort: :high,
+                 model_payload: %{
+                   provider: :codex,
+                   requested_model: "gpt-5-codex",
+                   resolved_model: "gpt-5-codex",
+                   resolution_source: :explicit,
+                   reasoning: "high",
+                   reasoning_effort: 1.2,
+                   normalized_reasoning_effort: 1.2,
+                   model_family: "gpt-5",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
                  output_schema: schema,
                  permission_mode: :yolo
                )
@@ -85,7 +108,19 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  command: "gemini-bin",
                  prompt: "hello",
                  cwd: "/tmp/gemini",
-                 model: "gemini-2.5-pro",
+                 model_payload: %{
+                   provider: :gemini,
+                   requested_model: "gemini-2.5-pro",
+                   resolved_model: "gemini-2.5-pro",
+                   resolution_source: :explicit,
+                   reasoning: nil,
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "gemini",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
                  sandbox: true,
                  extensions: ["fs", "git"],
                  permission_mode: :plan
@@ -119,7 +154,19 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  command: "amp-bin",
                  prompt: "ship it",
                  cwd: "/tmp/amp",
-                 model: "amp-1",
+                 model_payload: %{
+                   provider: :amp,
+                   requested_model: "amp-1",
+                   resolved_model: "amp-1",
+                   resolution_source: :explicit,
+                   reasoning: nil,
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "amp",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
                  mode: "chat",
                  max_turns: 2,
                  system_prompt: "do not waffle",
@@ -158,6 +205,66 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
              ]
 
       assert command.cwd == "/tmp/amp"
+    end
+
+    test "uses resolved model payload when model option is not set" do
+      assert {:ok, %Command{} = command} =
+               Gemini.build_invocation(
+                 model_payload: %{
+                   provider: :gemini,
+                   requested_model: "legacy",
+                   resolved_model: "gemini-2.5-pro",
+                   resolution_source: :explicit,
+                   reasoning: nil,
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "gemini",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
+                 prompt: "hello",
+                 cwd: "/tmp/gemini"
+               )
+
+      assert "--model" in command.args
+      idx = Enum.find_index(command.args, &(&1 == "--model"))
+      assert Enum.at(command.args, idx + 1) == "gemini-2.5-pro"
+    end
+
+    test "does not use raw model or reasoning options when payload is absent" do
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 prompt: "review this diff",
+                 model: "gpt-5-codex",
+                 reasoning_effort: :high
+               )
+
+      refute "--model" in command.args
+      refute "--reasoning-effort" in command.args
+    end
+
+    test "does not emit --model when payload model is absent" do
+      assert {:ok, %Command{} = command} =
+               Amp.build_invocation(
+                 model_payload: %{
+                   provider: :amp,
+                   requested_model: nil,
+                   resolved_model: nil,
+                   resolution_source: :default,
+                   reasoning: nil,
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "amp",
+                   catalog_version: "2026-03-25",
+                   visibility: :public,
+                   errors: []
+                 },
+                 prompt: "ship it",
+                 cwd: "/tmp/amp"
+               )
+
+      assert command.args == ["run", "--output", "jsonl", "ship it"]
     end
   end
 

@@ -62,11 +62,34 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   defp option_flags(opts) do
     []
-    |> Shared.maybe_add_pair("--model", Keyword.get(opts, :model))
-    |> Shared.maybe_add_pair("--reasoning-effort", Keyword.get(opts, :reasoning_effort))
+    |> Shared.maybe_add_pair("--model", model_value(opts))
+    |> Shared.maybe_add_pair("--reasoning-effort", reasoning_value(opts))
     |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
     |> Kernel.++(permission_flags(opts))
   end
+
+  defp model_value(opts) do
+    Keyword.get(opts, :model_payload, %{})
+    |> model_payload_value(:resolved_model)
+  end
+
+  defp reasoning_value(opts) do
+    payload = Keyword.get(opts, :model_payload, %{})
+    resolved_reasoning = model_payload_value(payload, :reasoning)
+    normalized_reasoning = model_payload_value(payload, :normalized_reasoning_effort)
+
+    cond do
+      resolved_reasoning != nil -> resolved_reasoning
+      normalized_reasoning != nil -> normalized_reasoning
+      true -> nil
+    end
+  end
+
+  defp model_payload_value(value, key) when is_map(value) do
+    Map.get(value, key, Map.get(value, Atom.to_string(key)))
+  end
+
+  defp model_payload_value(_payload, _key), do: nil
 
   defp permission_flags(opts) do
     case Shared.permission_mode(opts) do
@@ -235,9 +258,11 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
         output: %{
           usage: %{
             input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
-            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
+            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"]),
+            total_tokens: Shared.int_value(usage, [:total_tokens, "total_tokens"])
           }
-        }
+        },
+        metadata: Shared.fetch_any(raw, [:metadata, "metadata"])
       ),
       raw,
       state
@@ -247,13 +272,13 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   defp error_event(raw, state) do
     payload =
       Payload.Error.new(
-        message: Shared.fetch_any(raw, [:message, "message"]) || "Codex parser error",
         code:
           raw
-          |> Shared.fetch_any([:kind, "kind"])
+          |> Shared.fetch_any([:error_code, "error_code"])
           |> Shared.normalize_kind()
           |> Atom.to_string(),
-        severity: Shared.normalize_severity(Shared.fetch_any(raw, [:severity, "severity"])),
+        message:
+          Shared.fetch_any(raw, [:message, "message", :error, "error"]) || "Codex parser error",
         metadata: Shared.normalize_map(raw)
       )
 

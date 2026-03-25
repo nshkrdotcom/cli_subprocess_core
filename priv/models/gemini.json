@@ -1,0 +1,31 @@
+{
+  "provider": "gemini",
+  "catalog_version": "2026-03-25",
+  "remote_default": "gemini-2.5-pro",
+  "models": [
+    {
+      "id": "gemini-2.5-pro",
+      "aliases": [
+        "pro",
+        "default"
+      ],
+      "visibility": "public",
+      "family": "gemini",
+      "default": true,
+      "metadata": {
+        "description": "Default Gemini model."
+      }
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "aliases": [
+        "flash"
+      ],
+      "visibility": "restricted",
+      "family": "gemini",
+      "metadata": {
+        "description": "Restricted fast-mode model."
+      }
+    }
+  ]
+}
