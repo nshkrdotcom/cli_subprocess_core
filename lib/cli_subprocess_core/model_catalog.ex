@@ -22,7 +22,6 @@ defmodule CliSubprocessCore.ModelCatalog do
 
   @spec load(atom()) :: {:ok, t()} | {:error, load_error()}
   def load(provider) when is_atom(provider) do
-    provider = normalize_provider(provider)
     path = catalog_path(provider)
 
     with {:ok, body} <- read_catalog(path, provider),
@@ -40,12 +39,7 @@ defmodule CliSubprocessCore.ModelCatalog do
 
   @spec catalog_path(atom()) :: String.t()
   def catalog_path(provider) when is_atom(provider) do
-    base =
-      case Application.app_dir(:cli_subprocess_core) do
-        nil -> Path.expand("priv")
-        app_dir -> Path.join(app_dir, "priv")
-      end
-
+    base = Path.join(Application.app_dir(:cli_subprocess_core), "priv")
     Path.join(base, "models/#{provider}#{@catalog_filename_suffix}")
   end
 
@@ -75,25 +69,33 @@ defmodule CliSubprocessCore.ModelCatalog do
   defp decode_models(payload, provider) do
     case payload_get(payload, :models) do
       models when is_list(models) ->
-        models
-        |> Enum.reduce_while({:ok, []}, fn model_attrs, {:ok, loaded} ->
-          case Model.new(provider, model_attrs) do
-            {:ok, model} ->
-              {:cont, {:ok, [model | loaded]}}
-
-            {:error, reason} ->
-              {:halt, {:error, reason}}
-          end
-        end)
-        |> case do
-          {:ok, models} -> {:ok, Enum.reverse(models)}
-          {:error, reason} -> {:error, reason}
-        end
+        load_models(models, provider)
 
       _other ->
         {:error, {:model_unavailable, provider, {:invalid_catalog, :missing_models}}}
     end
   end
+
+  defp load_models(models, provider) when is_list(models) do
+    models
+    |> Enum.reduce_while({:ok, []}, fn model_attrs, {:ok, loaded} ->
+      append_model(loaded, provider, model_attrs)
+    end)
+    |> finalize_loaded_models()
+  end
+
+  defp append_model(loaded, provider, model_attrs) do
+    case Model.new(provider, model_attrs) do
+      {:ok, model} ->
+        {:cont, {:ok, [model | loaded]}}
+
+      {:error, reason} ->
+        {:halt, {:error, reason}}
+    end
+  end
+
+  defp finalize_loaded_models({:ok, models}), do: {:ok, Enum.reverse(models)}
+  defp finalize_loaded_models({:error, reason}), do: {:error, reason}
 
   defp catalog_version(payload) do
     case payload_get(payload, :catalog_version) do
@@ -105,10 +107,4 @@ defmodule CliSubprocessCore.ModelCatalog do
   defp payload_get(payload, key, default \\ nil) do
     Map.get(payload, key, Map.get(payload, Atom.to_string(key), default))
   end
-
-  defp normalize_provider(provider) when is_atom(provider),
-    do: provider |> Atom.to_string() |> String.to_atom()
-
-  defp normalize_provider(provider) when is_binary(provider),
-    do: provider |> String.trim() |> String.downcase() |> String.to_atom()
 end

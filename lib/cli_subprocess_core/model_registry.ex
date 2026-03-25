@@ -15,6 +15,14 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   @invalid_model_inputs ["", "nil", "null"]
   @all_visibilities [:public, :private, :internal, :restricted]
+  @visibility_filters %{
+    all: @all_visibilities,
+    public: [:public],
+    private: [:private],
+    internal: [:internal],
+    restricted: [:restricted],
+    default: [:public]
+  }
 
   @spec resolve(atom(), String.t() | nil, keyword()) ::
           {:ok, Selection.t()} | {:error, resolution_error()}
@@ -54,8 +62,9 @@ defmodule CliSubprocessCore.ModelRegistry do
          {:ok, filters} <- expand_visibility_filter(visibility) do
       visible =
         catalog.models
-        |> Enum.filter(&(&1.visibility in filters))
-        |> Enum.filter(fn model -> family == nil or model.family == family end)
+        |> Enum.filter(fn model ->
+          model.visibility in filters and (family == nil or model.family == family)
+        end)
         |> Enum.map(& &1.id)
 
       {:ok, visible}
@@ -83,9 +92,8 @@ defmodule CliSubprocessCore.ModelRegistry do
 
     with {:ok, catalog} <- load_catalog(provider),
          {:ok, normalized_requested} <-
-           normalize_requested_model(requested_model, :explicit, provider),
-         {:ok, model} <- find_model(catalog.models, normalized_requested, provider) do
-      {:ok, model}
+           normalize_requested_model(requested_model, :explicit, provider) do
+      find_model(catalog.models, normalized_requested, provider)
     end
   end
 
@@ -270,10 +278,15 @@ defmodule CliSubprocessCore.ModelRegistry do
   end
 
   defp catalog_remote_default(catalog, provider) do
-    case normalize_requested_model(catalog.remote_default, :remote, provider) do
-      {:ok, normalized} -> {:ok, normalized}
-      {:skip} -> {:error, {:model_unavailable, provider, :no_default_or_remote_model}}
-      {:error, reason} -> {:error, reason}
+    case catalog.remote_default do
+      nil ->
+        {:error, {:model_unavailable, provider, :no_default_or_remote_model}}
+
+      remote_default ->
+        case normalize_requested_model(remote_default, :remote, provider) do
+          {:ok, normalized} -> {:ok, normalized}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -333,38 +346,18 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   defp expand_visibility_filter(visibility) do
     case visibility do
-      :all ->
-        {:ok, @all_visibilities}
-
       value when is_list(value) ->
         expand_visibility_list(value)
 
-      :public ->
-        {:ok, [:public]}
-
-      :private ->
-        {:ok, [:private]}
-
-      :internal ->
-        {:ok, [:internal]}
-
-      :restricted ->
-        {:ok, [:restricted]}
-
-      :default ->
-        {:ok, [:public]}
+      value when is_atom(value) ->
+        visibility_from_key(value)
 
       value when is_binary(value) ->
-        normalized = String.downcase(String.trim(value))
-
-        case normalized do
-          "all" -> {:ok, @all_visibilities}
-          "public" -> {:ok, [:public]}
-          "private" -> {:ok, [:private]}
-          "internal" -> {:ok, [:internal]}
-          "restricted" -> {:ok, [:restricted]}
-          _ -> {:error, {:model_unavailable, :unknown, :invalid_visibility}}
-        end
+        value
+        |> String.trim()
+        |> String.downcase()
+        |> visibility_key_from_string()
+        |> visibility_from_key()
 
       _ ->
         {:error, {:model_unavailable, :unknown, :invalid_visibility}}
@@ -388,6 +381,21 @@ defmodule CliSubprocessCore.ModelRegistry do
 
       {:error, _} = error ->
         error
+    end
+  end
+
+  defp visibility_key_from_string("all"), do: :all
+  defp visibility_key_from_string("public"), do: :public
+  defp visibility_key_from_string("private"), do: :private
+  defp visibility_key_from_string("internal"), do: :internal
+  defp visibility_key_from_string("restricted"), do: :restricted
+  defp visibility_key_from_string("default"), do: :default
+  defp visibility_key_from_string(_other), do: :invalid
+
+  defp visibility_from_key(key) when is_atom(key) do
+    case Map.fetch(@visibility_filters, key) do
+      {:ok, filters} -> {:ok, filters}
+      :error -> {:error, {:model_unavailable, :unknown, :invalid_visibility}}
     end
   end
 

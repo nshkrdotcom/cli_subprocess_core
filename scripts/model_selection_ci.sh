@@ -24,6 +24,31 @@ ALL_TASKS=(
   dialyzer
 )
 
+workspace_deps_for_repo() {
+  case "$1" in
+    agent_session_manager)
+      printf '%s\n' \
+        "cli_subprocess_core" \
+        "claude_agent_sdk" \
+        "codex_sdk" \
+        "gemini_cli_sdk" \
+        "amp_sdk"
+      ;;
+    codex_sdk|gemini_cli_sdk|claude_agent_sdk|amp_sdk)
+      printf '%s\n' "cli_subprocess_core"
+      ;;
+    *)
+      ;;
+  esac
+}
+
+step_requires_workspace_refresh() {
+  case "$1" in
+    compile|test|credo|dialyzer|all|ci) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 usage() {
   cat <<'USAGE'
 Usage: model_selection_ci.sh [TASK] [--repo <repo>[,<repo>...]] [--tag <tag>[,<tag>...]]
@@ -180,43 +205,99 @@ run_task() {
   local repo="$1"
   local task="$2"
   local repo_dir="$ROOT_DIR/$repo"
-  local command
+  local -a command
 
   if [[ ! -d "$repo_dir" ]]; then
     echo "[ERROR] repository missing: $repo_dir" >&2
     return 1
   fi
 
+  local log_file="/tmp/model_selection_ci_${repo}_${task}.log"
+  : >"$log_file"
+
+  run_logged_command() {
+    local -a logged_command=("$@")
+
+    {
+      printf '[repo] %s\n' "$repo"
+      printf '[task] %s\n' "$task"
+      printf '[workdir] %s\n' "$repo_dir"
+      printf '[command]'
+      printf ' %q' "${logged_command[@]}"
+      printf '\n\n'
+    } >>"$log_file"
+
+    if (cd "$repo_dir" && "${logged_command[@]}") >>"$log_file" 2>&1; then
+      return 0
+    else
+      local rc=$?
+      cat "$log_file" >&2
+      return "$rc"
+    fi
+  }
+
   case "$task" in
     format)
-      command="mix format --check-formatted"
+      command=(mix format --check-formatted)
+      run_logged_command "${command[@]}"
       ;;
     compile)
-      command="mix compile --force --warnings-as-errors"
+      command=(mix compile --force --warnings-as-errors)
+      run_logged_command "${command[@]}"
       ;;
     test)
-      command="mix test --warnings-as-errors"
+      command=(mix test --warnings-as-errors)
+      run_logged_command "${command[@]}"
       ;;
     credo)
-      command="MIX_ENV=test mix credo --strict"
+      command=(env MIX_ENV=test mix credo --strict)
+      run_logged_command "${command[@]}"
       ;;
     dialyzer)
-      command="MIX_ENV=dev mix dialyzer"
+      command=(env MIX_ENV=dev mix dialyzer --plt --force-check)
+      run_logged_command "${command[@]}" &&
+        run_logged_command env MIX_ENV=dev mix dialyzer
       ;;
     *)
       echo "[ERROR] unknown task $task" >&2
       return 1
       ;;
   esac
+}
 
-  local output
-  if ! output=$(cd "$repo_dir" && eval "$command" 2>&1); then
-    local rc=$?
-    echo "$output" >&2
-    return $rc
+refresh_workspace_deps() {
+  local repo="$1"
+  local repo_dir="$ROOT_DIR/$repo"
+  local log_file="/tmp/model_selection_ci_${repo}_deps_refresh.log"
+  local -a deps=()
+  local dep
+
+  while IFS= read -r dep; do
+    [[ -n "$dep" ]] && deps+=("$dep")
+  done < <(workspace_deps_for_repo "$repo")
+
+  if ((${#deps[@]} == 0)); then
+    return 0
   fi
 
-  return 0
+  local -a command=(mix deps.compile "${deps[@]}" --force)
+
+  {
+    printf '[repo] %s\n' "$repo"
+    printf '[task] %s\n' "deps-refresh"
+    printf '[workdir] %s\n' "$repo_dir"
+    printf '[command]'
+    printf ' %q' "${command[@]}"
+    printf '\n\n'
+  } >"$log_file"
+
+  if (cd "$repo_dir" && "${command[@]}") >>"$log_file" 2>&1; then
+    return 0
+  else
+    local rc=$?
+    cat "$log_file" >&2
+    return "$rc"
+  fi
 }
 
 run_repo() {
@@ -231,6 +312,28 @@ run_repo() {
   fi
 
   echo "=== repo: $repo ==="
+
+  local refresh_needed=0
+  local step
+
+  for step in "${steps[@]}"; do
+    if step_requires_workspace_refresh "$step"; then
+      refresh_needed=1
+      break
+    fi
+  done
+
+  if ((refresh_needed)); then
+    printf '  - %-10s ... ' "deps"
+    if refresh_workspace_deps "$repo"; then
+      echo "PASS"
+    else
+      local rc=$?
+      echo "FAIL"
+      cat "/tmp/model_selection_ci_${repo}_deps_refresh.log" >&2
+      return $rc
+    fi
+  fi
 
   for step in "${steps[@]}"; do
     printf '  - %-10s ... ' "$step"

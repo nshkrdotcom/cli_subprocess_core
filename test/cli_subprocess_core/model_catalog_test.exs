@@ -13,7 +13,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert Enum.any?(claude_catalog.models, &(&1.id == "claude-3-7-sonnet"))
+      assert Enum.any?(claude_catalog.models, &(&1.id == "sonnet"))
 
       assert {:ok, gemini_catalog} = ModelCatalog.load(:gemini)
       assert gemini_catalog.provider == :gemini
