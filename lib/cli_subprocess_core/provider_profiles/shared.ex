@@ -9,7 +9,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :headless_timeout_ms,
     :max_buffer_size,
     :max_stderr_buffer_size,
-    :stderr_callback
+    :stderr_callback,
+    :close_stdin_on_start?
   ]
 
   @normalized_kinds %{

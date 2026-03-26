@@ -206,7 +206,6 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
     end
 
     test "Amp builds the expected CLI invocation" do
-      permissions = %{"edit" => true}
       mcp_config = %{"servers" => [%{"name" => "demo"}]}
 
       assert {:ok, %Command{} = command} =
@@ -227,12 +226,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                    visibility: :public,
                    errors: []
                  },
-                 mode: "chat",
-                 max_turns: 2,
-                 system_prompt: "do not waffle",
-                 permissions: permissions,
+                 mode: "smart",
                  mcp_config: mcp_config,
-                 tools: ["bash", "edit"],
                  include_thinking: true,
                  permission_mode: :dangerously_allow_all
                )
@@ -240,28 +235,16 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.command == "amp-bin"
 
       assert command.args == [
-               "run",
-               "--output",
-               "jsonl",
-               "--model",
-               "amp-1",
+               "--execute",
+               "ship it",
+               "--stream-json-thinking",
+               "--no-ide",
+               "--no-notifications",
                "--mode",
-               "chat",
-               "--max-turns",
-               "2",
-               "--system-prompt",
-               "do not waffle",
-               "--permissions-json",
-               Jason.encode!(permissions),
-               "--mcp-config-json",
+               "smart",
+               "--mcp-config",
                Jason.encode!(mcp_config),
-               "--tool",
-               "bash",
-               "--tool",
-               "edit",
-               "--thinking",
-               "--dangerously-allow-all",
-               "ship it"
+               "--dangerously-allow-all"
              ]
 
       assert command.cwd == "/tmp/amp"
@@ -324,7 +307,13 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  cwd: "/tmp/amp"
                )
 
-      assert command.args == ["run", "--output", "jsonl", "ship it"]
+      assert command.args == [
+               "--execute",
+               "ship it",
+               "--stream-json",
+               "--no-ide",
+               "--no-notifications"
+             ]
     end
   end
 
@@ -557,6 +546,33 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
       assert [stderr] = decode_stderr(Amp, "amp warning")
       assert %Payload.Stderr{content: "amp warning"} = stderr.payload
+    end
+
+    test "Amp decodes current execute stream JSON output" do
+      lines = [
+        ~s({"type":"system","subtype":"init","session_id":"amp-session-2"}),
+        ~s({"type":"assistant","message":{"type":"message","role":"assistant","content":[{"type":"text","text":"OK"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":13}},"session_id":"amp-session-2"}),
+        ~s({"type":"result","subtype":"success","duration_ms":1074,"result":"OK","session_id":"amp-session-2"})
+      ]
+
+      {events, _state} =
+        Enum.reduce(lines, {[], Amp.init_parser_state([])}, fn line, {acc, state} ->
+          {decoded, next_state} = Amp.decode_stdout(line, state)
+          {acc ++ decoded, next_state}
+        end)
+
+      assert Enum.map(events, & &1.kind) == [:raw, :assistant_message, :result]
+
+      assert %Payload.AssistantMessage{content: [%{"type" => "text", "text" => "OK"}]} =
+               Enum.at(events, 1).payload
+
+      assert %Payload.Result{
+               status: :completed,
+               stop_reason: "success",
+               output: %{duration_ms: 1074, usage: %{input_tokens: 10, output_tokens: 13}}
+             } = Enum.at(events, 2).payload
+
+      assert Enum.at(events, 2).provider_session_id == "amp-session-2"
     end
   end
 

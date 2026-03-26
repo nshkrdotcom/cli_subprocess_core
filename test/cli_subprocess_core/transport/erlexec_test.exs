@@ -152,6 +152,28 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
                    2_000
   end
 
+  test "close_stdin_on_start closes stdin immediately after boot" do
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      cat >/dev/null
+      printf 'done\\n'
+      """)
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               subscriber: {self(), ref},
+               close_stdin_on_start?: true
+             )
+
+    assert_receive {:cli_subprocess_core, ^ref, {:message, "done"}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+                   2_000
+  end
+
   test "last unsubscribe starts the headless timeout" do
     script =
       create_test_script("""

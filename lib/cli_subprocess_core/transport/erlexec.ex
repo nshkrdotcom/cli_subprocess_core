@@ -529,6 +529,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
            ),
          argv <- normalize_command_argv(options.command, options.args),
          {:ok, pid, os_pid} <- exec_run(options.command, argv, exec_opts),
+         :ok <- maybe_close_stdin_on_start(pid, options.close_stdin_on_start?),
          {:ok, state} <-
            add_bootstrap_subscriber(connected_state(state, pid, os_pid), options.subscriber) do
       {:ok, maybe_schedule_headless_timer(%{state | startup_options: nil})}
@@ -753,6 +754,9 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     kind, reason ->
       transport_error(Error.send_failed({kind, reason}))
   end
+
+  defp maybe_close_stdin_on_start(_pid, false), do: :ok
+  defp maybe_close_stdin_on_start(pid, true), do: send_run_eof(pid)
 
   defp collect_run_output(pid, os_pid, options, :infinity, stdout, stderr, output) do
     receive do

@@ -13,6 +13,7 @@ defmodule CliSubprocessCore.Transport.Options do
   @default_task_supervisor CliSubprocessCore.TaskSupervisor
   @default_stdout_mode :line
   @default_stdin_mode :line
+  @default_close_stdin_on_start? false
 
   @enforce_keys [:command]
   defstruct [
@@ -34,6 +35,7 @@ defmodule CliSubprocessCore.Transport.Options do
     max_buffer_size: @default_max_buffer_size,
     max_stderr_buffer_size: @default_max_stderr_buffer_size,
     stderr_callback: nil,
+    close_stdin_on_start?: @default_close_stdin_on_start?,
     replay_stderr_on_subscribe?: false
   ]
 
@@ -58,6 +60,7 @@ defmodule CliSubprocessCore.Transport.Options do
           max_buffer_size: pos_integer(),
           max_stderr_buffer_size: pos_integer(),
           stderr_callback: (binary() -> any()) | nil,
+          close_stdin_on_start?: boolean(),
           replay_stderr_on_subscribe?: boolean()
         }
 
@@ -81,6 +84,7 @@ defmodule CliSubprocessCore.Transport.Options do
           | {:invalid_max_buffer_size, term()}
           | {:invalid_max_stderr_buffer_size, term()}
           | {:invalid_stderr_callback, term()}
+          | {:invalid_close_stdin_on_start, term()}
           | {:invalid_replay_stderr_on_subscribe, term()}
 
   @doc """
@@ -107,6 +111,7 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_max_buffer_size(normalized.max_buffer_size),
          :ok <- validate_max_stderr_buffer_size(normalized.max_stderr_buffer_size),
          :ok <- validate_stderr_callback(normalized.stderr_callback),
+         :ok <- validate_close_stdin_on_start(normalized.close_stdin_on_start?),
          :ok <- validate_replay_stderr_on_subscribe(normalized.replay_stderr_on_subscribe?) do
       {:ok, struct!(__MODULE__, normalized)}
     else
@@ -175,6 +180,8 @@ defmodule CliSubprocessCore.Transport.Options do
            max_stderr_buffer_size:
              Keyword.get(opts, :max_stderr_buffer_size, @default_max_stderr_buffer_size),
            stderr_callback: Keyword.get(opts, :stderr_callback),
+           close_stdin_on_start?:
+             Keyword.get(opts, :close_stdin_on_start?, @default_close_stdin_on_start?),
            replay_stderr_on_subscribe?: Keyword.get(opts, :replay_stderr_on_subscribe?, false)
          }}
 
@@ -208,6 +215,8 @@ defmodule CliSubprocessCore.Transport.Options do
            max_stderr_buffer_size:
              Keyword.get(opts, :max_stderr_buffer_size, @default_max_stderr_buffer_size),
            stderr_callback: Keyword.get(opts, :stderr_callback),
+           close_stdin_on_start?:
+             Keyword.get(opts, :close_stdin_on_start?, @default_close_stdin_on_start?),
            replay_stderr_on_subscribe?: Keyword.get(opts, :replay_stderr_on_subscribe?, false)
          }}
     end
@@ -320,6 +329,11 @@ defmodule CliSubprocessCore.Transport.Options do
   defp validate_stderr_callback(nil), do: :ok
   defp validate_stderr_callback(callback) when is_function(callback, 1), do: :ok
   defp validate_stderr_callback(callback), do: {:error, {:invalid_stderr_callback, callback}}
+
+  defp validate_close_stdin_on_start(value) when is_boolean(value), do: :ok
+
+  defp validate_close_stdin_on_start(value),
+    do: {:error, {:invalid_close_stdin_on_start, value}}
 
   defp validate_replay_stderr_on_subscribe(value) when is_boolean(value), do: :ok
 

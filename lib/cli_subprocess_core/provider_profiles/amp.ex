@@ -8,10 +8,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.Shared
 
-  @required_flags ["run", "--output", "jsonl"]
   @event_handlers %{
     "approval_requested" => :approval_requested,
     "approval_resolved" => :approval_resolved,
+    "assistant" => :assistant_message,
     "assistant_delta" => :assistant_delta,
     "cost_update" => :cost_update,
     "error" => :error_event,
@@ -41,7 +41,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   @impl true
   def build_invocation(opts) when is_list(opts) do
     with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
-      args = @required_flags ++ option_flags(opts) ++ [prompt]
+      args = ["--execute", prompt] ++ output_flags(opts) ++ option_flags(opts)
       {:ok, Shared.command(Shared.resolve_command(opts, "amp"), args, opts)}
     end
   rescue
@@ -50,7 +50,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   end
 
   @impl true
-  def init_parser_state(opts), do: Shared.init_parser_state(id(), opts)
+  def init_parser_state(opts) do
+    Shared.init_parser_state(id(), opts)
+    |> Map.merge(%{amp_last_stop_reason: nil, amp_last_usage: %{}})
+  end
 
   @impl true
   def decode_stdout(line, state) when is_binary(line) and is_map(state) do
@@ -64,54 +67,35 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   def handle_exit(reason, state), do: Shared.handle_exit(reason, state)
 
   @impl true
-  def transport_options(opts), do: Shared.transport_options(opts)
+  def transport_options(opts) do
+    Shared.transport_options(opts)
+    |> Keyword.put(:close_stdin_on_start?, true)
+  end
+
+  defp output_flags(opts) do
+    if Keyword.get(opts, :include_thinking, false) do
+      ["--stream-json-thinking"]
+    else
+      ["--stream-json"]
+    end
+  end
 
   defp option_flags(opts) do
-    []
-    |> Shared.maybe_add_pair("--model", model_value(opts))
+    ["--no-ide", "--no-notifications"]
     |> Shared.maybe_add_pair("--mode", Keyword.get(opts, :mode))
-    |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
-    |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
-    |> Shared.maybe_add_json_pair("--permissions-json", Keyword.get(opts, :permissions))
-    |> Shared.maybe_add_json_pair("--mcp-config-json", Keyword.get(opts, :mcp_config))
-    |> Shared.maybe_add_repeat("--tool", Keyword.get(opts, :tools, []))
-    |> Shared.maybe_add_flag("--thinking", Keyword.get(opts, :include_thinking, false))
+    |> Shared.maybe_add_json_pair("--mcp-config", Keyword.get(opts, :mcp_config))
     |> Kernel.++(permission_flags(opts))
   end
 
   defp permission_flags(opts) do
     case Shared.permission_mode(opts) do
-      :auto ->
-        ["--permission-mode", "auto"]
-
-      :plan ->
-        ["--permission-mode", "plan"]
-
       :dangerously_allow_all ->
         ["--dangerously-allow-all"]
-
-      value when is_atom(value) and value != :default ->
-        ["--permission-mode", Atom.to_string(value)]
-
-      value when is_binary(value) and value != "" ->
-        ["--permission-mode", value]
 
       _ ->
         []
     end
   end
-
-  defp model_value(opts) do
-    Keyword.get(opts, :model_payload, %{})
-    |> model_payload_value(:resolved_model)
-  end
-
-  defp model_payload_value(%{resolved_model: value}, _key), do: value
-
-  defp model_payload_value(payload, key) when is_map(payload),
-    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
-
-  defp model_payload_value(_payload, _key), do: nil
 
   defp decode_event(raw, state) do
     @event_handlers
@@ -150,11 +134,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   end
 
   defp assistant_message(raw, state) do
+    message = assistant_message_source(raw)
+    state = remember_assistant_result_fields(state, message)
+
     Shared.emit_single(
       :assistant_message,
       Payload.AssistantMessage.new(
-        content: Shared.content_blocks(raw),
-        model: Shared.fetch_any(raw, [:model, "model"])
+        content: Shared.content_blocks(message),
+        model: Shared.fetch_any(message, [:model, "model"])
       ),
       raw,
       state
@@ -260,22 +247,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
 
   defp result(raw, state) do
     usage = Shared.fetch_any(raw, [:token_usage, "token_usage", :usage, "usage", :stats, "stats"])
-    usage = if is_map(usage), do: usage, else: %{}
+    usage = if is_map(usage), do: usage, else: Map.get(state, :amp_last_usage, %{})
+    stop_reason = result_stop_reason(raw, state)
 
     Shared.emit_single(
       :result,
       Payload.Result.new(
         status: :completed,
-        stop_reason:
-          Shared.fetch_any(raw, [
-            :stop_reason,
-            "stop_reason",
-            :status,
-            "status",
-            :reason,
-            "reason"
-          ]) ||
-            :unknown,
+        stop_reason: stop_reason,
         output: %{
           duration_ms: Shared.fetch_any(raw, [:duration_ms, "duration_ms"]),
           usage: %{
@@ -321,5 +300,37 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
       )
 
     Shared.emit_single(:error, payload, raw, state)
+  end
+
+  defp assistant_message_source(raw) do
+    case Shared.fetch_any(raw, [:message, "message"]) do
+      message when is_map(message) -> message
+      _ -> raw
+    end
+  end
+
+  defp remember_assistant_result_fields(state, message) when is_map(message) do
+    usage =
+      case Shared.fetch_any(message, [:usage, "usage", :token_usage, "token_usage"]) do
+        value when is_map(value) -> value
+        _ -> %{}
+      end
+
+    state
+    |> Map.put(:amp_last_stop_reason, Shared.fetch_any(message, [:stop_reason, "stop_reason"]))
+    |> Map.put(:amp_last_usage, usage)
+  end
+
+  defp result_stop_reason(raw, state) do
+    Shared.fetch_any(raw, [
+      :stop_reason,
+      "stop_reason",
+      :status,
+      "status",
+      :reason,
+      "reason",
+      :subtype,
+      "subtype"
+    ]) || Map.get(state, :amp_last_stop_reason) || :unknown
   end
 end
