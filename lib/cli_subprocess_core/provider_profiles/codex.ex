@@ -65,7 +65,6 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     |> Shared.maybe_add_flag("--oss", oss_enabled?(opts))
     |> Shared.maybe_add_pair("--local-provider", local_provider_value(opts))
     |> Shared.maybe_add_pair("--model", model_value(opts))
-    |> Shared.maybe_add_pair("--reasoning-effort", reasoning_value(opts))
     |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
     |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Kernel.++(permission_flags(opts))
@@ -77,15 +76,15 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     |> model_payload_value(:resolved_model)
   end
 
-  defp reasoning_value(opts) do
+  defp reasoning_config_values(opts) do
     payload = Keyword.get(opts, :model_payload, %{})
     resolved_reasoning = model_payload_value(payload, :reasoning)
     normalized_reasoning = model_payload_value(payload, :normalized_reasoning_effort)
 
     cond do
-      resolved_reasoning != nil -> resolved_reasoning
-      normalized_reasoning != nil -> normalized_reasoning
-      true -> nil
+      resolved_reasoning != nil -> [~s(model_reasoning_effort="#{resolved_reasoning}")]
+      normalized_reasoning != nil -> [~s(model_reasoning_effort="#{normalized_reasoning}")]
+      true -> []
     end
   end
 
@@ -125,7 +124,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       |> List.wrap()
       |> Enum.filter(&(is_binary(&1) and &1 != ""))
 
-    (Keyword.get(opts, :config_values, []) ++ payload_values)
+    (reasoning_config_values(opts) ++ Keyword.get(opts, :config_values, []) ++ payload_values)
     |> Enum.uniq()
   end
 

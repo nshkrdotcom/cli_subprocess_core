@@ -106,10 +106,10 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "--json",
                "--model",
                "gpt-5-codex",
-               "--reasoning-effort",
-               "high",
                "--output-schema",
                Jason.encode!(schema),
+               "--config",
+               ~s(model_reasoning_effort="high"),
                "--dangerously-bypass-approvals-and-sandbox",
                "review this diff"
              ]
@@ -156,8 +156,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "ollama",
                "--model",
                "llama3.2",
-               "--reasoning-effort",
-               "high",
+               "--config",
+               ~s(model_reasoning_effort="high"),
                "review this diff"
              ]
     end
@@ -284,7 +284,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                )
 
       refute "--model" in command.args
-      refute "--reasoning-effort" in command.args
+      refute "--config" in command.args
     end
 
     test "does not emit --model when payload model is absent" do
