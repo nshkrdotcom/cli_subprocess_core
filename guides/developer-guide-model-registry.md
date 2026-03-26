@@ -25,6 +25,7 @@ The model-selection internals live in:
 - `lib/cli_subprocess_core/model_registry.ex`
 - `lib/cli_subprocess_core/model_registry/model.ex`
 - `lib/cli_subprocess_core/model_registry/selection.ex`
+- `lib/cli_subprocess_core/ollama.ex`
 - `priv/models/codex.json`
 - `priv/models/claude.json`
 - `priv/models/gemini.json`
@@ -32,9 +33,16 @@ The model-selection internals live in:
 
 ## What the Catalogs Contain
 
-Each provider catalog is a static JSON file owned by the core repo.
+Each provider catalog is a core-owned source of truth.
 
-The catalog defines, per model:
+For Codex, Gemini, and Amp, that source is static JSON only.
+
+For Claude, the source is split:
+
+- static core catalog for the canonical Claude model surface
+- explicit backend-aware external validation for the Ollama path
+
+The static catalog defines, per model:
 
 - `id`
 - `aliases`
@@ -69,6 +77,10 @@ The output is a resolved selection that includes:
 - requested model
 - resolved model
 - resolution source
+- provider backend
+- model source
+- payload env overrides
+- backend metadata
 - reasoning and normalized reasoning effort
 - model family
 - catalog version
@@ -79,8 +91,8 @@ The output is a resolved selection that includes:
 
 The registry has separate responsibilities that should stay separate:
 
-- `resolve/3` chooses the final model
-- `validate/2` checks whether a requested model is valid
+- `resolve/3` chooses the final model and backend path
+- `validate/2` checks whether a requested model is valid for the resolved backend
 - `default_model/2` reads the effective provider default
 - `normalize_reasoning_effort/3` validates reasoning input against the chosen
   model
@@ -105,7 +117,7 @@ can handle a stable contract instead of inventing provider-specific error rules.
 ## Where the Selection Is Used
 
 After the registry resolves the model, the built-in provider profiles read that
-selection and format CLI arguments.
+selection and format CLI arguments and env.
 
 The provider profiles are:
 
@@ -115,7 +127,8 @@ The provider profiles are:
 - `lib/cli_subprocess_core/provider_profiles/amp.ex`
 
 Those modules should not make a second policy decision. Their job is to turn
-the resolved selection into transport arguments such as `--model ...`.
+the resolved selection into transport arguments such as `--model ...` and the
+backend-owned env attached to the payload.
 
 ## Minimal Integration Example
 
@@ -135,6 +148,23 @@ selection.resolved_model
 
 After that, provider-specific command building can safely use the resolved
 selection without re-deciding the model.
+
+For Claude/Ollama, a caller can keep canonical Claude names while mapping them
+to an installed external model:
+
+```elixir
+{:ok, selection} =
+  CliSubprocessCore.ModelRegistry.build_arg_payload(
+    :claude,
+    "haiku",
+    provider_backend: :ollama,
+    anthropic_base_url: "http://localhost:11434",
+    external_model_overrides: %{"haiku" => "llama3.2"}
+  )
+
+selection.resolved_model
+# => "llama3.2"
+```
 
 ## Reviewer Checklist
 

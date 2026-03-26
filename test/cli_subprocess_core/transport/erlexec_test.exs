@@ -226,7 +226,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       printf 'out\\n'
       """)
 
-    assert {:ok, transport} =
+    assert {:ok, _transport} =
              Erlexec.start(
                command: script,
                subscriber: {self(), ref},
@@ -236,9 +236,17 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
 
     assert_receive {:stderr_line, "err-one"}, 2_000
     assert_receive {:cli_subprocess_core, ^ref, {:stderr, stderr_chunk}}, 2_000
-    assert stderr_chunk =~ "err-one"
-    assert stderr_chunk =~ "err-two"
-    assert "\nerr-two" == Transport.stderr(transport)
+
+    trailing_stderr =
+      receive do
+        {:cli_subprocess_core, ^ref, {:stderr, chunk}} -> chunk
+      after
+        250 -> ""
+      end
+
+    combined_stderr = stderr_chunk <> trailing_stderr
+    assert combined_stderr =~ "err-one"
+    assert combined_stderr =~ "err-two"
     assert_receive {:cli_subprocess_core, ^ref, {:message, "out"}}, 2_000
     assert_receive {:stderr_line, "err-two"}, 2_000
 

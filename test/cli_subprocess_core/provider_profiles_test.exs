@@ -16,15 +16,24 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  env: %{"CLAUDE_ENV" => "1"},
                  model_payload: %{
                    provider: :claude,
-                   requested_model: "claude-3-7-sonnet",
-                   resolved_model: "claude-3-7-sonnet",
+                   requested_model: "haiku",
+                   resolved_model: "llama3.2",
                    resolution_source: :explicit,
                    reasoning: nil,
                    reasoning_effort: nil,
                    normalized_reasoning_effort: nil,
-                   model_family: "sonnet",
+                   model_family: "llama",
                    catalog_version: "2026-03-25",
                    visibility: :public,
+                   provider_backend: :ollama,
+                   model_source: :external,
+                   env_overrides: %{
+                     "ANTHROPIC_AUTH_TOKEN" => "ollama",
+                     "ANTHROPIC_API_KEY" => "",
+                     "ANTHROPIC_BASE_URL" => "http://127.0.0.1:11434"
+                   },
+                   settings_patch: %{},
+                   backend_metadata: %{"external_model" => "llama3.2"},
                    errors: []
                  },
                  max_turns: 5,
@@ -44,7 +53,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "--resume",
                "session-123",
                "--model",
-               "claude-3-7-sonnet",
+               "llama3.2",
                "--max-turns",
                "5",
                "--append-system-prompt",
@@ -56,7 +65,13 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
              ]
 
       assert command.cwd == "/tmp/claude"
-      assert command.env == %{"CLAUDE_ENV" => "1"}
+
+      assert command.env == %{
+               "CLAUDE_ENV" => "1",
+               "ANTHROPIC_AUTH_TOKEN" => "ollama",
+               "ANTHROPIC_API_KEY" => "",
+               "ANTHROPIC_BASE_URL" => "http://127.0.0.1:11434"
+             }
     end
 
     test "Codex builds the expected CLI invocation" do

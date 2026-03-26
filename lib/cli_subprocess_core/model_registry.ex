@@ -3,6 +3,7 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   alias CliSubprocessCore.ModelCatalog
   alias CliSubprocessCore.ModelRegistry.{Model, Selection}
+  alias CliSubprocessCore.Ollama
 
   @type resolution_error ::
           {:unknown_model, String.t() | nil, [String.t()], atom()}
@@ -12,6 +13,7 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   @type selection :: Selection.t()
   @type model :: Model.t()
+  @type provider_backend :: :anthropic | :ollama | atom()
 
   @invalid_model_inputs ["", "nil", "null"]
   @all_visibilities [:public, :private, :internal, :restricted]
@@ -28,24 +30,32 @@ defmodule CliSubprocessCore.ModelRegistry do
           {:ok, Selection.t()} | {:error, resolution_error()}
   def resolve(provider, requested_model, opts \\ []) when is_list(opts) do
     provider = normalize_provider(provider)
+    provider_backend = resolve_provider_backend(provider, opts)
 
     with {:ok, catalog} <- load_catalog(provider),
          {:ok, candidate, source, payload_requested} <-
-           pick_request_source(catalog, requested_model, opts, provider),
-         {:ok, model} <- find_model(catalog.models, candidate, provider),
+           pick_request_source(catalog, requested_model, opts, provider, provider_backend),
+         {:ok, model} <-
+           validate(provider, validation_request(candidate, provider_backend, opts)),
+         payload_attrs <- selection_payload_attrs(model, provider_backend, candidate, opts),
          {:ok, reasoning_payload} <- resolve_reasoning_payload(model, provider, opts) do
       {:ok,
        Selection.new(%{
          provider: provider,
          requested_model: payload_requested,
-         resolved_model: model.id,
+         resolved_model: payload_attrs.resolved_model,
          resolution_source: source,
          reasoning: reasoning_payload.reasoning,
          reasoning_effort: reasoning_payload.reasoning_effort,
          normalized_reasoning_effort: reasoning_payload.normalized_reasoning_effort,
-         model_family: model.family,
-         catalog_version: catalog.catalog_version,
-         visibility: model.visibility,
+         model_family: payload_attrs.model_family,
+         catalog_version: payload_attrs.catalog_version || catalog.catalog_version,
+         visibility: payload_attrs.visibility,
+         provider_backend: provider_backend,
+         model_source: payload_attrs.model_source,
+         env_overrides: payload_attrs.env_overrides,
+         settings_patch: payload_attrs.settings_patch,
+         backend_metadata: payload_attrs.backend_metadata,
          errors: []
        })}
     end
@@ -55,19 +65,16 @@ defmodule CliSubprocessCore.ModelRegistry do
           {:ok, [String.t()]} | {:error, {:model_unavailable, atom(), term()}}
   def list_visible(provider, opts \\ []) when is_list(opts) do
     provider = normalize_provider(provider)
+    provider_backend = resolve_provider_backend(provider, opts)
     visibility = Keyword.get(opts, :visibility, :public)
     family = normalize_optional_binary(Keyword.get(opts, :model_family))
 
-    with {:ok, catalog} <- load_catalog(provider),
-         {:ok, filters} <- expand_visibility_filter(visibility) do
-      visible =
-        catalog.models
-        |> Enum.filter(fn model ->
-          model.visibility in filters and (family == nil or model.family == family)
-        end)
-        |> Enum.map(& &1.id)
+    case {provider, provider_backend} do
+      {:claude, :ollama} ->
+        Ollama.list_model_names(opts)
 
-      {:ok, visible}
+      _other ->
+        list_catalog_visible(provider, visibility, family)
     end
   end
 
@@ -75,31 +82,54 @@ defmodule CliSubprocessCore.ModelRegistry do
           {:ok, String.t()} | {:error, {:model_unavailable, atom(), term()}}
   def default_model(provider, opts \\ []) when is_list(opts) do
     provider = normalize_provider(provider)
+    provider_backend = resolve_provider_backend(provider, opts)
 
-    with {:ok, catalog} <- load_catalog(provider) do
-      case default_model_from_catalog(catalog, provider) do
-        {:ok, model} -> {:ok, model.id}
-        {:error, _reason} -> catalog_remote_default(catalog, provider)
-      end
+    case {provider, provider_backend} do
+      {:claude, :ollama} ->
+        {:error, {:model_unavailable, provider, :no_external_model_default}}
+
+      _other ->
+        default_catalog_model(provider)
     end
   end
 
-  @spec validate(atom(), String.t() | nil) ::
+  @spec validate(atom(), String.t() | atom() | keyword() | map() | nil) ::
           {:ok, Model.t()} | {:error, resolution_error()}
   def validate(provider, requested_model)
       when is_binary(requested_model) or is_atom(requested_model) do
     provider = normalize_provider(provider)
 
-    with {:ok, catalog} <- load_catalog(provider),
-         {:ok, normalized_requested} <-
-           normalize_requested_model(requested_model, :explicit, provider) do
-      find_model(catalog.models, normalized_requested, provider)
-    end
+    do_validate(
+      provider,
+      validation_request(requested_model, resolve_provider_backend(provider, []), [])
+    )
+  end
+
+  def validate(provider, request) when is_list(request) or is_map(request) do
+    provider = normalize_provider(provider)
+    do_validate(provider, parse_validation_request(request, provider))
   end
 
   def validate(provider, nil) do
     {:error,
      {:empty_or_invalid_model, "requested model is missing", normalize_provider(provider)}}
+  end
+
+  defp do_validate(:claude, %{provider_backend: :ollama} = request) do
+    with {:ok, requested_model} <- normalize_requested_model(request.model, :explicit, :claude),
+         {:ok, catalog} <- load_catalog(:claude),
+         external_model <- external_claude_model(requested_model, request, catalog.models),
+         {:ok, details} <- Ollama.validate_model(external_model, :claude, ollama_opts(request)) do
+      build_external_claude_model(requested_model, external_model, details)
+    end
+  end
+
+  defp do_validate(provider, %{model: requested_model}) do
+    with {:ok, catalog} <- load_catalog(provider),
+         {:ok, normalized_requested} <-
+           normalize_requested_model(requested_model, :explicit, provider) do
+      find_model(catalog.models, normalized_requested, provider)
+    end
   end
 
   @spec normalize_reasoning_effort(atom(), Model.t() | String.t(), term()) ::
@@ -238,33 +268,37 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   defp normalize_reasoning_input(_other), do: :invalid
 
-  defp pick_request_source(catalog, requested_model, opts, provider) do
+  defp pick_request_source(catalog, requested_model, opts, provider, provider_backend) do
     case normalize_requested_model_maybe(requested_model, :explicit, provider) do
       {:ok, candidate} ->
         {:ok, candidate, :explicit, candidate}
 
       {:skip} ->
-        pick_env_or_default(catalog, env_model_from_opts(opts), provider)
+        pick_env_or_default(catalog, env_model_from_opts(opts), provider, provider_backend, opts)
 
       {:error, _} = error ->
         error
     end
   end
 
-  defp pick_env_or_default(catalog, env_model, provider) do
+  defp pick_env_or_default(catalog, env_model, provider, provider_backend, opts) do
     case normalize_requested_model_maybe(env_model, :env, provider) do
       {:ok, candidate} ->
         {:ok, candidate, :env, candidate}
 
       {:skip} ->
-        pick_default_or_remote(catalog, provider)
+        pick_default_or_remote(catalog, provider, provider_backend, opts)
 
       {:error, _} = error ->
         error
     end
   end
 
-  defp pick_default_or_remote(catalog, provider) do
+  defp pick_default_or_remote(_catalog, provider, :ollama, _opts) when provider == :claude do
+    {:error, {:model_unavailable, provider, :no_external_model_default}}
+  end
+
+  defp pick_default_or_remote(catalog, provider, _provider_backend, _opts) do
     case default_model_from_catalog(catalog, provider) do
       {:ok, model} ->
         {:ok, model.id, :default, nil}
@@ -343,6 +377,190 @@ defmodule CliSubprocessCore.ModelRegistry do
   defp load_catalog(provider) when is_atom(provider) do
     ModelCatalog.load(provider)
   end
+
+  defp list_catalog_visible(provider, visibility, family) do
+    with {:ok, catalog} <- load_catalog(provider),
+         {:ok, filters} <- expand_visibility_filter(visibility) do
+      visible =
+        catalog.models
+        |> Enum.filter(fn model ->
+          model.visibility in filters and (family == nil or model.family == family)
+        end)
+        |> Enum.map(& &1.id)
+
+      {:ok, visible}
+    end
+  end
+
+  defp default_catalog_model(provider) do
+    with {:ok, catalog} <- load_catalog(provider) do
+      case default_model_from_catalog(catalog, provider) do
+        {:ok, model} -> {:ok, model.id}
+        {:error, _reason} -> catalog_remote_default(catalog, provider)
+      end
+    end
+  end
+
+  defp validation_request(model, provider_backend, opts) do
+    %{
+      model: model,
+      provider_backend: provider_backend,
+      external_model_overrides: Keyword.get(opts, :external_model_overrides, %{}),
+      anthropic_base_url: Keyword.get(opts, :anthropic_base_url),
+      anthropic_auth_token: Keyword.get(opts, :anthropic_auth_token),
+      ollama_http: Keyword.get(opts, :ollama_http),
+      ollama_timeout_ms: Keyword.get(opts, :ollama_timeout_ms)
+    }
+  end
+
+  defp parse_validation_request(request, provider) do
+    request = Enum.into(request, %{})
+
+    %{
+      model: Map.get(request, :model, Map.get(request, "model")),
+      provider_backend:
+        resolve_provider_backend(
+          provider,
+          provider_backend:
+            Map.get(request, :provider_backend, Map.get(request, "provider_backend"))
+        ),
+      external_model_overrides:
+        Map.get(
+          request,
+          :external_model_overrides,
+          Map.get(request, "external_model_overrides", %{})
+        ),
+      anthropic_base_url:
+        Map.get(request, :anthropic_base_url, Map.get(request, "anthropic_base_url")),
+      anthropic_auth_token:
+        Map.get(request, :anthropic_auth_token, Map.get(request, "anthropic_auth_token")),
+      ollama_http: Map.get(request, :ollama_http, Map.get(request, "ollama_http")),
+      ollama_timeout_ms:
+        Map.get(request, :ollama_timeout_ms, Map.get(request, "ollama_timeout_ms"))
+    }
+  end
+
+  defp selection_payload_attrs(%Model{} = model, :ollama, requested_model, opts)
+       when model.provider == :claude do
+    %{
+      resolved_model: model.id,
+      model_family: model.family,
+      catalog_version: nil,
+      visibility: :public,
+      model_source: :external,
+      env_overrides: external_claude_env_overrides(opts),
+      settings_patch: %{},
+      backend_metadata:
+        model.metadata
+        |> Map.put_new("requested_model", requested_model)
+        |> Map.put_new("provider_backend", "ollama")
+    }
+  end
+
+  defp selection_payload_attrs(%Model{} = model, _provider_backend, _requested_model, _opts) do
+    %{
+      resolved_model: model.id,
+      model_family: model.family,
+      catalog_version: model.catalog_version,
+      visibility: model.visibility,
+      model_source: :catalog,
+      env_overrides: %{},
+      settings_patch: %{},
+      backend_metadata: %{}
+    }
+  end
+
+  defp external_claude_env_overrides(opts) do
+    %{
+      "ANTHROPIC_AUTH_TOKEN" => Keyword.get(opts, :anthropic_auth_token, "ollama") |> to_string(),
+      "ANTHROPIC_API_KEY" => "",
+      "ANTHROPIC_BASE_URL" =>
+        Keyword.get(opts, :anthropic_base_url, Ollama.default_base_url()) |> to_string()
+    }
+  end
+
+  defp external_claude_model(requested_model, request, models) when is_binary(requested_model) do
+    overrides = normalize_external_model_overrides(request.external_model_overrides)
+
+    case Enum.find(models, &Model.matches_id_or_alias?(&1, requested_model)) do
+      %Model{id: model_id, aliases: aliases} ->
+        ([model_id | aliases] ++ [requested_model])
+        |> Enum.find_value(requested_model, &Map.get(overrides, &1))
+
+      nil ->
+        Map.get(overrides, requested_model, requested_model)
+    end
+  end
+
+  defp normalize_external_model_overrides(overrides) when is_map(overrides) do
+    Map.new(overrides, fn {key, value} -> {to_string(key), to_string(value)} end)
+  end
+
+  defp normalize_external_model_overrides(_other), do: %{}
+
+  defp build_external_claude_model(requested_model, external_model, details) do
+    metadata = %{
+      "backend" => "ollama",
+      "requested_model" => requested_model,
+      "external_model" => external_model,
+      "capabilities" => Map.get(details, "capabilities", []),
+      "modified_at" => Map.get(details, "modified_at"),
+      "details" => Map.get(details, "details", %{})
+    }
+
+    Model.new(:claude, %{
+      id: external_model,
+      aliases:
+        [requested_model]
+        |> Enum.reject(&(&1 == external_model))
+        |> Enum.uniq(),
+      visibility: :public,
+      family: ollama_model_family(details),
+      metadata: metadata
+    })
+  end
+
+  defp ollama_model_family(details) when is_map(details) do
+    details
+    |> Map.get("details", %{})
+    |> Map.get("family")
+  end
+
+  defp ollama_opts(request) do
+    [
+      anthropic_base_url: request.anthropic_base_url,
+      ollama_http: request.ollama_http,
+      ollama_timeout_ms: request.ollama_timeout_ms
+    ]
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+  end
+
+  defp resolve_provider_backend(:claude, opts) when is_list(opts) do
+    case Keyword.get(opts, :provider_backend, :anthropic) do
+      nil ->
+        :anthropic
+
+      :anthropic ->
+        :anthropic
+
+      "anthropic" ->
+        :anthropic
+
+      :ollama ->
+        :ollama
+
+      "ollama" ->
+        :ollama
+
+      other when is_atom(other) ->
+        other
+
+      other when is_binary(other) ->
+        other |> String.trim() |> String.downcase() |> String.to_atom()
+    end
+  end
+
+  defp resolve_provider_backend(_provider, _opts), do: nil
 
   defp expand_visibility_filter(visibility) do
     case visibility do

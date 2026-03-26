@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.ModelRegistry.Selection do
   """
 
   @type resolution_source :: :explicit | :env | :default | :remote
+  @type model_source :: :catalog | :external
 
   @type t :: %__MODULE__{
           provider: atom(),
@@ -16,6 +17,11 @@ defmodule CliSubprocessCore.ModelRegistry.Selection do
           model_family: String.t() | nil,
           catalog_version: String.t() | nil,
           visibility: :public | :private | :internal | :restricted,
+          provider_backend: atom() | nil,
+          model_source: model_source(),
+          env_overrides: %{optional(String.t()) => String.t()},
+          settings_patch: map(),
+          backend_metadata: map(),
           errors: [term()]
         }
 
@@ -29,6 +35,11 @@ defmodule CliSubprocessCore.ModelRegistry.Selection do
             model_family: nil,
             catalog_version: nil,
             visibility: :public,
+            provider_backend: nil,
+            model_source: :catalog,
+            env_overrides: %{},
+            settings_patch: %{},
+            backend_metadata: %{},
             errors: []
 
   @spec new(keyword() | map()) :: t()
@@ -46,6 +57,11 @@ defmodule CliSubprocessCore.ModelRegistry.Selection do
       model_family: Map.get(attrs, :model_family),
       catalog_version: Map.get(attrs, :catalog_version),
       visibility: Map.get(attrs, :visibility, :public),
+      provider_backend: Map.get(attrs, :provider_backend),
+      model_source: Map.get(attrs, :model_source, :catalog),
+      env_overrides: Map.get(attrs, :env_overrides, %{}),
+      settings_patch: Map.get(attrs, :settings_patch, %{}),
+      backend_metadata: Map.get(attrs, :backend_metadata, %{}),
       errors: Map.get(attrs, :errors, [])
     }
   end

@@ -72,6 +72,30 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:error, {:invalid_reasoning_effort, :low, ["high", "medium"], :codex}} =
                ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :low)
     end
+
+    test "resolves Claude Ollama backend models through the core payload" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:claude, "haiku",
+                 provider_backend: :ollama,
+                 external_model_overrides: %{"haiku" => "llama3.2"},
+                 anthropic_base_url: "http://127.0.0.1:11434",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert payload.requested_model == "haiku"
+      assert payload.resolved_model == "llama3.2"
+      assert payload.provider_backend == :ollama
+      assert payload.model_source == :external
+      assert payload.model_family == "llama"
+
+      assert payload.env_overrides == %{
+               "ANTHROPIC_AUTH_TOKEN" => "ollama",
+               "ANTHROPIC_API_KEY" => "",
+               "ANTHROPIC_BASE_URL" => "http://127.0.0.1:11434"
+             }
+
+      assert payload.backend_metadata["external_model"] == "llama3.2"
+    end
   end
 
   describe "ModelRegistry.list_visible/2" do
@@ -86,11 +110,27 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert "sonnet" in models
       assert "legacy-sonnet" in models
     end
+
+    test "lists installed Ollama models for Claude Ollama backend" do
+      assert {:ok, models} =
+               ModelRegistry.list_visible(:claude,
+                 provider_backend: :ollama,
+                 ollama_http: &ollama_http/4
+               )
+
+      assert "llama3.2:latest" in models
+      assert "qwen3.5" in models
+    end
   end
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
       assert {:ok, "gpt-5-codex"} = ModelRegistry.default_model(:codex)
+    end
+
+    test "hard fails when Claude Ollama backend has no explicit external default" do
+      assert {:error, {:model_unavailable, :claude, :no_external_model_default}} =
+               ModelRegistry.default_model(:claude, provider_backend: :ollama)
     end
   end
 
@@ -105,6 +145,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.validate(:amp, "missing")
 
       assert {:error, {:empty_or_invalid_model, _, :amp}} = ModelRegistry.validate(:amp, "nil")
+    end
+
+    test "validates direct Claude Ollama model ids through the backend-aware request map" do
+      assert {:ok, model} =
+               ModelRegistry.validate(:claude,
+                 model: "llama3.2",
+                 provider_backend: :ollama,
+                 ollama_http: &ollama_http/4
+               )
+
+      assert model.id == "llama3.2"
+      assert model.family == "llama"
+      assert model.metadata["backend"] == "ollama"
     end
   end
 
@@ -138,5 +191,37 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.resolved_model == "gpt-5.4-mini"
       assert payload.reasoning == "medium"
     end
+  end
+
+  defp ollama_http(:get, "/api/tags", nil, _opts) do
+    {:ok, 200,
+     %{
+       "models" => [
+         %{"name" => "llama3.2:latest", "model" => "llama3.2:latest"},
+         %{"name" => "qwen3.5", "model" => "qwen3.5"}
+       ]
+     }}
+  end
+
+  defp ollama_http(:post, "/api/show", %{"model" => "llama3.2"}, _opts) do
+    {:ok, 200,
+     %{
+       "capabilities" => ["completion", "tools"],
+       "details" => %{"family" => "llama", "parameter_size" => "3.2B"},
+       "modified_at" => "2026-03-25T00:00:00Z"
+     }}
+  end
+
+  defp ollama_http(:post, "/api/show", %{"model" => "qwen3.5"}, _opts) do
+    {:ok, 200,
+     %{
+       "capabilities" => ["completion"],
+       "details" => %{"family" => "qwen", "parameter_size" => "7B"},
+       "modified_at" => "2026-03-25T00:00:00Z"
+     }}
+  end
+
+  defp ollama_http(:post, "/api/show", %{"model" => model}, _opts) do
+    {:ok, 404, %{"error" => "model '#{model}' not found"}}
   end
 end

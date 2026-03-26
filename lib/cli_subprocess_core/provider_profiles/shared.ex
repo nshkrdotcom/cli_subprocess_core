@@ -67,9 +67,18 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @spec command(String.t(), [String.t()], keyword()) :: Command.t()
   def command(binary, args, opts)
       when is_binary(binary) and is_list(args) and is_list(opts) do
+    payload_env =
+      opts
+      |> Keyword.get(:model_payload, %{})
+      |> payload_value(:env_overrides)
+      |> normalize_env()
+
     Command.new(binary, args,
       cwd: Keyword.get(opts, :cwd),
-      env: normalize_env(Keyword.get(opts, :env, %{}))
+      env:
+        Keyword.get(opts, :env, %{})
+        |> normalize_env()
+        |> Map.merge(payload_env)
     )
   end
 
@@ -381,6 +390,13 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   end
 
   defp normalize_env(_env), do: %{}
+
+  defp payload_value(%{env_overrides: value}, :env_overrides), do: value
+
+  defp payload_value(payload, key) when is_map(payload),
+    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
+
+  defp payload_value(_payload, _key), do: nil
 
   defp maybe_put_provider_session_id(state, nil), do: state
 

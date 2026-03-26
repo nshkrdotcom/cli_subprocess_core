@@ -54,6 +54,9 @@ The library is designed for two consumers:
   define and manage provider profile modules.
 - `CliSubprocessCore.ProviderProfiles.*` ships first-party profiles for Claude,
   Codex, Gemini, and Amp.
+- `CliSubprocessCore.ModelRegistry` and `CliSubprocessCore.Ollama` own
+  centralized model resolution, backend-aware validation, and the authoritative
+  payload passed downstream to provider renderers.
 - `CliSubprocessCore.Transport` and
   `CliSubprocessCore.Transport.Erlexec` own subprocess lifecycle, stdout/stderr
   dispatch, PTY startup, raw-byte versus line-oriented IO contracts,
@@ -185,6 +188,11 @@ Phase 4 finalizes the publication story for the common provider-profile layer:
 The shipped first-party modules are available through
 `CliSubprocessCore.first_party_profile_modules/0`.
 
+`CliSubprocessCore.ModelRegistry` is the single authority for model selection
+across the stack. That includes the explicit Claude `:ollama` backend path,
+where the core validates the external model and carries the required
+Anthropic-compatible env in the resolved payload.
+
 The default registry starts with these ids:
 
 - `:claude`
@@ -212,6 +220,10 @@ Ad hoc external profiles can also be registered at runtime with
 - `guides/provider-profile-contract.md`
 - `guides/custom-provider-profiles.md`
 - `guides/built-in-provider-profiles.md`
+- `guides/developer-guide-model-registry.md`
+- `guides/developer-guide-claude-backends.md`
+- `guides/developer-guide-provider-profiles.md`
+- `guides/developer-guide-runtime-layers.md`
 - `guides/command-api.md`
 - `guides/raw-transport.md`
 - `guides/session-api.md`
