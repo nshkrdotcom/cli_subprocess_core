@@ -117,6 +117,51 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.cwd == "/tmp/codex"
     end
 
+    test "Codex builds the expected CLI invocation for the Ollama OSS backend" do
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 command: "codex-bin",
+                 prompt: "review this diff",
+                 cwd: "/tmp/codex",
+                 model_payload: %{
+                   provider: :codex,
+                   requested_model: "llama3.2",
+                   resolved_model: "llama3.2",
+                   resolution_source: :explicit,
+                   reasoning: "high",
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "llama",
+                   catalog_version: nil,
+                   visibility: :public,
+                   provider_backend: :oss,
+                   model_source: :external,
+                   env_overrides: %{},
+                   settings_patch: %{},
+                   backend_metadata: %{
+                     "provider_backend" => "oss",
+                     "oss_provider" => "ollama"
+                   },
+                   errors: []
+                 }
+               )
+
+      assert command.command == "codex-bin"
+
+      assert command.args == [
+               "exec",
+               "--json",
+               "--oss",
+               "--local-provider",
+               "ollama",
+               "--model",
+               "llama3.2",
+               "--reasoning-effort",
+               "high",
+               "review this diff"
+             ]
+    end
+
     test "Gemini builds the expected CLI invocation" do
       assert {:ok, %Command{} = command} =
                Gemini.build_invocation(

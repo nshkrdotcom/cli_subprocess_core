@@ -96,6 +96,50 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
       assert payload.backend_metadata["external_model"] == "llama3.2"
     end
+
+    test "resolves Codex Ollama models through the core payload" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "llama3.2",
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert payload.requested_model == "llama3.2"
+      assert payload.resolved_model == "llama3.2"
+      assert payload.provider_backend == :oss
+      assert payload.model_source == :external
+      assert payload.reasoning == "high"
+      assert payload.model_family == "llama"
+      assert payload.backend_metadata["oss_provider"] == "ollama"
+      assert payload.backend_metadata["external_model"] == "llama3.2"
+      assert payload.backend_metadata["loaded"] == true
+    end
+
+    test "defaults Codex Ollama model selection to gpt-oss:20b" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, nil,
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert payload.resolution_source == :default
+      assert payload.resolved_model == "gpt-oss:20b"
+      assert payload.reasoning == "high"
+    end
+
+    test "carries Codex model_provider backend metadata in the resolved payload" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "gpt-5-codex",
+                 provider_backend: :model_provider,
+                 model_provider: "gateway"
+               )
+
+      assert payload.provider_backend == :model_provider
+      assert payload.resolved_model == "gpt-5-codex"
+      assert payload.backend_metadata["model_provider"] == "gateway"
+    end
   end
 
   describe "ModelRegistry.list_visible/2" do
@@ -121,6 +165,18 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert "llama3.2:latest" in models
       assert "qwen3.5" in models
     end
+
+    test "lists installed Ollama models for Codex OSS backend" do
+      assert {:ok, models} =
+               ModelRegistry.list_visible(:codex,
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert "llama3.2:latest" in models
+      assert "gpt-oss:20b" in models
+    end
   end
 
   describe "ModelRegistry.default_model/2" do
@@ -131,6 +187,14 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     test "hard fails when Claude Ollama backend has no explicit external default" do
       assert {:error, {:model_unavailable, :claude, :no_external_model_default}} =
                ModelRegistry.default_model(:claude, provider_backend: :ollama)
+    end
+
+    test "returns the Codex Ollama default model" do
+      assert {:ok, "gpt-oss:20b"} =
+               ModelRegistry.default_model(:codex,
+                 provider_backend: :oss,
+                 oss_provider: "ollama"
+               )
     end
   end
 
@@ -158,6 +222,21 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert model.id == "llama3.2"
       assert model.family == "llama"
       assert model.metadata["backend"] == "ollama"
+    end
+
+    test "validates direct Codex Ollama model ids through the backend-aware request map" do
+      assert {:ok, model} =
+               ModelRegistry.validate(:codex,
+                 model: "llama3.2",
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert model.id == "llama3.2"
+      assert model.family == "llama"
+      assert model.metadata["backend"] == "ollama"
+      assert model.metadata["loaded"] == true
     end
   end
 
@@ -198,7 +277,21 @@ defmodule CliSubprocessCore.ModelRegistryTest do
      %{
        "models" => [
          %{"name" => "llama3.2:latest", "model" => "llama3.2:latest"},
+         %{"name" => "gpt-oss:20b", "model" => "gpt-oss:20b"},
          %{"name" => "qwen3.5", "model" => "qwen3.5"}
+       ]
+     }}
+  end
+
+  defp ollama_http(:get, "/api/version", nil, _opts) do
+    {:ok, 200, %{"version" => "0.18.2"}}
+  end
+
+  defp ollama_http(:get, "/api/ps", nil, _opts) do
+    {:ok, 200,
+     %{
+       "models" => [
+         %{"name" => "llama3.2:latest", "model" => "llama3.2:latest"}
        ]
      }}
   end
@@ -208,6 +301,21 @@ defmodule CliSubprocessCore.ModelRegistryTest do
      %{
        "capabilities" => ["completion", "tools"],
        "details" => %{"family" => "llama", "parameter_size" => "3.2B"},
+       "model_info" => %{"llama.context_length" => 8192},
+       "modified_at" => "2026-03-25T00:00:00Z"
+     }}
+  end
+
+  defp ollama_http(:post, "/api/show", %{"model" => "gpt-oss:20b"}, _opts) do
+    {:ok, 200,
+     %{
+       "capabilities" => ["completion", "tools"],
+       "details" => %{
+         "family" => "gpt-oss",
+         "parameter_size" => "20B",
+         "quantization_level" => "Q4_K_M"
+       },
+       "model_info" => %{"gpt-oss.context_length" => 131_072},
        "modified_at" => "2026-03-25T00:00:00Z"
      }}
   end

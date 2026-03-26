@@ -45,6 +45,7 @@ defmodule CliSubprocessCore.MixProject do
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
         "guides/developer-guide-model-registry.md": [title: "Developer Guide: Model Registry"],
         "guides/developer-guide-claude-backends.md": [title: "Developer Guide: Claude Backends"],
+        "guides/developer-guide-codex-backends.md": [title: "Developer Guide: Codex Backends"],
         "guides/developer-guide-provider-profiles.md": [
           title: "Developer Guide: Provider Profiles"
         ],
@@ -65,6 +66,7 @@ defmodule CliSubprocessCore.MixProject do
         "Developer Guides": [
           "guides/developer-guide-model-registry.md",
           "guides/developer-guide-claude-backends.md",
+          "guides/developer-guide-codex-backends.md",
           "guides/developer-guide-provider-profiles.md",
           "guides/developer-guide-runtime-layers.md"
         ],

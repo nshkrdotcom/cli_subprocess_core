@@ -16,6 +16,9 @@ defmodule CliSubprocessCore.ModelRegistry do
   @type provider_backend :: :anthropic | :ollama | atom()
 
   @invalid_model_inputs ["", "nil", "null"]
+  @codex_external_reasonings ~w(none minimal low medium high xhigh)
+  @codex_oss_default_model "gpt-oss:20b"
+  @ollama_min_responses_version "0.13.4"
   @all_visibilities [:public, :private, :internal, :restricted]
   @visibility_filters %{
     all: @all_visibilities,
@@ -73,6 +76,12 @@ defmodule CliSubprocessCore.ModelRegistry do
       {:claude, :ollama} ->
         Ollama.list_model_names(opts)
 
+      {:codex, :oss} ->
+        case resolve_codex_oss_provider(provider, opts) do
+          {:ok, "ollama"} -> Ollama.list_model_names(ollama_opts(opts))
+          {:error, _reason} = error -> error
+        end
+
       _other ->
         list_catalog_visible(provider, visibility, family)
     end
@@ -87,6 +96,11 @@ defmodule CliSubprocessCore.ModelRegistry do
     case {provider, provider_backend} do
       {:claude, :ollama} ->
         {:error, {:model_unavailable, provider, :no_external_model_default}}
+
+      {:codex, :oss} ->
+        with {:ok, "ollama"} <- resolve_codex_oss_provider(provider, opts) do
+          {:ok, @codex_oss_default_model}
+        end
 
       _other ->
         default_catalog_model(provider)
@@ -121,6 +135,21 @@ defmodule CliSubprocessCore.ModelRegistry do
          external_model <- external_claude_model(requested_model, request, catalog.models),
          {:ok, details} <- Ollama.validate_model(external_model, :claude, ollama_opts(request)) do
       build_external_claude_model(requested_model, external_model, details)
+    end
+  end
+
+  defp do_validate(:codex, %{provider_backend: :oss} = request) do
+    with {:ok, "ollama"} <- resolve_codex_oss_provider(:codex, request),
+         {:ok, requested_model} <- normalize_requested_model(request.model, :explicit, :codex),
+         {:ok, ollama_version} <- ensure_ollama_responses_supported(:codex, ollama_opts(request)),
+         {:ok, details} <- Ollama.validate_model(requested_model, :codex, ollama_opts(request)) do
+      running_models =
+        case Ollama.running_models(ollama_opts(request)) do
+          {:ok, models} -> models
+          {:error, _reason} -> []
+        end
+
+      build_external_codex_model(requested_model, details, running_models, ollama_version)
     end
   end
 
@@ -171,6 +200,22 @@ defmodule CliSubprocessCore.ModelRegistry do
           {:ok, Selection.t()} | {:error, resolution_error()}
   def build_arg_payload(provider, requested_model, opts \\ []) when is_list(opts) do
     resolve(provider, requested_model, opts)
+  end
+
+  defp resolve_reasoning_payload(
+         %Model{provider: :codex, metadata: %{"backend" => "ollama"}},
+         provider,
+         opts
+       ) do
+    requested_reasoning = Keyword.get(opts, :reasoning_effort, Keyword.get(opts, :reasoning))
+
+    case normalize_external_codex_reasoning(requested_reasoning) do
+      {:ok, reasoning} ->
+        {:ok, %{reasoning: reasoning, reasoning_effort: nil, normalized_reasoning_effort: nil}}
+
+      {:error, allowed} ->
+        {:error, {:invalid_reasoning_effort, requested_reasoning, allowed, provider}}
+    end
   end
 
   defp resolve_reasoning_payload(%Model{} = model, provider, opts) do
@@ -298,6 +343,12 @@ defmodule CliSubprocessCore.ModelRegistry do
     {:error, {:model_unavailable, provider, :no_external_model_default}}
   end
 
+  defp pick_default_or_remote(_catalog, provider, :oss, opts) when provider == :codex do
+    with {:ok, "ollama"} <- resolve_codex_oss_provider(provider, opts) do
+      {:ok, @codex_oss_default_model, :default, nil}
+    end
+  end
+
   defp pick_default_or_remote(catalog, provider, _provider_backend, _opts) do
     case default_model_from_catalog(catalog, provider) do
       {:ok, model} ->
@@ -405,8 +456,11 @@ defmodule CliSubprocessCore.ModelRegistry do
     %{
       model: model,
       provider_backend: provider_backend,
+      model_provider: Keyword.get(opts, :model_provider),
+      oss_provider: Keyword.get(opts, :oss_provider),
       external_model_overrides: Keyword.get(opts, :external_model_overrides, %{}),
       anthropic_base_url: Keyword.get(opts, :anthropic_base_url),
+      ollama_base_url: Keyword.get(opts, :ollama_base_url),
       anthropic_auth_token: Keyword.get(opts, :anthropic_auth_token),
       ollama_http: Keyword.get(opts, :ollama_http),
       ollama_timeout_ms: Keyword.get(opts, :ollama_timeout_ms)
@@ -424,6 +478,8 @@ defmodule CliSubprocessCore.ModelRegistry do
           provider_backend:
             Map.get(request, :provider_backend, Map.get(request, "provider_backend"))
         ),
+      model_provider: Map.get(request, :model_provider, Map.get(request, "model_provider")),
+      oss_provider: Map.get(request, :oss_provider, Map.get(request, "oss_provider")),
       external_model_overrides:
         Map.get(
           request,
@@ -432,6 +488,7 @@ defmodule CliSubprocessCore.ModelRegistry do
         ),
       anthropic_base_url:
         Map.get(request, :anthropic_base_url, Map.get(request, "anthropic_base_url")),
+      ollama_base_url: Map.get(request, :ollama_base_url, Map.get(request, "ollama_base_url")),
       anthropic_auth_token:
         Map.get(request, :anthropic_auth_token, Map.get(request, "anthropic_auth_token")),
       ollama_http: Map.get(request, :ollama_http, Map.get(request, "ollama_http")),
@@ -454,6 +511,42 @@ defmodule CliSubprocessCore.ModelRegistry do
         model.metadata
         |> Map.put_new("requested_model", requested_model)
         |> Map.put_new("provider_backend", "ollama")
+    }
+  end
+
+  defp selection_payload_attrs(%Model{} = model, :oss, requested_model, _opts)
+       when model.provider == :codex do
+    %{
+      resolved_model: model.id,
+      model_family: model.family,
+      catalog_version: nil,
+      visibility: :public,
+      model_source: :external,
+      env_overrides: %{},
+      settings_patch: %{},
+      backend_metadata:
+        model.metadata
+        |> Map.put_new("requested_model", requested_model)
+        |> Map.put_new("provider_backend", "oss")
+        |> Map.put_new("oss_provider", "ollama")
+    }
+  end
+
+  defp selection_payload_attrs(%Model{} = model, :model_provider, requested_model, opts)
+       when model.provider == :codex do
+    %{
+      resolved_model: model.id,
+      model_family: model.family,
+      catalog_version: model.catalog_version,
+      visibility: model.visibility,
+      model_source: :catalog,
+      env_overrides: %{},
+      settings_patch: %{},
+      backend_metadata:
+        %{}
+        |> maybe_put_metadata("requested_model", requested_model)
+        |> maybe_put_metadata("provider_backend", "model_provider")
+        |> maybe_put_metadata("model_provider", Keyword.get(opts, :model_provider))
     }
   end
 
@@ -520,15 +613,107 @@ defmodule CliSubprocessCore.ModelRegistry do
     })
   end
 
+  defp build_external_codex_model(requested_model, details, running_models, ollama_version) do
+    metadata =
+      %{
+        "backend" => "ollama",
+        "oss_provider" => "ollama",
+        "requested_model" => requested_model,
+        "external_model" => requested_model,
+        "capabilities" => Map.get(details, "capabilities", []),
+        "modified_at" => Map.get(details, "modified_at"),
+        "details" => Map.get(details, "details", %{}),
+        "ollama_version" => ollama_version,
+        "loaded" => ollama_model_loaded?(requested_model, running_models)
+      }
+      |> maybe_put_metadata("context_length", ollama_context_length(details))
+      |> maybe_put_metadata("parameter_size", ollama_parameter_size(details))
+      |> maybe_put_metadata("quantization_level", ollama_quantization_level(details))
+
+    Model.new(:codex, %{
+      id: requested_model,
+      visibility: :public,
+      family: ollama_model_family(details),
+      reasoning_efforts: Map.new(@codex_external_reasonings, &{&1, nil}),
+      default_reasoning_effort: "high",
+      metadata: metadata
+    })
+  end
+
   defp ollama_model_family(details) when is_map(details) do
     details
     |> Map.get("details", %{})
     |> Map.get("family")
   end
 
+  defp ollama_context_length(details) when is_map(details) do
+    Map.get(details, "context_length") ||
+      get_in(details, ["details", "context_length"]) ||
+      ollama_model_info_value(details, ".context_length")
+  end
+
+  defp ollama_parameter_size(details) when is_map(details) do
+    get_in(details, ["details", "parameter_size"]) ||
+      Map.get(details, "parameter_size")
+  end
+
+  defp ollama_quantization_level(details) when is_map(details) do
+    get_in(details, ["details", "quantization_level"]) ||
+      Map.get(details, "quantization_level")
+  end
+
+  defp ollama_model_info_value(details, suffix) when is_binary(suffix) do
+    details
+    |> Map.get("model_info", %{})
+    |> Enum.find_value(fn
+      {key, value} when is_binary(key) and is_integer(value) ->
+        if String.ends_with?(key, suffix), do: value
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp ollama_model_loaded?(requested_model, running_models) when is_list(running_models) do
+    Enum.any?(running_models, fn
+      %{"name" => model_name} ->
+        same_external_model?(model_name, requested_model)
+
+      %{"model" => model_name} ->
+        same_external_model?(model_name, requested_model)
+
+      _ ->
+        false
+    end)
+  end
+
+  defp same_external_model?(left, right) when is_binary(left) and is_binary(right) do
+    normalize_external_model_name(left) == normalize_external_model_name(right)
+  end
+
+  defp normalize_external_model_name(name) when is_binary(name) do
+    name
+    |> String.trim()
+    |> String.trim_trailing(":latest")
+  end
+
+  defp maybe_put_metadata(metadata, _key, nil), do: metadata
+  defp maybe_put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
+
+  defp ollama_opts(request) when is_list(request) do
+    [
+      anthropic_base_url: Keyword.get(request, :anthropic_base_url),
+      ollama_base_url: Keyword.get(request, :ollama_base_url),
+      ollama_http: Keyword.get(request, :ollama_http),
+      ollama_timeout_ms: Keyword.get(request, :ollama_timeout_ms)
+    ]
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+  end
+
   defp ollama_opts(request) do
     [
       anthropic_base_url: request.anthropic_base_url,
+      ollama_base_url: request.ollama_base_url,
       ollama_http: request.ollama_http,
       ollama_timeout_ms: request.ollama_timeout_ms
     ]
@@ -536,31 +721,127 @@ defmodule CliSubprocessCore.ModelRegistry do
   end
 
   defp resolve_provider_backend(:claude, opts) when is_list(opts) do
-    case Keyword.get(opts, :provider_backend, :anthropic) do
-      nil ->
-        :anthropic
+    case normalize_backend_name(Keyword.get(opts, :provider_backend), "anthropic") do
+      "anthropic" -> :anthropic
+      "ollama" -> :ollama
+      other -> String.to_atom(other)
+    end
+  end
 
-      :anthropic ->
-        :anthropic
-
-      "anthropic" ->
-        :anthropic
-
-      :ollama ->
-        :ollama
-
-      "ollama" ->
-        :ollama
-
-      other when is_atom(other) ->
-        other
-
-      other when is_binary(other) ->
-        other |> String.trim() |> String.downcase() |> String.to_atom()
+  defp resolve_provider_backend(:codex, opts) when is_list(opts) do
+    case normalize_backend_name(Keyword.get(opts, :provider_backend), "openai") do
+      "openai" -> :openai
+      "oss" -> :oss
+      "model_provider" -> :model_provider
+      other -> String.to_atom(other)
     end
   end
 
   defp resolve_provider_backend(_provider, _opts), do: nil
+
+  defp ensure_ollama_responses_supported(provider, opts)
+       when is_atom(provider) and is_list(opts) do
+    case Ollama.fetch_version(opts) do
+      {:ok, version} ->
+        ensure_minimum_ollama_version(provider, version)
+
+      {:error, reason} ->
+        {:error, {:model_unavailable, provider, {:ollama_unavailable, reason}}}
+    end
+  end
+
+  defp ensure_minimum_ollama_version(provider, version) when is_atom(provider) do
+    case normalize_ollama_version(version) do
+      nil ->
+        {:ok, version}
+
+      normalized_version ->
+        if Version.compare(normalized_version, @ollama_min_responses_version) == :lt do
+          {:error,
+           {:model_unavailable, provider,
+            {:ollama_version_unsupported, version, @ollama_min_responses_version}}}
+        else
+          {:ok, version}
+        end
+    end
+  end
+
+  defp normalize_ollama_version(nil), do: nil
+
+  defp normalize_ollama_version(version) when is_binary(version) do
+    version
+    |> String.trim()
+    |> String.trim_leading("v")
+    |> case do
+      "" -> nil
+      normalized -> normalized
+    end
+  end
+
+  defp normalize_backend_name(nil, default), do: default
+
+  defp normalize_backend_name(value, default) when is_atom(value) do
+    value
+    |> Atom.to_string()
+    |> normalize_backend_name(default)
+  end
+
+  defp normalize_backend_name(value, default) when is_binary(value) do
+    case value |> String.trim() |> String.downcase() do
+      "" -> default
+      normalized -> normalized
+    end
+  end
+
+  defp normalize_external_codex_reasoning(nil), do: {:ok, "high"}
+
+  defp normalize_external_codex_reasoning(value) when is_atom(value) do
+    value
+    |> Atom.to_string()
+    |> normalize_external_codex_reasoning()
+  end
+
+  defp normalize_external_codex_reasoning(value) when is_binary(value) do
+    normalized = String.trim(value) |> String.downcase()
+
+    cond do
+      normalized == "" ->
+        {:ok, "high"}
+
+      normalized in @invalid_model_inputs ->
+        {:ok, "high"}
+
+      normalized in @codex_external_reasonings ->
+        {:ok, normalized}
+
+      true ->
+        {:error, @codex_external_reasonings}
+    end
+  end
+
+  defp normalize_external_codex_reasoning(_other), do: {:error, @codex_external_reasonings}
+
+  defp resolve_codex_oss_provider(provider, opts) when is_list(opts) do
+    opts
+    |> Keyword.get(:oss_provider, "ollama")
+    |> normalize_optional_binary()
+    |> case do
+      nil ->
+        {:error, {:model_unavailable, provider, :missing_oss_provider}}
+
+      "ollama" ->
+        {:ok, "ollama"}
+
+      other ->
+        {:error, {:model_unavailable, provider, {:unsupported_oss_provider, other}}}
+    end
+  end
+
+  defp resolve_codex_oss_provider(provider, %{oss_provider: provider_name}) do
+    resolve_codex_oss_provider(provider, oss_provider: provider_name)
+  end
+
+  defp resolve_codex_oss_provider(provider, _other), do: resolve_codex_oss_provider(provider, [])
 
   defp expand_visibility_filter(visibility) do
     case visibility do

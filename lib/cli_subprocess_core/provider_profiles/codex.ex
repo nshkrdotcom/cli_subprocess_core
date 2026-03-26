@@ -62,14 +62,18 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   defp option_flags(opts) do
     []
+    |> Shared.maybe_add_flag("--oss", oss_enabled?(opts))
+    |> Shared.maybe_add_pair("--local-provider", local_provider_value(opts))
     |> Shared.maybe_add_pair("--model", model_value(opts))
     |> Shared.maybe_add_pair("--reasoning-effort", reasoning_value(opts))
     |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
+    |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Kernel.++(permission_flags(opts))
   end
 
   defp model_value(opts) do
-    Keyword.get(opts, :model_payload, %{})
+    opts
+    |> Keyword.get(:model_payload, %{})
     |> model_payload_value(:resolved_model)
   end
 
@@ -90,6 +94,40 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   end
 
   defp model_payload_value(_payload, _key), do: nil
+
+  defp model_payload_backend_metadata(opts) do
+    opts
+    |> Keyword.get(:model_payload, %{})
+    |> model_payload_value(:backend_metadata)
+    |> case do
+      metadata when is_map(metadata) -> metadata
+      _ -> %{}
+    end
+  end
+
+  defp oss_enabled?(opts) do
+    payload_backend =
+      opts
+      |> Keyword.get(:model_payload, %{})
+      |> model_payload_value(:provider_backend)
+
+    payload_backend in [:oss, "oss"]
+  end
+
+  defp local_provider_value(opts) do
+    Map.get(model_payload_backend_metadata(opts), "oss_provider")
+  end
+
+  defp config_values(opts) do
+    payload_values =
+      model_payload_backend_metadata(opts)
+      |> Map.get("config_values", [])
+      |> List.wrap()
+      |> Enum.filter(&(is_binary(&1) and &1 != ""))
+
+    (Keyword.get(opts, :config_values, []) ++ payload_values)
+    |> Enum.uniq()
+  end
 
   defp permission_flags(opts) do
     case Shared.permission_mode(opts) do

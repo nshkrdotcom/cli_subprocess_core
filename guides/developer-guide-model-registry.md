@@ -35,12 +35,15 @@ The model-selection internals live in:
 
 Each provider catalog is a core-owned source of truth.
 
-For Codex, Gemini, and Amp, that source is static JSON only.
+For Gemini and Amp, that source is static JSON only.
 
-For Claude, the source is split:
+For Claude and Codex, the source is split:
 
 - static core catalog for the canonical Claude model surface
 - explicit backend-aware external validation for the Ollama path
+- static core catalog for the canonical Codex/OpenAI model surface
+- explicit backend-aware external validation for the Codex local OSS/Ollama
+  path
 
 The static catalog defines, per model:
 
@@ -164,6 +167,22 @@ to an installed external model:
 
 selection.resolved_model
 # => "llama3.2"
+```
+
+For Codex local OSS via Ollama, the caller should pass the backend intent into
+the core and let the registry validate the local model:
+
+```elixir
+{:ok, selection} =
+  CliSubprocessCore.ModelRegistry.build_arg_payload(
+    :codex,
+    "llama3.2",
+    provider_backend: :oss,
+    oss_provider: "ollama"
+  )
+
+selection.provider_backend
+# => :oss
 ```
 
 ## Reviewer Checklist

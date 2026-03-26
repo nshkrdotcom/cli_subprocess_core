@@ -191,7 +191,10 @@ The shipped first-party modules are available through
 `CliSubprocessCore.ModelRegistry` is the single authority for model selection
 across the stack. That includes the explicit Claude `:ollama` backend path,
 where the core validates the external model and carries the required
-Anthropic-compatible env in the resolved payload.
+Anthropic-compatible env in the resolved payload. It also includes the Codex
+local OSS path, where the core validates the Ollama runtime, validates the
+requested local model id, and carries the backend metadata used to render
+`--oss --local-provider ollama`.
 
 The default registry starts with these ids:
 
@@ -222,6 +225,7 @@ Ad hoc external profiles can also be registered at runtime with
 - `guides/built-in-provider-profiles.md`
 - `guides/developer-guide-model-registry.md`
 - `guides/developer-guide-claude-backends.md`
+- `guides/developer-guide-codex-backends.md`
 - `guides/developer-guide-provider-profiles.md`
 - `guides/developer-guide-runtime-layers.md`
 - `guides/command-api.md`

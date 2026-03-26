@@ -38,21 +38,37 @@ defmodule CliSubprocessCore.Ollama do
     request(:post, "/api/show", %{"model" => String.trim(model)}, opts)
   end
 
+  @spec fetch_version(keyword()) :: {:ok, String.t() | nil} | {:error, term()}
+  def fetch_version(opts \\ []) when is_list(opts) do
+    case request(:get, "/api/version", nil, opts) do
+      {:ok, %{"version" => version}} when is_binary(version) ->
+        {:ok, String.trim(version)}
+
+      {:ok, _other} ->
+        {:ok, nil}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @spec validate_model(String.t(), atom(), keyword()) ::
           {:ok, model_info()}
           | {:error, {:unknown_model, String.t(), [String.t()], atom()}}
           | {:error, {:model_unavailable, atom(), {:ollama_unavailable, term()}}}
   def validate_model(model, provider, opts \\ [])
       when is_binary(model) and is_atom(provider) and is_list(opts) do
+    model = String.trim(model)
+
     case show_model(model, opts) do
       {:ok, details} ->
         {:ok, details}
 
       {:error, {:http_error, 404, _body}} ->
-        unknown_model_error(model, provider, opts)
+        validate_model_alias(model, provider, opts)
 
       {:error, {:not_found, _body}} ->
-        unknown_model_error(model, provider, opts)
+        validate_model_alias(model, provider, opts)
 
       {:error, reason} ->
         {:error, {:model_unavailable, provider, {:ollama_unavailable, reason}}}
@@ -84,6 +100,37 @@ defmodule CliSubprocessCore.Ollama do
       end
 
     {:error, {:unknown_model, model, suggestions, provider}}
+  end
+
+  defp validate_model_alias(model, provider, opts) do
+    case alias_candidate(model, opts) do
+      nil ->
+        unknown_model_error(model, provider, opts)
+
+      candidate ->
+        case show_model(candidate, opts) do
+          {:ok, details} -> {:ok, details}
+          {:error, _reason} -> unknown_model_error(model, provider, opts)
+        end
+    end
+  end
+
+  defp alias_candidate(model, opts) do
+    case list_model_names(opts) do
+      {:ok, names} -> Enum.find(names, &same_model_name?(&1, model))
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp same_model_name?(installed_name, requested_name)
+       when is_binary(installed_name) and is_binary(requested_name) do
+    normalize_model_name(installed_name) == normalize_model_name(requested_name)
+  end
+
+  defp normalize_model_name(name) when is_binary(name) do
+    name
+    |> String.trim()
+    |> String.trim_trailing(":latest")
   end
 
   defp request(method, path, payload, opts) when method in [:get, :post] and is_list(opts) do

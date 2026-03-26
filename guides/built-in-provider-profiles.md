@@ -81,11 +81,23 @@ Common Codex options:
 
 - `:prompt`
 - `:command`
-- `:model`
-- `:reasoning_effort`
+- `:model_payload`
 - `:output_schema`
 - `:permission_mode`
 - `:provider_permission_mode`
+
+The Codex profile does not own model or backend policy.
+
+It reads the resolved payload for:
+
+- `--model`
+- `--reasoning-effort`
+- `--oss`
+- `--local-provider`
+
+That is what allows the same profile to render either the normal OpenAI Codex
+path or the local Codex OSS/Ollama path without inventing a second fallback or
+validation layer.
 
 ## Gemini
 
