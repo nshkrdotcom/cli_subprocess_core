@@ -23,8 +23,8 @@ multiple external CLI families.
 The common-lane schema boundary now sits beside the existing runtime layers,
 not above them as a second architecture.
 
-- `CliSubprocessCore.Schema` and `CliSubprocessCore.Schema.Conventions` own the
-  shared `Zoi` conventions for core-owned dynamic boundaries.
+- `CliSubprocessCore.Schema` owns the shared `Zoi` validation contract for
+  core-owned dynamic boundaries.
 - `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`,
   `CliSubprocessCore.ModelRegistry.Model`,
   `CliSubprocessCore.ModelRegistry.Selection`, and

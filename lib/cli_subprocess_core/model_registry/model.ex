@@ -177,22 +177,32 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
 
   defp normalize_reasoning_efforts(values) when is_list(values) do
     Enum.reduce_while(values, {:ok, %{}}, fn value, {:ok, acc} ->
-      if is_binary(value) do
-        normalized = value |> String.trim() |> String.downcase()
-
-        if normalized == "" do
-          {:halt, {:error, {:reasoning_efforts, "keys must not be blank"}}}
-        else
+      case normalize_reasoning_list_key(value) do
+        {:ok, normalized} ->
           {:cont, {:ok, Map.put(acc, normalized, nil)}}
-        end
-      else
-        {:halt, {:error, {:reasoning_efforts, "list values must be strings"}}}
+
+        {:error, reason} ->
+          {:halt, {:error, reason}}
       end
     end)
   end
 
   defp normalize_reasoning_efforts(_other),
     do: {:error, {:reasoning_efforts, "must be a map or list"}}
+
+  defp normalize_reasoning_list_key(value) when is_binary(value) do
+    case value |> String.trim() |> String.downcase() do
+      "" ->
+        {:error, {:reasoning_efforts, "keys must not be blank"}}
+
+      normalized ->
+        {:ok, normalized}
+    end
+  end
+
+  defp normalize_reasoning_list_key(_other) do
+    {:error, {:reasoning_efforts, "list values must be strings"}}
+  end
 
   defp normalize_reasoning_key(key) when is_binary(key) do
     normalized = key |> String.trim() |> String.downcase()

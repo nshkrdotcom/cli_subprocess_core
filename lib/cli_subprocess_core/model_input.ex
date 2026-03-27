@@ -108,8 +108,13 @@ defmodule CliSubprocessCore.ModelInput do
     |> validate_supplied_payload(provider)
   end
 
-  defp normalize_supplied_payload(provider, payload) when is_map(payload) or is_list(payload) do
+  defp normalize_supplied_payload(provider, payload) when is_list(payload) do
+    normalize_supplied_payload(provider, Enum.into(payload, %{}))
+  end
+
+  defp normalize_supplied_payload(provider, payload) when is_map(payload) do
     payload
+    |> normalize_selection_attrs()
     |> Selection.new()
     |> normalize_selection_payload()
     |> validate_supplied_payload(provider)
@@ -119,13 +124,25 @@ defmodule CliSubprocessCore.ModelInput do
 
   defp normalize_selection_payload(%Selection{} = payload) do
     payload
-    |> Map.from_struct()
+    |> Selection.to_map()
     |> Map.put(:provider, normalize_provider(fetch_map_value(payload, :provider)))
     |> Map.put(:provider_backend, normalize_backend(fetch_map_value(payload, :provider_backend)))
     |> Map.put(:env_overrides, normalize_map(fetch_map_value(payload, :env_overrides)))
     |> Map.put(:settings_patch, normalize_map(fetch_map_value(payload, :settings_patch)))
     |> Map.put(:backend_metadata, normalize_map(fetch_map_value(payload, :backend_metadata)))
     |> Selection.new()
+  end
+
+  defp normalize_selection_attrs(payload) when is_map(payload) do
+    payload
+    |> Map.drop([:__struct__, "__struct__", :extra, "extra"])
+    |> CliSubprocessCore.Schema.merge_extra(selection_extra(payload))
+  end
+
+  defp selection_extra(payload) when is_map(payload) do
+    payload
+    |> fetch_map_value(:extra)
+    |> normalize_map()
   end
 
   defp validate_supplied_payload(%Selection{} = payload, provider) do
@@ -343,7 +360,7 @@ defmodule CliSubprocessCore.ModelInput do
     |> normalize_string()
   end
 
-  defp fetch_map_value(%Selection{} = payload, key) when is_atom(key) do
+  defp fetch_map_value(payload, key) when is_map(payload) and is_atom(key) do
     Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
   end
 

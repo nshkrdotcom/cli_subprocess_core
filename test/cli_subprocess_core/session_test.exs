@@ -139,6 +139,7 @@ defmodule CliSubprocessCore.SessionTest do
     script =
       create_test_script("""
       trap 'exit 130' INT
+      printf 'ready\\n' >&2
       sleep 60
       """)
 
@@ -153,15 +154,19 @@ defmodule CliSubprocessCore.SessionTest do
     assert_receive {@session_event_tag, ^ref, {:event, run_started}}, 2_000
     assert run_started.kind == :run_started
 
+    assert_receive {@session_event_tag, ^ref, {:event, stderr_event}}, 2_000
+    assert stderr_event.kind == :stderr
+    assert %Payload.Stderr{content: "ready"} = stderr_event.payload
+
     assert :ok = Session.interrupt(session)
 
-    assert_receive {@session_event_tag, ^ref, {:event, error_event}}, 2_000
+    assert_receive {@session_event_tag, ^ref, {:event, error_event}}, 5_000
     assert error_event.kind == :error
     assert %Payload.Error{message: message} = error_event.payload
     assert message =~ "CLI exited with code"
 
     monitor = Process.monitor(session)
-    assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 2_000
+    assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 5_000
     assert reason in [:normal, :noproc]
   end
 

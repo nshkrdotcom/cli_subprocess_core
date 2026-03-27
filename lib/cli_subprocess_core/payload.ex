@@ -90,6 +90,8 @@ end
 defmodule CliSubprocessCore.Payload.RunStarted do
   @moduledoc "Marks the start of a provider CLI run."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [
       provider_session_id: nil,
@@ -99,11 +101,11 @@ defmodule CliSubprocessCore.Payload.RunStarted do
       metadata: %{}
     ],
     schema_fields: %{
-      provider_session_id: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      command: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      args: CliSubprocessCore.Schema.Conventions.string_list(),
-      cwd: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      provider_session_id: Conventions.optional_trimmed_string(),
+      command: Conventions.optional_trimmed_string(),
+      args: Conventions.string_list(),
+      cwd: Conventions.optional_trimmed_string(),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -119,13 +121,15 @@ end
 defmodule CliSubprocessCore.Payload.AssistantDelta do
   @moduledoc "Represents a streamed assistant delta."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [content: "", index: nil, format: :text, metadata: %{}],
     schema_fields: %{
-      content: CliSubprocessCore.Schema.Conventions.default_trimmed_string(""),
+      content: Conventions.default_trimmed_string(""),
       index: CliSubprocessCore.Payload.optional_non_neg_integer_schema(),
-      format: CliSubprocessCore.Schema.Conventions.default_any(:text),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      format: Conventions.default_any(:text),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -140,13 +144,15 @@ end
 defmodule CliSubprocessCore.Payload.AssistantMessage do
   @moduledoc "Represents a completed assistant message."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [content: [], role: :assistant, model: nil, metadata: %{}],
     schema_fields: %{
       content: CliSubprocessCore.Payload.content_list_schema(),
-      role: CliSubprocessCore.Schema.Conventions.default_enum([:assistant], :assistant),
-      model: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      role: Conventions.default_enum([:assistant], :assistant),
+      model: Conventions.optional_trimmed_string(),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -161,12 +167,14 @@ end
 defmodule CliSubprocessCore.Payload.UserMessage do
   @moduledoc "Represents normalized user input."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [content: [], role: :user, metadata: %{}],
     schema_fields: %{
       content: CliSubprocessCore.Payload.content_list_schema(),
-      role: CliSubprocessCore.Schema.Conventions.default_enum([:user], :user),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      role: Conventions.default_enum([:user], :user),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -180,12 +188,14 @@ end
 defmodule CliSubprocessCore.Payload.Thinking do
   @moduledoc "Represents provider thinking output."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [content: "", signature: nil, metadata: %{}],
     schema_fields: %{
-      content: CliSubprocessCore.Schema.Conventions.default_trimmed_string(""),
-      signature: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      content: Conventions.default_trimmed_string(""),
+      signature: Conventions.optional_trimmed_string(),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -199,13 +209,15 @@ end
 defmodule CliSubprocessCore.Payload.ToolUse do
   @moduledoc "Represents a tool invocation request."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [tool_name: nil, tool_call_id: nil, input: %{}, metadata: %{}],
     schema_fields: %{
-      tool_name: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      tool_call_id: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      input: CliSubprocessCore.Schema.Conventions.default_map(%{}),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      tool_name: Conventions.optional_trimmed_string(),
+      tool_call_id: Conventions.optional_trimmed_string(),
+      input: Conventions.default_map(%{}),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -220,13 +232,15 @@ end
 defmodule CliSubprocessCore.Payload.ToolResult do
   @moduledoc "Represents a tool invocation result."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [tool_call_id: nil, content: nil, is_error: false, metadata: %{}],
     schema_fields: %{
-      tool_call_id: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      content: CliSubprocessCore.Schema.Conventions.optional_any(),
+      tool_call_id: Conventions.optional_trimmed_string(),
+      content: Conventions.optional_any(),
       is_error: Zoi.default(Zoi.optional(Zoi.boolean()), false),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -241,13 +255,15 @@ end
 defmodule CliSubprocessCore.Payload.ApprovalRequested do
   @moduledoc "Represents an approval request emitted by a provider CLI."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [approval_id: nil, subject: nil, details: %{}, metadata: %{}],
     schema_fields: %{
-      approval_id: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      subject: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      details: CliSubprocessCore.Schema.Conventions.default_map(%{}),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      approval_id: Conventions.optional_trimmed_string(),
+      subject: Conventions.optional_trimmed_string(),
+      details: Conventions.default_map(%{}),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -262,13 +278,15 @@ end
 defmodule CliSubprocessCore.Payload.ApprovalResolved do
   @moduledoc "Represents an approval decision."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [approval_id: nil, decision: nil, reason: nil, metadata: %{}],
     schema_fields: %{
-      approval_id: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      decision: CliSubprocessCore.Schema.Conventions.optional_any(),
-      reason: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      approval_id: Conventions.optional_trimmed_string(),
+      decision: Conventions.optional_any(),
+      reason: Conventions.optional_trimmed_string(),
+      metadata: Conventions.metadata()
     }
 
   @type decision :: :allow | :deny | atom() | String.t() | nil
@@ -284,6 +302,8 @@ end
 defmodule CliSubprocessCore.Payload.CostUpdate do
   @moduledoc "Represents token and cost accounting updates."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [input_tokens: 0, output_tokens: 0, total_tokens: 0, cost_usd: 0.0, metadata: %{}],
     schema_fields: %{
@@ -291,7 +311,7 @@ defmodule CliSubprocessCore.Payload.CostUpdate do
       output_tokens: CliSubprocessCore.Payload.non_neg_integer_schema(0),
       total_tokens: CliSubprocessCore.Payload.non_neg_integer_schema(0),
       cost_usd: CliSubprocessCore.Payload.non_neg_number_schema(0.0),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -307,13 +327,15 @@ end
 defmodule CliSubprocessCore.Payload.Result do
   @moduledoc "Represents the terminal result of a provider CLI run."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [status: nil, stop_reason: nil, output: nil, metadata: %{}],
     schema_fields: %{
-      status: CliSubprocessCore.Schema.Conventions.optional_any(),
-      stop_reason: CliSubprocessCore.Schema.Conventions.optional_any(),
-      output: CliSubprocessCore.Schema.Conventions.optional_any(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      status: Conventions.optional_any(),
+      stop_reason: Conventions.optional_any(),
+      output: Conventions.optional_any(),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -328,17 +350,18 @@ end
 defmodule CliSubprocessCore.Payload.Error do
   @moduledoc "Represents a normalized runtime error."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [message: "", code: nil, severity: :error, metadata: %{}],
     schema_fields: %{
-      message: CliSubprocessCore.Schema.Conventions.default_trimmed_string(""),
-      code: CliSubprocessCore.Schema.Conventions.optional_trimmed_string(),
-      severity:
-        CliSubprocessCore.Schema.Conventions.default_enum([:info, :warning, :error], :error),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      message: Conventions.default_trimmed_string(""),
+      code: Conventions.optional_trimmed_string(),
+      severity: Conventions.default_enum([:info, :warning, :error, :fatal], :error),
+      metadata: Conventions.metadata()
     }
 
-  @type severity :: :info | :warning | :error
+  @type severity :: :info | :warning | :error | :fatal
   @type t :: %__MODULE__{
           message: String.t(),
           code: String.t() | nil,
@@ -351,11 +374,13 @@ end
 defmodule CliSubprocessCore.Payload.Stderr do
   @moduledoc "Represents stderr output emitted by a provider CLI."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [content: "", metadata: %{}],
     schema_fields: %{
-      content: CliSubprocessCore.Schema.Conventions.default_trimmed_string(""),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      content: Conventions.default_trimmed_string(""),
+      metadata: Conventions.metadata()
     }
 
   @type t :: %__MODULE__{
@@ -368,12 +393,14 @@ end
 defmodule CliSubprocessCore.Payload.Raw do
   @moduledoc "Represents an unnormalized raw provider payload."
 
+  alias CliSubprocessCore.Schema.Conventions
+
   use CliSubprocessCore.Payload,
     defaults: [stream: :stdout, content: nil, metadata: %{}],
     schema_fields: %{
-      stream: CliSubprocessCore.Schema.Conventions.default_any(:stdout),
-      content: CliSubprocessCore.Schema.Conventions.optional_any(),
-      metadata: CliSubprocessCore.Schema.Conventions.metadata()
+      stream: Conventions.default_any(:stdout),
+      content: Conventions.optional_any(),
+      metadata: Conventions.metadata()
     }
 
   @type stream :: :stdout | :stderr | atom() | String.t()

@@ -104,6 +104,44 @@ defmodule CliSubprocessCore.ModelInputTest do
     assert normalized.selection == payload
   end
 
+  test "preserves explicit payload extras without wrapping them under :extra" do
+    payload =
+      Selection.new(%{
+        provider: :gemini,
+        requested_model: "gemini-2.5-flash",
+        resolved_model: "gemini-2.5-flash",
+        resolution_source: :explicit,
+        visibility: :restricted,
+        model_source: :catalog,
+        future_flag: true
+      })
+
+    assert {:ok, normalized} = ModelInput.normalize(:gemini, model_payload: payload)
+    assert normalized.selection == payload
+    assert normalized.attrs[:model_payload] == payload
+    assert normalized.selection.extra == %{future_flag: true}
+  end
+
+  test "normalizes Map.from_struct payloads without nesting the extra field" do
+    payload =
+      Selection.new(%{
+        provider: :amp,
+        resolved_model: "amp-1",
+        resolution_source: :default,
+        model_family: "amp",
+        catalog_version: "2026-03-25",
+        visibility: :public,
+        future_flag: true
+      })
+
+    assert {:ok, normalized} =
+             ModelInput.normalize(:amp, model_payload: Map.from_struct(payload))
+
+    assert normalized.selection == payload
+    assert normalized.attrs[:model_payload] == payload
+    assert normalized.selection.extra == %{future_flag: true}
+  end
+
   test "validates Claude payload conflicts through the shared normalizer" do
     {:ok, payload} = CliSubprocessCore.ModelRegistry.build_arg_payload(:claude, "sonnet", [])
 

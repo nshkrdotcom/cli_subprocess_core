@@ -4,7 +4,7 @@ defmodule CliSubprocessCore.Schema.Conventions do
   @type enum_value :: atom() | String.t()
 
   @spec any_map() :: Zoi.schema()
-  def any_map, do: Zoi.map(Zoi.any(), Zoi.any())
+  def any_map, do: Zoi.map(%{}, unrecognized_keys: :preserve)
 
   @spec metadata() :: Zoi.schema()
   def metadata, do: default_map(%{})

@@ -1,5 +1,8 @@
 defmodule CliSubprocessCore.Schema do
-  @moduledoc false
+  @moduledoc """
+  Canonical schema helpers and shared validation error types for common-lane
+  dynamic boundaries.
+  """
 
   alias CliSubprocessCore.Schema.Error
 
@@ -39,7 +42,7 @@ defmodule CliSubprocessCore.Schema do
     end
   end
 
-  @spec split_extra(map(), [atom()]) :: {map(), map()}
+  @spec split_extra(map(), [term()]) :: {map(), map()}
   def split_extra(map, keys) when is_map(map) and is_list(keys) do
     known = Map.take(map, keys)
     extra = Map.drop(map, keys)

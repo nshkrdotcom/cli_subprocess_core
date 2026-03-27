@@ -106,6 +106,8 @@ Common examples:
 - `CliSubprocessCore.Payload.ApprovalRequested` and
   `CliSubprocessCore.Payload.ApprovalResolved` represent human approval flow.
 - `CliSubprocessCore.Payload.CostUpdate` carries token and cost accounting.
+- `CliSubprocessCore.Payload.Error` uses the normalized shared severity lane:
+  `:info`, `:warning`, `:error`, or terminal `:fatal`.
 - `CliSubprocessCore.Payload.Raw` retains unnormalized material when a provider
   event does not map cleanly to a richer normalized struct yet.
 

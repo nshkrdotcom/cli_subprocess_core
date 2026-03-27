@@ -493,6 +493,19 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Stderr{content: "gemini warning"} = stderr.payload
     end
 
+    test "Gemini preserves fatal provider severities on error events" do
+      {events, _state} =
+        Gemini.decode_stdout(
+          ~s({"type":"error","severity":"fatal","message":"Authentication failed","timestamp":"2026-02-11T12:00:02.000Z"}),
+          Gemini.init_parser_state([])
+        )
+
+      assert [%{kind: :error, payload: %Payload.Error{} = payload}] = events
+      assert payload.severity == :fatal
+      assert payload.code == "unknown"
+      assert payload.metadata["severity"] == "fatal"
+    end
+
     test "Amp decodes its JSONL fixture into normalized events" do
       events = decode_fixture(Amp, "amp")
 

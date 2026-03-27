@@ -87,9 +87,8 @@ The library is designed for two consumers:
 `CliSubprocessCore` is also the shared schema-conventions anchor for the common
 CLI lane.
 
-- `CliSubprocessCore.Schema` and `CliSubprocessCore.Schema.Conventions` define
-  the canonical `Zoi` validation and normalization vocabulary for new
-  core-owned dynamic boundaries.
+- `CliSubprocessCore.Schema` defines the canonical `Zoi` validation and
+  normalization contract for new core-owned dynamic boundaries.
 - `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`,
   `CliSubprocessCore.ModelRegistry.Model`,
   `CliSubprocessCore.ModelRegistry.Selection`, and

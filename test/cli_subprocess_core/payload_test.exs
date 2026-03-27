@@ -44,4 +44,12 @@ defmodule CliSubprocessCore.PayloadTest do
       assert module.to_map(payload)["wire_field"] == "kept"
     end
   end
+
+  test "Payload.Error accepts fatal severity for transport-terminal failures" do
+    assert %Payload.Error{severity: :fatal} =
+             Payload.Error.new(message: "boom", code: "auth_error", severity: :fatal)
+
+    assert {:ok, %Payload.Error{severity: :fatal}} =
+             Payload.Error.parse(%{"message" => "boom", "severity" => "fatal"})
+  end
 end
