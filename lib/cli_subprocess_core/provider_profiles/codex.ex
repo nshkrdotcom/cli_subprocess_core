@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["exec", "--json"]
@@ -130,12 +131,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   end
 
   defp permission_flags(opts) do
-    case Shared.permission_mode(opts) do
-      :auto_edit -> ["--full-auto"]
-      :yolo -> ["--dangerously-bypass-approvals-and-sandbox"]
-      :plan -> ["--plan"]
-      _ -> []
-    end
+    ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
   end
 
   defp decode_event(raw, state) do

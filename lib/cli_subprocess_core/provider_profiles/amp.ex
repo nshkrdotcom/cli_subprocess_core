@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @event_handlers %{
@@ -89,13 +90,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   end
 
   defp permission_flags(opts) do
-    case Shared.permission_mode(opts) do
-      :dangerously_allow_all ->
-        ["--dangerously-allow-all"]
-
-      _ ->
-        []
-    end
+    ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
   end
 
   defp decode_event(raw, state) do

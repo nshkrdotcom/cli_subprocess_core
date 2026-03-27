@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Gemini do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @impl true
@@ -54,12 +55,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Gemini do
   end
 
   defp permission_flags(opts) do
-    case Shared.permission_mode(opts) do
-      :auto_edit -> ["--approval-mode", "auto_edit"]
-      :plan -> ["--approval-mode", "plan"]
-      :yolo -> ["--yolo"]
-      _ -> []
-    end
+    ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
   end
 
   defp model_value(opts) do

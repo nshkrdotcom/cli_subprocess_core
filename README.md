@@ -52,6 +52,9 @@ The library is designed for two consumers:
   one-shot command boundary for common non-PTY CLI flows.
 - `CliSubprocessCore.ProviderProfile` and `CliSubprocessCore.ProviderRegistry`
   define and manage provider profile modules.
+- `CliSubprocessCore.ProviderFeatures` owns canonical built-in provider feature
+  metadata such as provider-native permission terminology and partial common
+  features like Ollama-backed model routing.
 - `CliSubprocessCore.ProviderProfiles.*` ships first-party profiles for Claude,
   Codex, Gemini, and Amp.
 - `CliSubprocessCore.ModelRegistry` and `CliSubprocessCore.Ollama` own
@@ -83,7 +86,7 @@ Add the dependency and start the application normally:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.1.0"}
+    {:cli_subprocess_core, "~> 0.1.1"}
   ]
 end
 ```
@@ -223,6 +226,7 @@ Ad hoc external profiles can also be registered at runtime with
 - `guides/provider-profile-contract.md`
 - `guides/custom-provider-profiles.md`
 - `guides/built-in-provider-profiles.md`
+- `guides/provider-feature-manifests.md`
 - `guides/developer-guide-model-registry.md`
 - `guides/developer-guide-claude-backends.md`
 - `guides/developer-guide-codex-backends.md`

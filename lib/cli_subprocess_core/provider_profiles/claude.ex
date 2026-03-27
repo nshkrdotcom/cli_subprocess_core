@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["--output-format", "stream-json", "--verbose", "--print"]
@@ -70,21 +71,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
     |> Shared.maybe_add_pair("--append-system-prompt", Keyword.get(opts, :append_system_prompt))
     |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
-    |> Shared.maybe_add_pair("--permission-mode", permission_flag(opts))
+    |> Kernel.++(ProviderFeatures.permission_args(id(), Shared.permission_mode(opts)))
     |> Shared.maybe_add_flag("--thinking", Keyword.get(opts, :include_thinking, false))
-  end
-
-  defp permission_flag(opts) do
-    case Shared.permission_mode(opts) do
-      :accept_edits -> "acceptEdits"
-      :bypass_permissions -> "bypassPermissions"
-      :delegate -> "delegate"
-      :dont_ask -> "dontAsk"
-      :plan -> "plan"
-      value when is_atom(value) -> Atom.to_string(value)
-      value when is_binary(value) -> value
-      _ -> "default"
-    end
   end
 
   defp model_value(opts) do

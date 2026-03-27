@@ -1,7 +1,7 @@
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -43,6 +43,7 @@ defmodule CliSubprocessCore.MixProject do
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
+        "guides/provider-feature-manifests.md": [title: "Provider Feature Manifests"],
         "guides/developer-guide-model-registry.md": [title: "Developer Guide: Model Registry"],
         "guides/developer-guide-claude-backends.md": [title: "Developer Guide: Claude Backends"],
         "guides/developer-guide-codex-backends.md": [title: "Developer Guide: Codex Backends"],
@@ -61,7 +62,8 @@ defmodule CliSubprocessCore.MixProject do
         "Provider Profiles": [
           "guides/provider-profile-contract.md",
           "guides/custom-provider-profiles.md",
-          "guides/built-in-provider-profiles.md"
+          "guides/built-in-provider-profiles.md",
+          "guides/provider-feature-manifests.md"
         ],
         "Developer Guides": [
           "guides/developer-guide-model-registry.md",
@@ -133,8 +135,12 @@ defmodule CliSubprocessCore.MixProject do
       plt_add_apps: [:mix, :ex_unit],
       plt_core_path: "priv/plts/core",
       plt_local_path: "priv/plts",
-      plt_file: {:no_warn, "priv/plts/project.plt"},
+      plt_file: {:no_warn, "priv/plts/#{dialyzer_plt_basename()}.plt"},
       flags: [:error_handling, :underspecs]
     ]
+  end
+
+  defp dialyzer_plt_basename do
+    "project-#{@version}"
   end
 end
