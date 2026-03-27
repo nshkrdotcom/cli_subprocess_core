@@ -30,9 +30,9 @@ defmodule CliSubprocessCore.Transport do
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
   alias CliSubprocessCore.Transport.Delivery
-  alias CliSubprocessCore.Transport.Erlexec
   alias CliSubprocessCore.Transport.Info
   alias CliSubprocessCore.Transport.RunResult
+  alias CliSubprocessCore.Transport.Subprocess
 
   @typedoc "Opaque transport reference."
   @type t :: pid()
@@ -85,68 +85,68 @@ defmodule CliSubprocessCore.Transport do
   Starts the default raw transport implementation.
   """
   @spec start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
-  def start(opts), do: Erlexec.start(opts)
+  def start(opts), do: Subprocess.start(opts)
 
   @doc """
   Starts the default raw transport implementation and links it to the caller.
   """
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
-  def start_link(opts), do: Erlexec.start_link(opts)
+  def start_link(opts), do: Subprocess.start_link(opts)
 
   @doc """
   Runs a one-shot non-PTY command and captures exact stdout, stderr, and exit
   data.
   """
   @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
-  def run(%Command{} = command, opts \\ []) when is_list(opts), do: Erlexec.run(command, opts)
+  def run(%Command{} = command, opts \\ []) when is_list(opts), do: Subprocess.run(command, opts)
 
   @doc """
   Sends data to the subprocess stdin.
   """
   @spec send(t(), iodata() | map() | list()) :: :ok | {:error, {:transport, Error.t()}}
-  def send(transport, message), do: Erlexec.send(transport, message)
+  def send(transport, message), do: Subprocess.send(transport, message)
 
   @doc """
   Subscribes the caller in legacy mode.
   """
   @spec subscribe(t(), pid()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid), do: Erlexec.subscribe(transport, pid)
+  def subscribe(transport, pid), do: Subprocess.subscribe(transport, pid)
 
   @doc """
   Subscribes a process with an explicit tag mode.
   """
   @spec subscribe(t(), pid(), subscription_tag()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid, tag), do: Erlexec.subscribe(transport, pid, tag)
+  def subscribe(transport, pid, tag), do: Subprocess.subscribe(transport, pid, tag)
 
   @doc """
   Removes a subscriber.
   """
   @spec unsubscribe(t(), pid()) :: :ok
-  def unsubscribe(transport, pid), do: Erlexec.unsubscribe(transport, pid)
+  def unsubscribe(transport, pid), do: Subprocess.unsubscribe(transport, pid)
 
   @doc """
   Stops the transport.
   """
   @spec close(t()) :: :ok
-  def close(transport), do: Erlexec.close(transport)
+  def close(transport), do: Subprocess.close(transport)
 
   @doc """
   Forces the subprocess down immediately.
   """
   @spec force_close(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def force_close(transport), do: Erlexec.force_close(transport)
+  def force_close(transport), do: Subprocess.force_close(transport)
 
   @doc """
   Sends SIGINT to the subprocess.
   """
   @spec interrupt(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def interrupt(transport), do: Erlexec.interrupt(transport)
+  def interrupt(transport), do: Subprocess.interrupt(transport)
 
   @doc """
   Returns transport connectivity status.
   """
   @spec status(t()) :: :connected | :disconnected | :error
-  def status(transport), do: Erlexec.status(transport)
+  def status(transport), do: Subprocess.status(transport)
 
   @doc """
   Closes stdin for EOF-driven CLIs.
@@ -155,19 +155,19 @@ defmodule CliSubprocessCore.Transport do
   EOF byte (`Ctrl-D`).
   """
   @spec end_input(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def end_input(transport), do: Erlexec.end_input(transport)
+  def end_input(transport), do: Subprocess.end_input(transport)
 
   @doc """
   Returns the stderr ring buffer tail.
   """
   @spec stderr(t()) :: binary()
-  def stderr(transport), do: Erlexec.stderr(transport)
+  def stderr(transport), do: Subprocess.stderr(transport)
 
   @doc """
   Returns the current transport metadata snapshot.
   """
   @spec info(t()) :: Info.t()
-  def info(transport), do: Erlexec.info(transport)
+  def info(transport), do: Subprocess.info(transport)
 
   @doc """
   Extracts a normalized transport event from a legacy mailbox message.

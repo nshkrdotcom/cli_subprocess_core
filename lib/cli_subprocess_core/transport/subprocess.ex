@@ -1,11 +1,5 @@
-defmodule CliSubprocessCore.Transport.Erlexec do
-  @moduledoc """
-  `erlexec`-backed raw subprocess transport.
-
-  This implementation owns subprocess startup, stdout line framing, realtime
-  stderr dispatch, subscriber fan-out, bounded call behavior, and final exit
-  flushing for late stdout/stderr fragments.
-  """
+defmodule CliSubprocessCore.Transport.Subprocess do
+  @moduledoc false
 
   use GenServer
 

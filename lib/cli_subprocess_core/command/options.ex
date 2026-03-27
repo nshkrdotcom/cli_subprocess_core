@@ -3,16 +3,14 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry, Transport}
+  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry}
   alias CliSubprocessCore.Transport.RunOptions
 
   @default_registry ProviderRegistry
-  @default_transport_module Transport
   @reserved_keys [
     :provider,
     :profile,
     :registry,
-    :transport_module,
     :stdin,
     :timeout,
     :stderr,
@@ -23,7 +21,6 @@ defmodule CliSubprocessCore.Command.Options do
             provider: nil,
             profile: nil,
             registry: @default_registry,
-            transport_module: @default_transport_module,
             stdin: nil,
             timeout: RunOptions.default_timeout_ms(),
             stderr: :separate,
@@ -35,7 +32,6 @@ defmodule CliSubprocessCore.Command.Options do
           provider: atom() | nil,
           profile: module() | nil,
           registry: pid() | atom(),
-          transport_module: module(),
           stdin: term(),
           timeout: timeout(),
           stderr: RunOptions.stderr_mode(),
@@ -55,7 +51,7 @@ defmodule CliSubprocessCore.Command.Options do
           | {:invalid_profile, term()}
           | {:provider_profile_mismatch, atom(), atom()}
           | {:invalid_registry, term()}
-          | {:invalid_transport_module, term()}
+          | {:unsupported_option, :transport_module}
           | {:invalid_timeout, term()}
           | {:invalid_stderr, term()}
           | {:invalid_close_stdin, term()}
@@ -66,15 +62,11 @@ defmodule CliSubprocessCore.Command.Options do
   @spec new(Command.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
   def new(%Command{} = invocation, opts) when is_list(opts) do
     with :ok <- validate_invocation(invocation),
-         :ok <-
-           validate_transport_module(
-             Keyword.get(opts, :transport_module, @default_transport_module)
-           ),
+         :ok <- reject_transport_selector(opts),
          {:ok, run_options} <- RunOptions.new(invocation, opts) do
       {:ok,
        %__MODULE__{
          invocation: invocation,
-         transport_module: Keyword.get(opts, :transport_module, @default_transport_module),
          stdin: run_options.stdin,
          timeout: run_options.timeout,
          stderr: run_options.stderr,
@@ -97,10 +89,7 @@ defmodule CliSubprocessCore.Command.Options do
     with {:ok, profile} <- validate_profile(profile),
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
-         :ok <-
-           validate_transport_module(
-             Keyword.get(opts, :transport_module, @default_transport_module)
-           ),
+         :ok <- reject_transport_selector(opts),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, RunOptions.default_timeout_ms())),
          :ok <- validate_stderr(Keyword.get(opts, :stderr, :separate)),
          :ok <- validate_close_stdin(Keyword.get(opts, :close_stdin, true)) do
@@ -109,7 +98,6 @@ defmodule CliSubprocessCore.Command.Options do
          provider: provider,
          profile: profile,
          registry: Keyword.get(opts, :registry, @default_registry),
-         transport_module: Keyword.get(opts, :transport_module, @default_transport_module),
          stdin: Keyword.get(opts, :stdin),
          timeout: Keyword.get(opts, :timeout, RunOptions.default_timeout_ms()),
          stderr: Keyword.get(opts, :stderr, :separate),
@@ -153,19 +141,6 @@ defmodule CliSubprocessCore.Command.Options do
   defp validate_registry(registry) when is_pid(registry) or is_atom(registry), do: :ok
   defp validate_registry(registry), do: {:error, {:invalid_registry, registry}}
 
-  defp validate_transport_module(module) when is_atom(module) do
-    callbacks = [{:run, 2}]
-
-    if Code.ensure_loaded?(module) and
-         Enum.all?(callbacks, fn {name, arity} -> function_exported?(module, name, arity) end) do
-      :ok
-    else
-      {:error, {:invalid_transport_module, module}}
-    end
-  end
-
-  defp validate_transport_module(module), do: {:error, {:invalid_transport_module, module}}
-
   defp validate_timeout(:infinity), do: :ok
   defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 0, do: :ok
   defp validate_timeout(timeout), do: {:error, {:invalid_timeout, timeout}}
@@ -175,4 +150,12 @@ defmodule CliSubprocessCore.Command.Options do
 
   defp validate_close_stdin(value) when is_boolean(value), do: :ok
   defp validate_close_stdin(value), do: {:error, {:invalid_close_stdin, value}}
+
+  defp reject_transport_selector(opts) when is_list(opts) do
+    if Keyword.has_key?(opts, :transport_module) do
+      {:error, {:unsupported_option, :transport_module}}
+    else
+      :ok
+    end
+  end
 end

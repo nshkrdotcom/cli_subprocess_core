@@ -3,16 +3,14 @@ defmodule CliSubprocessCore.Session.Options do
   Validated startup options for the common session engine.
   """
 
-  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry, Transport}
+  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
 
   @default_registry ProviderRegistry
   @default_session_event_tag :cli_subprocess_core_session
-  @default_transport_module Transport
   @reserved_keys [
     :provider,
     :profile,
     :registry,
-    :transport_module,
     :subscriber,
     :metadata,
     :session_event_tag,
@@ -22,7 +20,6 @@ defmodule CliSubprocessCore.Session.Options do
   defstruct provider: nil,
             profile: nil,
             registry: @default_registry,
-            transport_module: @default_transport_module,
             subscriber: nil,
             metadata: %{},
             session_event_tag: @default_session_event_tag,
@@ -35,7 +32,6 @@ defmodule CliSubprocessCore.Session.Options do
           provider: atom(),
           profile: module() | nil,
           registry: pid() | atom(),
-          transport_module: module(),
           subscriber: subscriber(),
           metadata: map(),
           session_event_tag: atom(),
@@ -49,7 +45,7 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_profile, term()}
           | {:provider_profile_mismatch, atom(), atom()}
           | {:invalid_registry, term()}
-          | {:invalid_transport_module, term()}
+          | {:unsupported_option, :transport_module}
           | {:invalid_subscriber, term()}
           | {:invalid_metadata, term()}
           | {:invalid_session_event_tag, term()}
@@ -69,10 +65,7 @@ defmodule CliSubprocessCore.Session.Options do
     with {:ok, profile} <- validate_profile(profile),
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
-         :ok <-
-           validate_transport_module(
-             Keyword.get(opts, :transport_module, @default_transport_module)
-           ),
+         :ok <- reject_transport_selector(opts),
          :ok <- validate_subscriber(Keyword.get(opts, :subscriber)),
          :ok <- validate_metadata(Keyword.get(opts, :metadata, %{})),
          :ok <-
@@ -85,7 +78,6 @@ defmodule CliSubprocessCore.Session.Options do
          provider: provider,
          profile: profile,
          registry: Keyword.get(opts, :registry, @default_registry),
-         transport_module: Keyword.get(opts, :transport_module, @default_transport_module),
          subscriber: Keyword.get(opts, :subscriber),
          metadata: Keyword.get(opts, :metadata, %{}),
          session_event_tag: Keyword.get(opts, :session_event_tag, @default_session_event_tag),
@@ -140,29 +132,6 @@ defmodule CliSubprocessCore.Session.Options do
   defp validate_registry(registry) when is_pid(registry) or is_atom(registry), do: :ok
   defp validate_registry(registry), do: {:error, {:invalid_registry, registry}}
 
-  defp validate_transport_module(module) when is_atom(module) do
-    callbacks = [
-      {:start, 1},
-      {:send, 2},
-      {:end_input, 1},
-      {:interrupt, 1},
-      {:close, 1},
-      {:subscribe, 3},
-      {:unsubscribe, 2},
-      {:status, 1},
-      {:stderr, 1}
-    ]
-
-    if Code.ensure_loaded?(module) and
-         Enum.all?(callbacks, fn {name, arity} -> function_exported?(module, name, arity) end) do
-      :ok
-    else
-      {:error, {:invalid_transport_module, module}}
-    end
-  end
-
-  defp validate_transport_module(module), do: {:error, {:invalid_transport_module, module}}
-
   defp validate_subscriber(nil), do: :ok
   defp validate_subscriber(pid) when is_pid(pid), do: :ok
 
@@ -180,4 +149,12 @@ defmodule CliSubprocessCore.Session.Options do
   defp validate_starter(nil), do: :ok
   defp validate_starter({pid, ref}) when is_pid(pid) and is_reference(ref), do: :ok
   defp validate_starter(starter), do: {:error, {:invalid_starter, starter}}
+
+  defp reject_transport_selector(opts) when is_list(opts) do
+    if Keyword.has_key?(opts, :transport_module) do
+      {:error, {:unsupported_option, :transport_module}}
+    else
+      :ok
+    end
+  end
 end

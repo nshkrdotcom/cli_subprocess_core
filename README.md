@@ -20,8 +20,9 @@
 providers. It owns the raw subprocess transport, the normalized session/event
 model above that transport, the shared non-PTY command lane, and the built-in
 provider profiles that turn provider-specific JSONL streams into a stable core
-vocabulary. Within the runtime stack, it is the only repo that owns `erlexec`
-startup, `:exec.*`, and raw subprocess lifecycle state.
+vocabulary. Within the runtime stack, it is the only repo that owns the
+underlying subprocess runtime startup, `:exec.*`, and raw subprocess lifecycle
+state.
 
 The library is designed for two consumers:
 
@@ -63,8 +64,7 @@ The library is designed for two consumers:
 - `CliSubprocessCore.ModelInput` owns mixed raw-versus-payload normalization so
   downstream SDKs and ASM can consume one canonical payload instead of
   re-resolving provider model policy locally.
-- `CliSubprocessCore.Transport` and
-  `CliSubprocessCore.Transport.Erlexec` own subprocess lifecycle, stdout/stderr
+- `CliSubprocessCore.Transport` owns subprocess lifecycle, stdout/stderr
   dispatch, PTY startup, raw-byte versus line-oriented IO contracts,
   synchronous `run/2`, interrupt, close, force-close behavior, and transport
   metadata through `CliSubprocessCore.Transport.Info`.

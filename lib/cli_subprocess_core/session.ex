@@ -30,7 +30,6 @@ defmodule CliSubprocessCore.Session do
             runtime: nil,
             parser_state: nil,
             subscribers: %{},
-            transport_module: nil,
             transport_pid: nil,
             transport_ref: nil
 
@@ -47,7 +46,6 @@ defmodule CliSubprocessCore.Session do
           runtime: Runtime.t(),
           parser_state: term(),
           subscribers: %{optional(pid()) => subscriber_info()},
-          transport_module: module(),
           transport_pid: pid(),
           transport_ref: reference()
         }
@@ -218,7 +216,6 @@ defmodule CliSubprocessCore.Session do
             Runtime.new(provider: options.provider, profile: profile, metadata: options.metadata),
           parser_state: profile.init_parser_state(options.provider_options),
           subscribers: %{},
-          transport_module: options.transport_module,
           transport_pid: transport_pid,
           transport_ref: transport_ref
         }
@@ -254,15 +251,15 @@ defmodule CliSubprocessCore.Session do
 
   @impl GenServer
   def handle_call({:send, input}, _from, state) do
-    {:reply, state.transport_module.send(state.transport_pid, input), state}
+    {:reply, CliSubprocessCore.Transport.send(state.transport_pid, input), state}
   end
 
   def handle_call(:end_input, _from, state) do
-    {:reply, state.transport_module.end_input(state.transport_pid), state}
+    {:reply, CliSubprocessCore.Transport.end_input(state.transport_pid), state}
   end
 
   def handle_call(:interrupt, _from, state) do
-    {:reply, state.transport_module.interrupt(state.transport_pid), state}
+    {:reply, CliSubprocessCore.Transport.interrupt(state.transport_pid), state}
   end
 
   def handle_call({:subscribe, pid, tag}, _from, state) do
@@ -326,7 +323,7 @@ defmodule CliSubprocessCore.Session do
   @impl GenServer
   def terminate(_reason, state) do
     if is_pid(state.transport_pid) do
-      _ = state.transport_module.close(state.transport_pid)
+      _ = CliSubprocessCore.Transport.close(state.transport_pid)
     end
 
     :ok
@@ -393,14 +390,14 @@ defmodule CliSubprocessCore.Session do
       |> Keyword.put(:subscriber, {self(), transport_ref})
       |> Keyword.put(:event_tag, @transport_event_tag)
 
-    case options.transport_module.start(transport_opts) do
+    case CliSubprocessCore.Transport.start(transport_opts) do
       {:ok, transport_pid} ->
-        case await_transport_started(options.transport_module, transport_pid) do
+        case await_transport_started(CliSubprocessCore.Transport, transport_pid) do
           :ok ->
             {:ok, transport_pid, transport_ref}
 
           {:error, reason} ->
-            safe_close_transport(options.transport_module, transport_pid)
+            safe_close_transport(CliSubprocessCore.Transport, transport_pid)
             {:error, reason}
         end
 
@@ -433,13 +430,13 @@ defmodule CliSubprocessCore.Session do
   end
 
   defp session_info(state) do
-    transport_info = maybe_transport_info(state.transport_module, state.transport_pid)
+    transport_info = maybe_transport_info(CliSubprocessCore.Transport, state.transport_pid)
 
     transport_status =
-      transport_status(state.transport_module, state.transport_pid, transport_info)
+      transport_status(CliSubprocessCore.Transport, state.transport_pid, transport_info)
 
     transport_stderr =
-      transport_stderr(state.transport_module, state.transport_pid, transport_info)
+      transport_stderr(CliSubprocessCore.Transport, state.transport_pid, transport_info)
 
     %{
       capabilities: state.profile.capabilities(),
@@ -453,7 +450,7 @@ defmodule CliSubprocessCore.Session do
       subscribers: map_size(state.subscribers),
       transport:
         build_transport_snapshot(
-          state.transport_module,
+          CliSubprocessCore.Transport,
           state.transport_pid,
           transport_status,
           transport_stderr,

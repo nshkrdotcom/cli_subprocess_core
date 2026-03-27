@@ -185,7 +185,7 @@ defmodule CliSubprocessCore.RawSessionTest do
   test "raw session delivery metadata reflects the transport's effective tagged event atom" do
     assert {:ok, session} =
              RawSession.start("ignored", [],
-               transport_module: TagDriftTransport,
+               transport: TagDriftTransport,
                event_tag: :requested_raw_session_tag,
                actual_event_tag: :transport_owned_raw_session
              )
@@ -197,6 +197,11 @@ defmodule CliSubprocessCore.RawSessionTest do
              RawSession.info(session)
 
     assert :ok = RawSession.stop(session)
+  end
+
+  test "raw sessions reject the legacy transport_module option name" do
+    assert {:error, {:unsupported_option, :transport_module}} =
+             RawSession.start("ignored", [], transport_module: TagDriftTransport)
   end
 
   test "lazy startup surfaces subprocess spawn failures before returning a raw session" do

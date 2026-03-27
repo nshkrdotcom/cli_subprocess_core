@@ -157,6 +157,16 @@ defmodule CliSubprocessCore.CommandTest do
     assert error.context == %{invocation: invocation}
   end
 
+  test "run/2 rejects public transport_module selection" do
+    invocation = Command.new("sh", ["-c", "printf ready"])
+
+    assert {:error, %Error{} = error} =
+             Command.run(invocation, transport_module: CliSubprocessCore.Transport)
+
+    assert error.reason == {:invalid_options, {:unsupported_option, :transport_module}}
+    assert error.context == %{invocation: invocation}
+  end
+
   defp create_test_script(body) do
     dir =
       Path.join(

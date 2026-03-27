@@ -41,14 +41,14 @@ Common session-level options:
 - `:subscriber`
 - `:metadata`
 - `:registry`
-- `:transport_module`
 - `:session_event_tag` for low-level adapter-controlled tagged delivery; higher-level
   callers should keep that raw tag below their projected public event surface
 
 All other options are passed through to the provider profile for command
 construction, parser initialization, and transport overrides. If the selected
 transport is configured for lazy startup, the session still waits for that
-startup to finish before returning.
+startup to finish before returning. Legacy backend-selection overrides are
+rejected.
 
 ## Lifecycle API
 

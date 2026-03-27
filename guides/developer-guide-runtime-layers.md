@@ -61,7 +61,6 @@ longer-lived sessions.
 Owned by:
 
 - `CliSubprocessCore.Transport`
-- `CliSubprocessCore.Transport.Erlexec`
 
 This layer starts the external process, manages stdin/stdout/stderr, and
 captures process exit information.

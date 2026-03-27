@@ -1,7 +1,7 @@
 # Shutdown And Timeouts
 
-`CliSubprocessCore.Transport.Erlexec` separates normal shutdown, escalated
-shutdown, and timeout behavior so callers can choose the right level of force.
+`CliSubprocessCore.Transport` separates normal shutdown, escalated shutdown,
+and timeout behavior so callers can choose the right level of force.
 
 ## Normal Close
 
@@ -60,7 +60,8 @@ This is separate from `close/1`:
 - `close/1` tears down the transport itself
 
 Interrupt and forced shutdown signal the subprocess process group directly from
-the core runtime. Startup does not depend on erlexec's `:kill_group` flag.
+the core runtime. Startup does not depend on the internal runtime's
+`:kill_group` flag.
 
 ## Headless Timeout
 
@@ -76,7 +77,7 @@ Set `headless_timeout_ms: :infinity` to disable this behavior.
 
 ## Exit Finalization
 
-erlexec child exits are finalized after a short delay so the transport can:
+Child exits are finalized after a short delay so the transport can:
 
 1. drain any queued stdout lines
 2. flush a trailing stdout fragment

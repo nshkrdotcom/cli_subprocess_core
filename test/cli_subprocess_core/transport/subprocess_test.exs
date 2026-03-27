@@ -1,17 +1,17 @@
-defmodule CliSubprocessCore.Transport.ErlexecTest do
+defmodule CliSubprocessCore.Transport.SubprocessTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
   alias CliSubprocessCore.ProcessExit
   alias CliSubprocessCore.Transport
-  alias CliSubprocessCore.Transport.{Erlexec, Error}
+  alias CliSubprocessCore.Transport.{Error, Subprocess}
 
   test "eager startup streams stdout and a normalized exit to tagged subscribers" do
     ref = make_ref()
     script = create_test_script("printf 'alpha\\nbeta\\n'")
 
-    assert {:ok, transport} = Erlexec.start(command: script, subscriber: {self(), ref})
+    assert {:ok, transport} = Subprocess.start(command: script, subscriber: {self(), ref})
 
     assert_receive {:cli_subprocess_core, ^ref, {:message, "alpha"}}, 2_000
     assert_receive {:cli_subprocess_core, ^ref, {:message, "beta"}}, 2_000
@@ -19,13 +19,13 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
                    2_000
 
-    assert :disconnected == Erlexec.status(transport)
+    assert :disconnected == Subprocess.status(transport)
   end
 
   test "legacy subscribers receive bare transport tuples" do
     script = create_test_script("printf 'legacy\\n'")
 
-    assert {:ok, _transport} = Erlexec.start(command: script, subscriber: {self(), :legacy})
+    assert {:ok, _transport} = Subprocess.start(command: script, subscriber: {self(), :legacy})
 
     assert_receive {:transport_message, "legacy"}, 2_000
     assert_receive {:transport_exit, %ProcessExit{status: :success, code: 0}}, 2_000
@@ -33,7 +33,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
 
   test "start returns a structured error when the command cannot be spawned" do
     assert {:error, {:transport, %Error{reason: {:command_not_found, "/tmp/definitely_missing"}}}} =
-             Erlexec.start(command: "/tmp/definitely_missing")
+             Subprocess.start(command: "/tmp/definitely_missing")
   end
 
   test "lazy startup returns deterministic preflight failures without booting the transport" do
@@ -45,7 +45,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
 
     assert capture_log(fn ->
              assert {:error, {:transport, %Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
-                      Erlexec.start(
+                      Subprocess.start(
                         command: System.find_executable("cat") || "/bin/cat",
                         startup_mode: :lazy,
                         cwd: missing_cwd
@@ -65,7 +65,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                event_tag: :custom_transport
@@ -94,7 +94,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     script = create_test_script("printf '#{long_line}\\nnext\\n'")
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                max_buffer_size: 16,
                buffer_events_until_subscribe?: true
@@ -117,7 +117,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     script = create_test_script("cat")
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                stdout_mode: :raw,
@@ -159,7 +159,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                stdout_mode: :raw,
@@ -186,7 +186,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, _transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                close_stdin_on_start?: true
@@ -207,7 +207,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, transport} =
-             Erlexec.start(command: script, headless_timeout_ms: 50)
+             Subprocess.start(command: script, headless_timeout_ms: 50)
 
     monitor = Process.monitor(transport)
     assert :ok = Transport.subscribe(transport, self())
@@ -227,7 +227,11 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, transport} =
-             Erlexec.start(command: script, subscriber: {self(), ref}, headless_timeout_ms: 100)
+             Subprocess.start(
+               command: script,
+               subscriber: {self(), ref},
+               headless_timeout_ms: 100
+             )
 
     parent = self()
     child_ref = make_ref()
@@ -273,7 +277,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, _transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                max_stderr_buffer_size: 8,
@@ -316,7 +320,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                replay_stderr_on_subscribe?: true
              )
@@ -337,7 +341,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     script = create_test_script("printf 'fast stderr' >&2")
 
     assert {:ok, transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                replay_stderr_on_subscribe?: true
              )
@@ -363,7 +367,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, _transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                max_buffer_size: 128
@@ -390,7 +394,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       """)
 
     assert {:ok, _transport} =
-             Erlexec.start(
+             Subprocess.start(
                command: script,
                subscriber: {self(), ref},
                max_buffer_size: byte_size(large_line) + 1_024
@@ -407,7 +411,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
     fragment = "  trailing fragment  "
     script = create_test_script("printf '#{fragment}'")
 
-    assert {:ok, _transport} = Erlexec.start(command: script, subscriber: {self(), ref})
+    assert {:ok, _transport} = Subprocess.start(command: script, subscriber: {self(), ref})
 
     assert_receive {:cli_subprocess_core, ^ref, {:message, ^fragment}}, 2_000
 
@@ -424,7 +428,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       sleep 60
       """)
 
-    assert {:ok, transport} = Erlexec.start(command: script, subscriber: {self(), ref})
+    assert {:ok, transport} = Subprocess.start(command: script, subscriber: {self(), ref})
 
     assert :ok = Transport.interrupt(transport)
 
@@ -439,7 +443,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       sleep 60
       """)
 
-    assert {:ok, transport} = Erlexec.start(command: script)
+    assert {:ok, transport} = Subprocess.start(command: script)
 
     interrupt_task =
       Task.async(fn ->
@@ -463,7 +467,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
   test "force_close stops the transport immediately" do
     script = create_test_script("sleep 60")
 
-    assert {:ok, transport} = Erlexec.start(command: script)
+    assert {:ok, transport} = Subprocess.start(command: script)
     monitor = Process.monitor(transport)
 
     assert :ok = Transport.force_close(transport)
@@ -473,7 +477,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
   test "safe_call returns a timeout without killing a suspended transport" do
     script = create_test_script("sleep 60")
 
-    assert {:ok, transport} = Erlexec.start(command: script)
+    assert {:ok, transport} = Subprocess.start(command: script)
 
     try do
       monitor = Process.monitor(transport)
@@ -497,7 +501,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
   test "calls after transport exit return structured not_connected errors" do
     script = create_test_script("exit 0")
 
-    assert {:ok, transport} = Erlexec.start(command: script)
+    assert {:ok, transport} = Subprocess.start(command: script)
     monitor = Process.monitor(transport)
 
     assert_receive {:DOWN, ^monitor, :process, ^transport, :normal}, 2_000

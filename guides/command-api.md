@@ -72,14 +72,13 @@ Reserved command-lane options are:
 - `:provider`
 - `:profile`
 - `:registry`
-- `:transport_module`
 - `:stdin`
 - `:timeout`
 - `:stderr`
 - `:close_stdin`
 
 All remaining options are passed to `build_invocation/1` on the resolved
-provider profile.
+provider profile. Legacy backend-selection overrides are rejected.
 
 ## Transport Boundary
 

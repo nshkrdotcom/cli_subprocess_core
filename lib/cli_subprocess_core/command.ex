@@ -80,7 +80,6 @@ defmodule CliSubprocessCore.Command do
   - `:provider`
   - `:profile`
   - `:registry`
-  - `:transport_module`
   - `:stdin`
   - `:timeout`
   - `:stderr`
@@ -202,7 +201,7 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp do_run(invocation, %Options{} = options) do
-    case options.transport_module.run(invocation,
+    case CliSubprocessCore.Transport.run(invocation,
            stdin: options.stdin,
            timeout: options.timeout,
            stderr: options.stderr,

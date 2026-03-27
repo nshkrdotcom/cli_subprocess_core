@@ -20,7 +20,7 @@ defmodule CliSubprocessCore.RawSession do
   @reserved_keys [
     :receiver,
     :event_tag,
-    :transport_module,
+    :transport,
     :stdin?,
     :stdout_mode,
     :stdin_mode,
@@ -34,7 +34,7 @@ defmodule CliSubprocessCore.RawSession do
     :transport,
     :transport_ref,
     :event_tag,
-    :transport_module,
+    :transport_api,
     :stdout_mode,
     :stdin_mode,
     :interrupt_mode,
@@ -47,7 +47,7 @@ defmodule CliSubprocessCore.RawSession do
     :transport,
     :transport_ref,
     :event_tag,
-    :transport_module,
+    :transport_api,
     :stdout_mode,
     :stdin_mode,
     :interrupt_mode,
@@ -61,7 +61,7 @@ defmodule CliSubprocessCore.RawSession do
           transport: pid(),
           transport_ref: reference(),
           event_tag: atom(),
-          transport_module: module(),
+          transport_api: module(),
           stdout_mode: :line | :raw,
           stdin_mode: :line | :raw,
           interrupt_mode: :signal | {:stdin, binary()},
@@ -164,7 +164,7 @@ defmodule CliSubprocessCore.RawSession do
   @spec send_input(t(), iodata()) :: :ok | {:error, term()}
   def send_input(%__MODULE__{stdin?: false}, _data), do: {:error, :stdin_unavailable}
 
-  def send_input(%__MODULE__{transport_module: module, transport: transport}, data) do
+  def send_input(%__MODULE__{transport_api: module, transport: transport}, data) do
     module.send(transport, data)
   end
 
@@ -177,7 +177,7 @@ defmodule CliSubprocessCore.RawSession do
   @spec close_input(t()) :: :ok | {:error, term()}
   def close_input(%__MODULE__{stdin?: false}), do: {:error, :stdin_unavailable}
 
-  def close_input(%__MODULE__{transport_module: module, transport: transport}) do
+  def close_input(%__MODULE__{transport_api: module, transport: transport}) do
     module.end_input(transport)
   end
 
@@ -185,7 +185,7 @@ defmodule CliSubprocessCore.RawSession do
   Stops the subprocess transport.
   """
   @spec stop(t()) :: :ok
-  def stop(%__MODULE__{transport_module: module, transport: transport}) do
+  def stop(%__MODULE__{transport_api: module, transport: transport}) do
     module.close(transport)
   end
 
@@ -193,7 +193,7 @@ defmodule CliSubprocessCore.RawSession do
   Forces the subprocess down immediately.
   """
   @spec force_close(t()) :: :ok | {:error, term()}
-  def force_close(%__MODULE__{transport_module: module, transport: transport}) do
+  def force_close(%__MODULE__{transport_api: module, transport: transport}) do
     module.force_close(transport)
   end
 
@@ -201,7 +201,7 @@ defmodule CliSubprocessCore.RawSession do
   Interrupts the subprocess according to the configured transport contract.
   """
   @spec interrupt(t()) :: :ok | {:error, term()}
-  def interrupt(%__MODULE__{transport_module: module, transport: transport}) do
+  def interrupt(%__MODULE__{transport_api: module, transport: transport}) do
     module.interrupt(transport)
   end
 
@@ -209,7 +209,7 @@ defmodule CliSubprocessCore.RawSession do
   Returns the transport status for the raw session.
   """
   @spec status(t()) :: :connected | :disconnected | :error
-  def status(%__MODULE__{transport_module: module, transport: transport}) do
+  def status(%__MODULE__{transport_api: module, transport: transport}) do
     module.status(transport)
   end
 
@@ -217,7 +217,7 @@ defmodule CliSubprocessCore.RawSession do
   Returns the stderr tail retained by the underlying transport.
   """
   @spec stderr(t()) :: binary()
-  def stderr(%__MODULE__{transport_module: module, transport: transport}) do
+  def stderr(%__MODULE__{transport_api: module, transport: transport}) do
     module.stderr(transport)
   end
 
@@ -226,7 +226,7 @@ defmodule CliSubprocessCore.RawSession do
   """
   @spec info(t()) :: info_t()
   def info(%__MODULE__{} = session) do
-    transport_info = session.transport_module.info(session.transport)
+    transport_info = session.transport_api.info(session.transport)
 
     %{
       delivery: delivery_info(session),
@@ -277,7 +277,7 @@ defmodule CliSubprocessCore.RawSession do
   defp do_start(fun, %Command{} = invocation, opts) when fun in [:start, :start_link] do
     receiver = Keyword.get(opts, :receiver, self())
     event_tag = Keyword.get(opts, :event_tag, @default_event_tag)
-    transport_module = Keyword.get(opts, :transport_module, Transport)
+    transport_api = Keyword.get(opts, :transport, Transport)
     stdin? = Keyword.get(opts, :stdin?, true)
     pty? = Keyword.get(opts, :pty?, false)
     stdout_mode = Keyword.get(opts, :stdout_mode, :raw)
@@ -286,9 +286,10 @@ defmodule CliSubprocessCore.RawSession do
     transport_ref = make_ref()
 
     with {:ok, _started_apps} <- Application.ensure_all_started(:cli_subprocess_core),
+         :ok <- reject_legacy_transport_selector(opts),
          :ok <- validate_receiver(receiver),
          :ok <- validate_event_tag(event_tag),
-         :ok <- validate_transport_module(transport_module),
+         :ok <- validate_transport_api(transport_api),
          :ok <- validate_stdin_available(stdin?) do
       transport_opts =
         opts
@@ -301,7 +302,7 @@ defmodule CliSubprocessCore.RawSession do
         |> Keyword.put_new(:pty?, pty?)
         |> Keyword.put_new(:interrupt_mode, interrupt_mode)
 
-      case apply(transport_module, fun, [transport_opts]) do
+      case apply(transport_api, fun, [transport_opts]) do
         {:ok, transport} ->
           session_config = %{
             event_tag: event_tag,
@@ -312,7 +313,7 @@ defmodule CliSubprocessCore.RawSession do
             stdin?: stdin?,
             stdin_mode: stdin_mode,
             stdout_mode: stdout_mode,
-            transport_module: transport_module,
+            transport_api: transport_api,
             transport_ref: transport_ref
           }
 
@@ -324,13 +325,13 @@ defmodule CliSubprocessCore.RawSession do
     end
   end
 
-  defp start_transport_session(%{transport_module: transport_module} = session_config, transport) do
-    case await_transport_started(transport_module, transport) do
+  defp start_transport_session(%{transport_api: transport_api} = session_config, transport) do
+    case await_transport_started(transport_api, transport) do
       :ok ->
         build_session(session_config, transport)
 
       {:error, reason} ->
-        safe_close_transport(transport_module, transport)
+        safe_close_transport(transport_api, transport)
         {:error, reason}
     end
   end
@@ -345,12 +346,12 @@ defmodule CliSubprocessCore.RawSession do
            stdin?: stdin?,
            stdin_mode: stdin_mode,
            stdout_mode: stdout_mode,
-           transport_module: transport_module,
+           transport_api: transport_api,
            transport_ref: transport_ref
          },
          transport
        ) do
-    case transport_module.info(transport) do
+    case transport_api.info(transport) do
       %Info{} = transport_info ->
         {:ok,
          %__MODULE__{
@@ -359,7 +360,7 @@ defmodule CliSubprocessCore.RawSession do
            transport: transport,
            transport_ref: transport_ref,
            event_tag: resolve_delivery_event_tag(transport_info, event_tag),
-           transport_module: transport_module,
+           transport_api: transport_api,
            stdout_mode: resolve_transport_contract(transport_info, :stdout_mode, stdout_mode),
            stdin_mode: resolve_transport_contract(transport_info, :stdin_mode, stdin_mode),
            interrupt_mode:
@@ -369,7 +370,7 @@ defmodule CliSubprocessCore.RawSession do
          }}
 
       other ->
-        transport_module.close(transport)
+        transport_api.close(transport)
         {:error, {:invalid_transport_info, other}}
     end
   end
@@ -498,7 +499,7 @@ defmodule CliSubprocessCore.RawSession do
   defp validate_stdin_available(value) when is_boolean(value), do: :ok
   defp validate_stdin_available(value), do: {:error, {:invalid_stdin, value}}
 
-  defp validate_transport_module(module) when is_atom(module) do
+  defp validate_transport_api(module) when is_atom(module) do
     callbacks = [
       {:start, 1},
       {:start_link, 1},
@@ -516,9 +517,17 @@ defmodule CliSubprocessCore.RawSession do
          Enum.all?(callbacks, fn {name, arity} -> function_exported?(module, name, arity) end) do
       :ok
     else
-      {:error, {:invalid_transport_module, module}}
+      {:error, {:invalid_transport, module}}
     end
   end
 
-  defp validate_transport_module(module), do: {:error, {:invalid_transport_module, module}}
+  defp validate_transport_api(module), do: {:error, {:invalid_transport, module}}
+
+  defp reject_legacy_transport_selector(opts) when is_list(opts) do
+    if Keyword.has_key?(opts, :transport_module) do
+      {:error, {:unsupported_option, :transport_module}}
+    else
+      :ok
+    end
+  end
 end

@@ -9,7 +9,6 @@ directly.
 ## Public Modules
 
 - `CliSubprocessCore.Transport` – public behaviour and default facade
-- `CliSubprocessCore.Transport.Erlexec` – erlexec-backed implementation
 - `CliSubprocessCore.Transport.Info` – transport metadata snapshot
 - `CliSubprocessCore.Transport.Options` – validated startup options
 - `CliSubprocessCore.Transport.RunOptions` – validated one-shot execution options
@@ -107,8 +106,8 @@ migrations need exact byte chunks.
 
 ## IO Operations
 
-`send/2` normalizes payloads and writes through erlexec under a task-wrapped
-`GenServer.call`.
+`send/2` normalizes payloads and writes through the internal subprocess runtime
+under a task-wrapped `GenServer.call`.
 
 - line mode appends a trailing newline when needed
 - raw mode preserves the exact bytes you send
@@ -129,9 +128,9 @@ that wait for stdin closure before producing a final result.
 - `{:stdin, payload}` writes an exact interrupt payload such as `<<3>>`
 
 Process-group signaling is owned explicitly by the core at interrupt and
-shutdown time. The transport does not rely on erlexec's `:kill_group` startup
-flag, because that flag can destabilize the shared `:exec` worker on child
-exit.
+shutdown time. The transport does not rely on the runtime's `:kill_group`
+startup flag, because that flag can destabilize the shared `:exec` worker on
+child exit.
 
 ## Metadata
 
