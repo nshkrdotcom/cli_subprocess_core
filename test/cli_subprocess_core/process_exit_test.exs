@@ -19,7 +19,7 @@ defmodule CliSubprocessCore.ProcessExitTest do
     refute ProcessExit.successful?(exit)
   end
 
-  test "normalizes shifted raw exit statuses from erlexec" do
+  test "normalizes shifted raw exit statuses" do
     exit = ProcessExit.from_reason(42 * 256)
 
     assert exit.status == :exit

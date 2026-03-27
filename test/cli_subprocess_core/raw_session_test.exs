@@ -131,7 +131,7 @@ defmodule CliSubprocessCore.RawSessionTest do
                "failed to start #{label} short-lived session"
 
         exec_pid = Process.whereis(:exec)
-        assert is_pid(exec_pid), "expected erlexec worker for #{label} session"
+        assert is_pid(exec_pid), "expected shared exec worker for #{label} session"
         monitor_ref = Process.monitor(exec_pid)
 
         assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000),

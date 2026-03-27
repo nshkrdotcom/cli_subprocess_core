@@ -18,8 +18,8 @@ defmodule CliSubprocessCore.ProcessExit do
   @doc """
   Normalizes raw subprocess exit reasons into a stable struct.
 
-  This includes integer exit statuses reported by `erlexec`, including the
-  shifted raw values some platforms report as `code * 256`.
+  This includes raw integer exit statuses, including the shifted values some
+  platforms report as `code * 256`.
   """
   @spec from_reason(term(), keyword()) :: t()
   def from_reason(reason, opts \\ []) do
