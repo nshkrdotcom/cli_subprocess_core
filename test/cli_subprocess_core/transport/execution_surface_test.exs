@@ -23,8 +23,36 @@ defmodule CliSubprocessCore.Transport.ExecutionSurfaceTest do
     assert resolved.adapter_options[:target_id] == "target-1"
   end
 
-  test "rejects unsupported surface kinds before adapter startup" do
-    assert {:error, {:unsupported_surface_kind, :leased_ssh}} =
-             ExecutionSurface.resolve(command: "cat", surface_kind: :leased_ssh)
+  test "resolve/1 supports the SSH-backed execution surfaces through the generic lane" do
+    assert {:ok, static_ssh} =
+             ExecutionSurface.resolve(
+               command: "cat",
+               surface_kind: :static_ssh,
+               target_id: "ssh-target-1",
+               transport_options: %{destination: "ssh.example"}
+             )
+
+    assert {:ok, leased_ssh} =
+             ExecutionSurface.resolve(
+               command: "cat",
+               surface_kind: :leased_ssh,
+               lease_ref: "lease-1",
+               surface_ref: "surface-1",
+               transport_options: %{destination: "leased.example"}
+             )
+
+    assert static_ssh.surface.surface_kind == :static_ssh
+    assert static_ssh.adapter_options[:target_id] == "ssh-target-1"
+    assert static_ssh.adapter_options[:destination] == "ssh.example"
+
+    assert leased_ssh.surface.surface_kind == :leased_ssh
+    assert leased_ssh.adapter_options[:lease_ref] == "lease-1"
+    assert leased_ssh.adapter_options[:surface_ref] == "surface-1"
+    assert leased_ssh.adapter_options[:destination] == "leased.example"
+  end
+
+  test "rejects guest bridge before adapter startup" do
+    assert {:error, {:unsupported_surface_kind, :guest_bridge}} =
+             ExecutionSurface.resolve(command: "cat", surface_kind: :guest_bridge)
   end
 end

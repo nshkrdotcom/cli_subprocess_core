@@ -131,6 +131,22 @@ callers can pass:
 - `boundary_class`
 - `observability`
 
+Landed execution surfaces today are:
+
+- `:local_subprocess`
+- `:static_ssh`
+- `:leased_ssh`
+
+`CliSubprocessCore.Transport.SSHExec` is the built-in internal adapter for the
+two SSH-backed surfaces. Its `transport_options` lane accepts:
+
+- required `:destination`
+- optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
+- optional `:ssh_args` and `:ssh_options`
+
+`:guest_bridge` remains reserved in the generic contract but is still
+rejected until the later deferred bridge phase lands.
+
 `CliSubprocessCore.Transport` resolves the concrete built-in adapter
 internally. Callers should not choose transport modules directly.
 

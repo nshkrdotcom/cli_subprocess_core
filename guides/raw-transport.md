@@ -29,6 +29,22 @@ transport keywords. Above the core, execution-surface input stays generic:
 - `:target_id`, `:lease_ref`, `:surface_ref`, `:boundary_class`, and
   `:observability` carry generic surface metadata into `Transport.Info`
 
+Landed surfaces today are:
+
+- `:local_subprocess`
+- `:static_ssh`
+- `:leased_ssh`
+
+The SSH-backed surfaces resolve internally to
+`CliSubprocessCore.Transport.SSHExec`. Their `:transport_options` contract is:
+
+- required `:destination`
+- optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
+- optional `:ssh_args` and `:ssh_options`
+
+`:guest_bridge` remains part of the generic contract but is still rejected
+until the deferred bridge phase lands.
+
 ```elixir
 command =
   CliSubprocessCore.Command.new("sh", ["-c", "cat"],

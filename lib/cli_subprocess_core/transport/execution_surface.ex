@@ -1,7 +1,7 @@
 defmodule CliSubprocessCore.Transport.ExecutionSurface do
   @moduledoc false
 
-  alias CliSubprocessCore.Transport.LocalSubprocess
+  alias CliSubprocessCore.Transport.{LocalSubprocess, SSHExec}
 
   @surface_kinds [:local_subprocess, :static_ssh, :leased_ssh, :guest_bridge]
   @default_surface_kind :local_subprocess
@@ -166,6 +166,8 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
   end
 
   defp resolve_adapter(:local_subprocess), do: {:ok, LocalSubprocess}
+  defp resolve_adapter(:static_ssh), do: {:ok, SSHExec}
+  defp resolve_adapter(:leased_ssh), do: {:ok, SSHExec}
   defp resolve_adapter(surface_kind), do: {:error, {:unsupported_surface_kind, surface_kind}}
 
   defp adapter_dispatch(adapter) when is_atom(adapter) do

@@ -41,6 +41,7 @@ defmodule CliSubprocessCore.Transport.Subprocess do
             surface_ref: nil,
             boundary_class: nil,
             observability: %{},
+            adapter_metadata: %{},
             subscribers: %{},
             buffered_events: :queue.new(),
             buffered_event_count: 0,
@@ -456,13 +457,14 @@ defmodule CliSubprocessCore.Transport.Subprocess do
 
   defp build_state(%Options{} = options) do
     %__MODULE__{
-      invocation: build_invocation(options),
+      invocation: options.invocation_override || build_invocation(options),
       surface_kind: options.surface_kind,
       target_id: options.target_id,
       lease_ref: options.lease_ref,
       surface_ref: options.surface_ref,
       boundary_class: options.boundary_class,
       observability: options.observability,
+      adapter_metadata: options.adapter_metadata,
       status: :disconnected,
       buffered_events: :queue.new(),
       buffered_event_count: 0,
@@ -983,7 +985,7 @@ defmodule CliSubprocessCore.Transport.Subprocess do
       surface_ref: state.surface_ref,
       boundary_class: state.boundary_class,
       observability: state.observability,
-      adapter_metadata: %{},
+      adapter_metadata: state.adapter_metadata,
       status: state.status,
       stdout_mode: state.stdout_mode,
       stdin_mode: state.stdin_mode,

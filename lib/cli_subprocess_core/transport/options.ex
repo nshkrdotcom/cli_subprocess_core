@@ -26,6 +26,8 @@ defmodule CliSubprocessCore.Transport.Options do
     :surface_ref,
     :boundary_class,
     :observability,
+    adapter_metadata: %{},
+    invocation_override: nil,
     args: [],
     cwd: nil,
     env: %{},
@@ -59,6 +61,8 @@ defmodule CliSubprocessCore.Transport.Options do
           surface_ref: String.t() | nil,
           boundary_class: atom() | nil,
           observability: map(),
+          adapter_metadata: map(),
+          invocation_override: Command.t() | nil,
           args: [String.t()],
           cwd: String.t() | nil,
           env: Command.env_map(),
@@ -144,7 +148,20 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_replay_stderr_on_subscribe(normalized.replay_stderr_on_subscribe?),
          :ok <-
            validate_buffer_events_until_subscribe(normalized.buffer_events_until_subscribe?) do
-      {:ok, struct!(__MODULE__, Map.merge(normalized, surface_metadata(surface)))}
+      {:ok,
+       struct!(
+         __MODULE__,
+         normalized
+         |> Map.merge(surface_metadata(surface))
+         |> Map.put(
+           :adapter_metadata,
+           normalize_adapter_metadata(Keyword.get(opts, :adapter_metadata))
+         )
+         |> Map.put(
+           :invocation_override,
+           normalize_invocation_override(Keyword.get(opts, :invocation_override))
+         )
+       )}
     else
       {:error, reason} -> {:error, {:invalid_transport_options, reason}}
     end
@@ -294,10 +311,19 @@ defmodule CliSubprocessCore.Transport.Options do
     }
   end
 
+  defp normalize_adapter_metadata(metadata) when is_map(metadata), do: metadata
+  defp normalize_adapter_metadata(_other), do: %{}
+
+  defp normalize_invocation_override(%Command{} = command), do: command
+  defp normalize_invocation_override(_other), do: nil
+
   defp validate_command(command) when is_binary(command) and byte_size(command) > 0, do: :ok
   defp validate_command(command), do: {:error, {:invalid_command, command}}
 
-  defp validate_surface_kind(:local_subprocess), do: :ok
+  defp validate_surface_kind(surface_kind)
+       when surface_kind in [:local_subprocess, :static_ssh, :leased_ssh],
+       do: :ok
+
   defp validate_surface_kind(surface_kind), do: {:error, {:invalid_surface_kind, surface_kind}}
 
   defp validate_args(args) when is_list(args) do

@@ -44,11 +44,11 @@ defmodule CliSubprocessCore.TransportTest do
                    2_000
   end
 
-  test "start rejects unsupported execution surfaces" do
+  test "start rejects guest bridge until the deferred adapter lands" do
     assert {:error, {:transport, %Error{} = error}} =
-             Transport.start(command: "cat", surface_kind: :leased_ssh)
+             Transport.start(command: "cat", surface_kind: :guest_bridge)
 
-    assert error.reason == {:unsupported_surface_kind, :leased_ssh}
+    assert error.reason == {:unsupported_surface_kind, :guest_bridge}
   end
 
   defp create_test_script(body) do
