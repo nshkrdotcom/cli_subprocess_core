@@ -30,5 +30,18 @@ defmodule CliSubprocessCore.PayloadTest do
       assert %^module{} = payload
       assert Map.get(payload, :metadata) == %{}
     end
+
+    test "#{inspect(module)}.parse/1 preserves unknown fields for forward-compatible boundaries" do
+      {module, attrs} = unquote(Macro.escape({module, attrs}))
+
+      assert {:ok, payload} =
+               attrs
+               |> Enum.into(%{})
+               |> Map.put("wire_field", "kept")
+               |> module.parse()
+
+      assert %^module{extra: %{"wire_field" => "kept"}} = payload
+      assert module.to_map(payload)["wire_field"] == "kept"
+    end
   end
 end

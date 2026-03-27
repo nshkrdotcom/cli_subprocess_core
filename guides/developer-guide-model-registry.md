@@ -17,6 +17,17 @@ That means the core decides:
 
 Consumer repos should not re-implement any of those decisions.
 
+The core model boundary is now schema-backed as well:
+
+- `CliSubprocessCore.ModelRegistry.Model` validates catalog entries through the
+  shared `Zoi` conventions and preserves future-compatible metadata in `extra`
+  instead of discarding it.
+- `CliSubprocessCore.ModelRegistry.Selection` is the canonical normalized model
+  payload surface returned downstream.
+- `CliSubprocessCore.ModelInput.normalize/3` is the mixed raw-versus-payload
+  ingress boundary. Downstream repos should consume it instead of inventing a
+  second model arbitration layer.
+
 ## The Core Files
 
 The model-selection internals live in:

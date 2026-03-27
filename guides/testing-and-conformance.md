@@ -49,6 +49,21 @@ Provider profile tests should stay deterministic and fixture-driven:
 
 These tests are the fastest way to catch schema drift in provider CLI output.
 
+## Schema Conformance Expectations
+
+For core-owned dynamic boundaries such as `CliSubprocessCore.Event`,
+`CliSubprocessCore.Payload.*`, `CliSubprocessCore.ModelRegistry.Model`,
+`CliSubprocessCore.ModelRegistry.Selection`, and
+`CliSubprocessCore.ModelInput`, the repo should keep explicit tests for:
+
+- minimal valid parse into the public struct
+- missing stable-field failures with a core-local error shape
+- forward-compatible unknown-field preservation where the boundary is intended
+  to evolve
+- round-trip projection through `to_map/1` when the boundary is re-encodable
+- ownership boundaries proving the core does not absorb provider-native
+  app-server or control-protocol schemas
+
 ## Session Integration Tests
 
 Session tests should verify behavior that only exists once transport and

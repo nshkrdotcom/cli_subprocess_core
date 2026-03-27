@@ -140,7 +140,7 @@ defmodule CliSubprocessCore.ModelInput do
         {:ok,
          if(payload.provider == provider,
            do: payload,
-           else: payload |> Map.from_struct() |> Map.put(:provider, provider) |> Selection.new()
+           else: payload |> Selection.to_map() |> Map.put(:provider, provider) |> Selection.new()
          )}
     end
   end

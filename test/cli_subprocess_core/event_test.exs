@@ -65,9 +65,69 @@ defmodule CliSubprocessCore.EventTest do
     assert Event.payload_module(:raw) == Payload.Raw
   end
 
+  test "parses string-keyed envelopes and preserves unknown fields through projection" do
+    assert {:ok, event} =
+             Event.parse(%{
+               "kind" => "assistant_delta",
+               "provider" => :codex,
+               "sequence" => 7,
+               "provider_session_id" => "session-1",
+               "payload" => %{
+                 "content" => "partial",
+                 "chunk_id" => "delta-1"
+               },
+               "wire_version" => 2
+             })
+
+    assert %Event{
+             kind: :assistant_delta,
+             provider: :codex,
+             sequence: 7,
+             provider_session_id: "session-1",
+             payload: %Payload.AssistantDelta{
+               content: "partial",
+               extra: %{"chunk_id" => "delta-1"}
+             },
+             extra: %{"wire_version" => 2}
+           } = event
+
+    assert Event.to_map(event) == %{
+             "wire_version" => 2,
+             id: event.id,
+             kind: :assistant_delta,
+             provider: :codex,
+             sequence: 7,
+             timestamp: event.timestamp,
+             payload: %{
+               "chunk_id" => "delta-1",
+               content: "partial",
+               index: nil,
+               format: :text,
+               metadata: %{}
+             },
+             raw: nil,
+             provider_session_id: "session-1",
+             metadata: %{}
+           }
+  end
+
   test "rejects unknown kinds" do
     assert_raise ArgumentError, fn ->
       Event.new(:unknown_kind, provider: :codex)
     end
+  end
+
+  test "returns adapted schema errors for invalid payloads" do
+    assert {:error, {:invalid_event_payload, :assistant_delta, details}} =
+             Event.parse(%{
+               kind: :assistant_delta,
+               payload: %{
+                 content: "partial",
+                 index: -1
+               }
+             })
+
+    assert details.message == "too small: must be at least 0"
+    assert details.errors == %{index: ["too small: must be at least 0"]}
   end
 end

@@ -3,7 +3,57 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
   Canonical model metadata loaded by `CliSubprocessCore.ModelRegistry`.
   """
 
+  alias CliSubprocessCore.Schema
+  alias CliSubprocessCore.Schema.Conventions
+
   @type visibility :: :public | :private | :internal | :restricted
+
+  @known_fields [
+    :provider,
+    :id,
+    :aliases,
+    :visibility,
+    :family,
+    :default,
+    :default_reasoning_effort,
+    :reasoning_efforts,
+    :catalog_version,
+    :metadata
+  ]
+
+  @reasoning_efforts_schema Zoi.default(
+                              Zoi.optional(
+                                Zoi.nullish(
+                                  Zoi.union([
+                                    Zoi.map(
+                                      Zoi.union([Zoi.string(), Zoi.atom()]),
+                                      Zoi.nullish(Zoi.number())
+                                    ),
+                                    Zoi.array(Zoi.string())
+                                  ])
+                                )
+                              ),
+                              %{}
+                            )
+
+  @schema Zoi.map(
+            %{
+              provider: Zoi.atom(),
+              id: Conventions.trimmed_string() |> Zoi.min(1),
+              aliases: Zoi.default(Zoi.optional(Zoi.array(Zoi.any())), []),
+              visibility:
+                Conventions.default_enum([:public, :private, :internal, :restricted], :public),
+              family: Conventions.optional_trimmed_string(),
+              default: Zoi.default(Zoi.optional(Zoi.boolean()), false),
+              default_reasoning_effort:
+                Zoi.optional(Zoi.nullish(Zoi.union([Zoi.string(), Zoi.atom()]))),
+              reasoning_efforts: @reasoning_efforts_schema,
+              catalog_version: Conventions.optional_trimmed_string(),
+              metadata: Conventions.metadata()
+            },
+            coerce: true,
+            unrecognized_keys: :preserve
+          )
 
   @type t :: %__MODULE__{
           provider: atom(),
@@ -15,7 +65,8 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
           default_reasoning_effort: String.t() | nil,
           reasoning_efforts: %{String.t() => number() | nil},
           catalog_version: String.t() | nil,
-          metadata: map()
+          metadata: map(),
+          extra: map()
         }
 
   defstruct provider: nil,
@@ -27,41 +78,62 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
             default_reasoning_effort: nil,
             reasoning_efforts: %{},
             catalog_version: nil,
-            metadata: %{}
+            metadata: %{},
+            extra: %{}
 
-  @spec new(atom(), map()) :: {:ok, t()} | {:error, {:model_unavailable, atom(), term()}}
-  def new(provider, attrs) when is_atom(provider) and is_map(attrs) do
-    with {:ok, id} <- fetch_required(attrs, :id),
-         {:ok, aliases} <- parse_aliases(fetch_optional(attrs, :aliases, [])),
-         {:ok, visibility} <- parse_visibility(fetch_optional(attrs, :visibility, :public)),
-         {:ok, family} <- parse_family(fetch_optional(attrs, :family)),
+  @spec schema() :: Zoi.schema()
+  def schema, do: @schema
+
+  @spec parse(atom(), keyword() | map()) ::
+          {:ok, t()} | {:error, {:model_unavailable, atom(), term()}}
+  def parse(provider, attrs) when is_atom(provider) and (is_list(attrs) or is_map(attrs)) do
+    attrs =
+      attrs
+      |> Enum.into(%{})
+      |> Map.put(:provider, provider)
+
+    with {:ok, parsed} <- Schema.parse(@schema, attrs, :invalid_model),
+         {:ok, aliases} <- normalize_aliases(Map.get(parsed, :aliases, [])),
          {:ok, reasoning_efforts} <-
-           parse_reasoning_efforts(fetch_optional(attrs, :reasoning_efforts, %{})),
+           normalize_reasoning_efforts(Map.get(parsed, :reasoning_efforts, %{})),
          {:ok, default_reasoning_effort} <-
-           parse_default_reasoning_effort(
-             fetch_optional(attrs, :default_reasoning_effort),
+           normalize_default_reasoning_effort(
+             Map.get(parsed, :default_reasoning_effort),
              reasoning_efforts
-           ),
-         {:ok, default_model} <- parse_default_model(fetch_optional(attrs, :default, false)),
-         {:ok, catalog_version} <- parse_optional_binary(fetch_optional(attrs, :catalog_version)),
-         {:ok, metadata} <- parse_metadata(fetch_optional(attrs, :metadata, %{})) do
+           ) do
+      {known, extra} = Schema.split_extra(parsed, @known_fields)
+
       {:ok,
        %__MODULE__{
          provider: provider,
-         id: id,
+         id: Map.fetch!(known, :id),
          aliases: aliases,
-         visibility: visibility,
-         family: family,
-         default: default_model,
+         visibility: Map.get(known, :visibility, :public),
+         family: blank_to_nil(Map.get(known, :family)),
+         default: Map.get(known, :default, false),
          default_reasoning_effort: default_reasoning_effort,
          reasoning_efforts: reasoning_efforts,
-         catalog_version: catalog_version,
-         metadata: metadata
+         catalog_version: blank_to_nil(Map.get(known, :catalog_version)),
+         metadata: Map.get(known, :metadata, %{}),
+         extra: extra
        }}
     else
+      {:error, {:invalid_model, details}} ->
+        {:error, {:model_unavailable, provider, {:invalid_model, "invalid model", details}}}
+
       {:error, reason} ->
-        {:error, {:model_unavailable, provider, reason}}
+        {:error, {:model_unavailable, provider, {:invalid_model, "invalid model", reason}}}
     end
+  end
+
+  @spec new(atom(), map()) :: {:ok, t()} | {:error, {:model_unavailable, atom(), term()}}
+  def new(provider, attrs) when is_atom(provider) and is_map(attrs) do
+    parse(provider, attrs)
+  end
+
+  @spec to_map(t()) :: map()
+  def to_map(%__MODULE__{} = model) do
+    Schema.to_map(model, @known_fields)
   end
 
   @spec matches_id_or_alias?(t(), String.t()) :: boolean()
@@ -82,37 +154,7 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
     end
   end
 
-  defp fetch_required(attrs, key) do
-    value = fetch_optional(attrs, key)
-
-    if is_binary(value) and String.trim(value) != "" do
-      {:ok, String.trim(value)}
-    else
-      {:error, {:invalid_model, "missing #{key}"}}
-    end
-  end
-
-  defp fetch_optional(attrs, key, default \\ nil) do
-    Map.get(attrs, key, Map.get(attrs, Atom.to_string(key), default))
-  end
-
-  defp parse_visibility(visibility) when is_atom(visibility) do
-    parse_visibility(Atom.to_string(visibility))
-  end
-
-  defp parse_visibility(visibility) when is_binary(visibility) do
-    case String.downcase(String.trim(visibility)) do
-      "public" -> {:ok, :public}
-      "private" -> {:ok, :private}
-      "internal" -> {:ok, :internal}
-      "restricted" -> {:ok, :restricted}
-      _ -> {:error, {:invalid_model, "invalid visibility #{inspect(visibility)}"}}
-    end
-  end
-
-  defp parse_visibility(_other), do: {:error, {:invalid_model, "invalid visibility"}}
-
-  defp parse_aliases(aliases) when is_list(aliases) do
+  defp normalize_aliases(aliases) when is_list(aliases) do
     aliases
     |> Enum.map(&String.trim(to_string(&1)))
     |> Enum.filter(&(&1 != ""))
@@ -120,25 +162,10 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
     |> then(&{:ok, &1})
   end
 
-  defp parse_aliases(_other), do: {:ok, []}
+  defp normalize_aliases(_other), do: {:error, {:aliases, "must be a list"}}
 
-  defp parse_family(nil), do: {:ok, nil}
-
-  defp parse_family(value) when is_binary(value) do
-    trimmed = String.trim(value)
-
-    if trimmed == "" do
-      {:ok, nil}
-    else
-      {:ok, trimmed}
-    end
-  end
-
-  defp parse_family(_other), do: {:ok, nil}
-
-  defp parse_reasoning_efforts(values) when is_map(values) do
-    values
-    |> Enum.reduce_while({:ok, %{}}, fn {key, raw_value}, {:ok, acc} ->
+  defp normalize_reasoning_efforts(values) when is_map(values) do
+    Enum.reduce_while(values, {:ok, %{}}, fn {key, raw_value}, {:ok, acc} ->
       with {:ok, normalized_key} <- normalize_reasoning_key(key),
            {:ok, normalized_value} <- normalize_reasoning_value(raw_value) do
         {:cont, {:ok, Map.put(acc, normalized_key, normalized_value)}}
@@ -146,36 +173,34 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
-    |> case do
-      {:error, reason} -> {:error, reason}
-      {:ok, efforts} -> {:ok, efforts}
-    end
   end
 
-  defp parse_reasoning_efforts(values) when is_list(values) do
-    values
-    |> Enum.reduce_while({:ok, %{}}, fn value, {:ok, acc} ->
+  defp normalize_reasoning_efforts(values) when is_list(values) do
+    Enum.reduce_while(values, {:ok, %{}}, fn value, {:ok, acc} ->
       if is_binary(value) do
-        {:cont, {:ok, Map.put(acc, String.downcase(String.trim(value)), nil)}}
+        normalized = value |> String.trim() |> String.downcase()
+
+        if normalized == "" do
+          {:halt, {:error, {:reasoning_efforts, "keys must not be blank"}}}
+        else
+          {:cont, {:ok, Map.put(acc, normalized, nil)}}
+        end
       else
-        {:halt, {:error, {:invalid_model, "invalid reasoning effort #{inspect(value)}"}}}
+        {:halt, {:error, {:reasoning_efforts, "list values must be strings"}}}
       end
     end)
-    |> case do
-      {:error, reason} -> {:error, reason}
-      {:ok, efforts} -> {:ok, efforts}
-    end
   end
 
-  defp parse_reasoning_efforts(_other), do: {:ok, %{}}
+  defp normalize_reasoning_efforts(_other),
+    do: {:error, {:reasoning_efforts, "must be a map or list"}}
 
   defp normalize_reasoning_key(key) when is_binary(key) do
-    normalized = String.trim(key)
+    normalized = key |> String.trim() |> String.downcase()
 
     if normalized == "" do
-      {:error, {:invalid_model, "invalid reasoning effort key"}}
+      {:error, {:reasoning_efforts, "keys must not be blank"}}
     else
-      {:ok, String.downcase(normalized)}
+      {:ok, normalized}
     end
   end
 
@@ -183,50 +208,45 @@ defmodule CliSubprocessCore.ModelRegistry.Model do
     do: normalize_reasoning_key(Atom.to_string(key))
 
   defp normalize_reasoning_key(_other),
-    do: {:error, {:invalid_model, "invalid reasoning effort key"}}
+    do: {:error, {:reasoning_efforts, "keys must be atoms or strings"}}
 
   defp normalize_reasoning_value(value) when is_number(value), do: {:ok, value}
   defp normalize_reasoning_value(nil), do: {:ok, nil}
 
   defp normalize_reasoning_value(_other),
-    do: {:error, {:invalid_model, "invalid reasoning effort value"}}
+    do: {:error, {:reasoning_efforts, "values must be numbers or nil"}}
 
-  defp parse_default_reasoning_effort(nil, _efforts), do: {:ok, nil}
+  defp normalize_default_reasoning_effort(nil, _efforts), do: {:ok, nil}
 
-  defp parse_default_reasoning_effort(value, efforts) when is_binary(value) do
-    default_reasoning = String.downcase(String.trim(value))
+  defp normalize_default_reasoning_effort(value, efforts) when is_atom(value) do
+    normalize_default_reasoning_effort(Atom.to_string(value), efforts)
+  end
+
+  defp normalize_default_reasoning_effort(value, efforts) when is_binary(value) do
+    normalized = value |> String.trim() |> String.downcase()
 
     cond do
-      default_reasoning == "" ->
+      normalized == "" ->
         {:ok, nil}
 
-      Map.has_key?(efforts, default_reasoning) ->
-        {:ok, default_reasoning}
+      Map.has_key?(efforts, normalized) ->
+        {:ok, normalized}
 
       true ->
-        {:error,
-         {:invalid_model, "unknown default reasoning effort #{inspect(default_reasoning)}"}}
+        {:error, {:default_reasoning_effort, "must reference a declared reasoning effort"}}
     end
   end
 
-  defp parse_default_reasoning_effort(value, efforts) when is_atom(value) do
-    parse_default_reasoning_effort(Atom.to_string(value), efforts)
+  defp normalize_default_reasoning_effort(_value, _efforts) do
+    {:error, {:default_reasoning_effort, "must be a string, atom, or nil"}}
   end
 
-  defp parse_default_reasoning_effort(_value, _efforts), do: {:ok, nil}
+  defp blank_to_nil(nil), do: nil
 
-  defp parse_default_model(value) when is_boolean(value), do: {:ok, value}
-  defp parse_default_model(_other), do: {:ok, false}
-
-  defp parse_optional_binary(nil), do: {:ok, nil}
-
-  defp parse_optional_binary(value) when is_binary(value) do
-    value = String.trim(value)
-    {:ok, if(value == "", do: nil, else: value)}
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
   end
-
-  defp parse_optional_binary(_other), do: {:ok, nil}
-
-  defp parse_metadata(value) when is_map(value), do: {:ok, value}
-  defp parse_metadata(_other), do: {:ok, %{}}
 end

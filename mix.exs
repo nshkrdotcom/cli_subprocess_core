@@ -124,6 +124,7 @@ defmodule CliSubprocessCore.MixProject do
     [
       {:erlexec, "~> 2.2"},
       {:jason, "~> 1.4"},
+      {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}

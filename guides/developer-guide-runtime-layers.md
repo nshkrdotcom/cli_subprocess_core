@@ -18,6 +18,21 @@ or trying to understand where a change should land.
 These layers exist so the runtime can stay consistent while still supporting
 multiple external CLI families.
 
+## Schema Ownership Inside The Layers
+
+The common-lane schema boundary now sits beside the existing runtime layers,
+not above them as a second architecture.
+
+- `CliSubprocessCore.Schema` and `CliSubprocessCore.Schema.Conventions` own the
+  shared `Zoi` conventions for core-owned dynamic boundaries.
+- `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`,
+  `CliSubprocessCore.ModelRegistry.Model`,
+  `CliSubprocessCore.ModelRegistry.Selection`, and
+  `CliSubprocessCore.ModelInput` use that schema layer at map ingress and then
+  project back into the existing public structs.
+- Provider-native app-server, control-protocol, and orchestration schemas stay
+  in the downstream repos that own those boundaries.
+
 ## Layer 1: Model Policy
 
 Owned by:

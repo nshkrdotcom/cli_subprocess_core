@@ -3,6 +3,22 @@
 The normalized runtime vocabulary in `CliSubprocessCore` is the source of truth
 for provider CLI execution events.
 
+## Schema Ownership And Forward Compatibility
+
+`Zoi` is the canonical validation and normalization layer for new dynamic maps
+that enter the common runtime vocabulary.
+
+- `CliSubprocessCore.Event` and every `CliSubprocessCore.Payload.*` module own a
+  `schema/0`, `parse/1`, `parse!/1`, and `to_map/1` boundary.
+- The public contract remains the event or payload struct, not an anonymous
+  parsed map.
+- Forward-compatible common-lane fields are preserved with
+  `Zoi.map(..., unrecognized_keys: :preserve)` and projected into each
+  struct's `extra` field.
+- Provider-native detail that does not belong in the normalized vocabulary
+  should stay in `event.raw` or in the provider repo that owns the richer
+  schema.
+
 ## Event Envelope
 
 `CliSubprocessCore.Event` is the common envelope emitted by the shared runtime.
@@ -17,7 +33,8 @@ for provider CLI execution events.
   payload: %CliSubprocessCore.Payload.AssistantDelta{},
   raw: nil,
   provider_session_id: "provider-session-1",
-  metadata: %{}
+  metadata: %{},
+  extra: %{}
 }
 ```
 
@@ -32,6 +49,8 @@ Field meanings:
 - `raw`: optional provider-native data retained for debugging
 - `provider_session_id`: provider-assigned session identifier when available
 - `metadata`: runtime-owned metadata
+- `extra`: preserved future-compatible event keys that are not part of the
+  stable shared envelope yet
 
 ## Normalized Kinds
 
@@ -75,6 +94,9 @@ Each kind maps to a payload module:
 
 The payload structs intentionally separate shared runtime semantics from any
 provider-native output shape.
+
+Every payload struct also preserves forward-compatible unknown keys in its own
+`extra` field when the boundary is intentionally map-backed and evolving.
 
 Common examples:
 

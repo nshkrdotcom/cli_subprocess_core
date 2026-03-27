@@ -82,6 +82,28 @@ The library is designed for two consumers:
   `CliSubprocessCore.ProcessExit`, and `CliSubprocessCore.TaskSupport` support
   the transport and session layers.
 
+## Schema Contract
+
+`CliSubprocessCore` is also the shared schema-conventions anchor for the common
+CLI lane.
+
+- `CliSubprocessCore.Schema` and `CliSubprocessCore.Schema.Conventions` define
+  the canonical `Zoi` validation and normalization vocabulary for new
+  core-owned dynamic boundaries.
+- `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`,
+  `CliSubprocessCore.ModelRegistry.Model`,
+  `CliSubprocessCore.ModelRegistry.Selection`, and
+  `CliSubprocessCore.ModelInput` remain ergonomic caller-facing structs while
+  routing inbound dynamic maps through that schema layer.
+- Forward-compatible common-lane wire surfaces use
+  `Zoi.map(..., unrecognized_keys: :preserve)` plus projection so future fields
+  survive in `extra` where the boundary needs them.
+- Closed boundaries may still use direct struct validation, but evolving wire
+  surfaces should not depend on `Zoi.struct/3`.
+- Provider-native app-server, control-protocol, and orchestration-local schemas
+  stay in the repo that owns that boundary. They do not move into
+  `cli_subprocess_core`.
+
 ## Quick Start
 
 Add the dependency and start the application normally:

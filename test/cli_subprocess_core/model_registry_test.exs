@@ -2,6 +2,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   use ExUnit.Case, async: true
 
   alias CliSubprocessCore.ModelRegistry
+  alias CliSubprocessCore.ModelRegistry.Model
   alias CliSubprocessCore.ModelRegistry.Selection
 
   describe "ModelRegistry.resolve/3" do
@@ -286,6 +287,53 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert model.family == "llama"
       assert model.metadata["backend"] == "ollama"
       assert model.metadata["support_tier"] == "runtime_validated_only"
+    end
+  end
+
+  describe "schema-backed model payloads" do
+    test "normalizes model metadata and preserves unknown fields" do
+      assert {:ok, model} =
+               Model.new(:codex, %{
+                 "id" => " gpt-5-codex ",
+                 "aliases" => [" codex ", :codex, "codex"],
+                 "visibility" => "public",
+                 "reasoning_efforts" => %{"high" => 1.0},
+                 "default_reasoning_effort" => "high",
+                 "future_flag" => true
+               })
+
+      assert %Model{
+               provider: :codex,
+               id: "gpt-5-codex",
+               aliases: ["codex"],
+               visibility: :public,
+               reasoning_efforts: %{"high" => 1.0},
+               default_reasoning_effort: "high",
+               extra: %{"future_flag" => true}
+             } = model
+
+      assert Model.to_map(model)["future_flag"] == true
+    end
+
+    test "preserves selection extras while keeping ergonomic fields" do
+      selection =
+        Selection.new(%{
+          "provider" => :codex,
+          "resolved_model" => "gpt-5-codex",
+          "resolution_source" => "default",
+          "provider_backend" => :model_provider,
+          "forward_compat" => %{"v" => 1}
+        })
+
+      assert %Selection{
+               provider: :codex,
+               resolved_model: "gpt-5-codex",
+               resolution_source: :default,
+               provider_backend: :model_provider,
+               extra: %{"forward_compat" => %{"v" => 1}}
+             } = selection
+
+      assert Selection.to_map(selection)["forward_compat"] == %{"v" => 1}
     end
   end
 
