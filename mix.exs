@@ -135,12 +135,7 @@ defmodule CliSubprocessCore.MixProject do
       plt_add_apps: [:mix, :ex_unit],
       plt_core_path: "priv/plts/core",
       plt_local_path: "priv/plts",
-      plt_file: {:no_warn, "priv/plts/#{dialyzer_plt_basename()}.plt"},
       flags: [:error_handling, :underspecs]
     ]
-  end
-
-  defp dialyzer_plt_basename do
-    "project-#{@version}"
   end
 end
