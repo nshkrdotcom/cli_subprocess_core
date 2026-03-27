@@ -1,5 +1,10 @@
 defmodule CliSubprocessCore.Ollama do
-  @moduledoc false
+  @moduledoc """
+  Ollama HTTP integration used by model validation and backend resolution.
+
+  This module wraps the small set of Ollama endpoints the core runtime uses to
+  verify availability, inspect installed models, and validate model ids.
+  """
 
   @default_base_url "http://localhost:11434"
   @default_timeout_ms 5_000

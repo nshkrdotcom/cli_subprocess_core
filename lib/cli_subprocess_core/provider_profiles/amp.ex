@@ -40,9 +40,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
-    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
+    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+         {:ok, command_spec} <- Shared.resolve_command_spec(opts, :amp, "amp") do
       args = ["--execute", prompt] ++ output_flags(opts) ++ option_flags(opts)
-      {:ok, Shared.command(Shared.resolve_command(opts, "amp"), args, opts)}
+      {:ok, Shared.command(command_spec, args, opts)}
     end
   rescue
     error ->

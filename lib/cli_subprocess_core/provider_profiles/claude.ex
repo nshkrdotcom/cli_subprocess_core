@@ -34,19 +34,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
-    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
+    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+         {:ok, command_spec} <-
+           Shared.resolve_command_spec(opts, :claude, "claude", [:path_to_claude_code_executable]) do
       args =
         @required_flags ++
           resume_args(Keyword.get(opts, :resume)) ++
           option_flags(opts) ++
           [prompt]
 
-      {:ok,
-       Shared.command(
-         Shared.resolve_command(opts, "claude", [:path_to_claude_code_executable]),
-         args,
-         opts
-       )}
+      {:ok, Shared.command(command_spec, args, opts)}
     end
   end
 

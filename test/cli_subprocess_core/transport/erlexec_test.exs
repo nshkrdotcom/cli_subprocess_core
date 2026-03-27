@@ -161,7 +161,7 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
       printf 'done\\n'
       """)
 
-    assert {:ok, transport} =
+    assert {:ok, _transport} =
              Erlexec.start(
                command: script,
                subscriber: {self(), ref},

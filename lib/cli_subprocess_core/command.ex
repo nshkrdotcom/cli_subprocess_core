@@ -7,7 +7,7 @@ defmodule CliSubprocessCore.Command do
   """
 
   alias CliSubprocessCore.Command.{Error, Options}
-  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
   alias CliSubprocessCore.Transport.RunResult
 
   @enforce_keys [:command]
@@ -33,14 +33,24 @@ defmodule CliSubprocessCore.Command do
   @doc """
   Builds a normalized invocation struct.
   """
-  @spec new(String.t(), [String.t()] | keyword(), keyword()) :: t()
+  @spec new(String.t() | CommandSpec.t(), [String.t()] | keyword(), keyword()) :: t()
   def new(command, args \\ [], opts \\ [])
-      when is_binary(command) and is_list(args) and is_list(opts) do
+      when (is_binary(command) or is_struct(command, CommandSpec)) and is_list(args) and
+             is_list(opts) do
     {args, opts} =
       if opts == [] and keyword_list?(args) do
         {[], args}
       else
         {args, opts}
+      end
+
+    {command, args} =
+      case command do
+        %CommandSpec{} = spec ->
+          {spec.program, CommandSpec.command_args(spec, args)}
+
+        binary when is_binary(binary) ->
+          {binary, args}
       end
 
     %__MODULE__{

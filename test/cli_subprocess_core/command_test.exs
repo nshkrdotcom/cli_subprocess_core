@@ -3,6 +3,7 @@ defmodule CliSubprocessCore.CommandTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Command.Error
+  alias CliSubprocessCore.CommandSpec
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
 
   test "builds normalized invocations" do
@@ -21,6 +22,34 @@ defmodule CliSubprocessCore.CommandTest do
     assert command.clear_env? == true
     assert command.user == "runner"
     assert Command.argv(command) == ["codex", "exec", "--json"]
+  end
+
+  test "builds normalized invocations from command specs with argv prefixes" do
+    spec =
+      CommandSpec.new("npx", argv_prefix: ["--yes", "--package", "@google/gemini-cli", "gemini"])
+
+    command = Command.new(spec, ["--prompt", "hello"])
+
+    assert command.command == "npx"
+
+    assert command.args == [
+             "--yes",
+             "--package",
+             "@google/gemini-cli",
+             "gemini",
+             "--prompt",
+             "hello"
+           ]
+
+    assert Command.argv(command) == [
+             "npx",
+             "--yes",
+             "--package",
+             "@google/gemini-cli",
+             "gemini",
+             "--prompt",
+             "hello"
+           ]
   end
 
   test "validates the invocation contract" do

@@ -253,6 +253,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
     test "uses resolved model payload when model option is not set" do
       assert {:ok, %Command{} = command} =
                Gemini.build_invocation(
+                 command: "gemini-bin",
                  model_payload: %{
                    provider: :gemini,
                    requested_model: "legacy",
@@ -278,6 +279,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
     test "does not use raw model or reasoning options when payload is absent" do
       assert {:ok, %Command{} = command} =
                Codex.build_invocation(
+                 command: "codex-bin",
                  prompt: "review this diff",
                  model: "gpt-5-codex",
                  reasoning_effort: :high
@@ -290,6 +292,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
     test "does not emit --model when payload model is absent" do
       assert {:ok, %Command{} = command} =
                Amp.build_invocation(
+                 command: "amp-bin",
                  model_payload: %{
                    provider: :amp,
                    requested_model: nil,

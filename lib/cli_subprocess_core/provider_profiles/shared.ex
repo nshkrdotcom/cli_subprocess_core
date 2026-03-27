@@ -1,7 +1,7 @@
 defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @moduledoc false
 
-  alias CliSubprocessCore.{Command, Event, Payload, ProcessExit}
+  alias CliSubprocessCore.{Command, CommandSpec, Event, Payload, ProcessExit, ProviderCLI}
 
   @transport_option_keys [
     :startup_mode,
@@ -26,11 +26,12 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   }
 
   @type parser_state :: %{
-          provider: atom(),
-          emitted: non_neg_integer(),
-          options: map(),
-          provider_session_id: String.t() | nil,
-          result_emitted?: boolean()
+          required(:provider) => atom(),
+          required(:emitted) => non_neg_integer(),
+          required(:options) => map(),
+          required(:provider_session_id) => String.t() | nil,
+          required(:result_emitted?) => boolean(),
+          optional(atom()) => term()
         }
 
   @spec init_parser_state(atom(), keyword()) :: parser_state()
@@ -65,16 +66,25 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     end)
   end
 
-  @spec command(String.t(), [String.t()], keyword()) :: Command.t()
-  def command(binary, args, opts)
-      when is_binary(binary) and is_list(args) and is_list(opts) do
+  @spec resolve_command_spec(keyword(), atom(), String.t(), [atom()]) ::
+          {:ok, CommandSpec.t()} | {:error, term()}
+  def resolve_command_spec(opts, provider, default_command, extra_keys \\ [])
+      when is_list(opts) and is_atom(provider) and is_binary(default_command) and
+             is_list(extra_keys) do
+    ProviderCLI.resolve(provider, opts, default_command: default_command, extra_keys: extra_keys)
+  end
+
+  @spec command(String.t() | CommandSpec.t(), [String.t()], keyword()) :: Command.t()
+  def command(binary_or_spec, args, opts)
+      when (is_binary(binary_or_spec) or is_struct(binary_or_spec, CommandSpec)) and is_list(args) and
+             is_list(opts) do
     payload_env =
       opts
       |> Keyword.get(:model_payload, %{})
       |> payload_value(:env_overrides)
       |> normalize_env()
 
-    Command.new(binary, args,
+    Command.new(binary_or_spec, args,
       cwd: Keyword.get(opts, :cwd),
       env:
         Keyword.get(opts, :env, %{})

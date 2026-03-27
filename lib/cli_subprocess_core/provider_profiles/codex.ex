@@ -33,13 +33,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
-    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt) do
+    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+         {:ok, command_spec} <- Shared.resolve_command_spec(opts, :codex, "codex") do
       args =
         @required_flags ++
           option_flags(opts) ++
           [prompt]
 
-      {:ok, Shared.command(Shared.resolve_command(opts, "codex"), args, opts)}
+      {:ok, Shared.command(command_spec, args, opts)}
     end
   end
 
