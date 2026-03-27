@@ -6,54 +6,6 @@ defmodule CliSubprocessCore.RawSessionTest do
   alias CliSubprocessCore.RawSession
   alias CliSubprocessCore.Transport.RunResult
 
-  defmodule TagDriftTransport do
-    alias CliSubprocessCore.Transport.Delivery
-    alias CliSubprocessCore.Transport.Info
-
-    def start(opts), do: Agent.start(fn -> build_state(opts) end)
-    def start_link(opts), do: Agent.start_link(fn -> build_state(opts) end)
-    def send(_transport, _data), do: :ok
-    def end_input(_transport), do: :ok
-    def interrupt(_transport), do: :ok
-    def stderr(_transport), do: ""
-
-    def close(transport) do
-      Agent.stop(transport, :normal)
-      :ok
-    catch
-      :exit, _reason -> :ok
-    end
-
-    def force_close(transport), do: close(transport)
-
-    def status(transport) when is_pid(transport) do
-      if Process.alive?(transport), do: :connected, else: :disconnected
-    end
-
-    def info(transport) when is_pid(transport) do
-      if Process.alive?(transport) do
-        Agent.get(transport, fn %{tagged_event_tag: tagged_event_tag} ->
-          %Info{
-            status: :connected,
-            stdout_mode: :raw,
-            stdin_mode: :raw,
-            pty?: false,
-            interrupt_mode: :signal,
-            delivery: Delivery.new(tagged_event_tag)
-          }
-        end)
-      else
-        Info.disconnected()
-      end
-    end
-
-    defp build_state(opts) do
-      %{
-        tagged_event_tag: Keyword.get(opts, :actual_event_tag, :transport_owned_raw_session)
-      }
-    end
-  end
-
   test "raw sessions preserve exact stdin bytes and collect a normalized result" do
     script = create_test_script("cat")
 
@@ -182,18 +134,16 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert result.exit.code == 0
   end
 
-  test "raw session delivery metadata reflects the transport's effective tagged event atom" do
+  test "raw session delivery metadata reflects the configured tagged event atom through the core transport" do
+    script = create_test_script("sleep 60")
+
     assert {:ok, session} =
-             RawSession.start("ignored", [],
-               transport: TagDriftTransport,
-               event_tag: :requested_raw_session_tag,
-               actual_event_tag: :transport_owned_raw_session
-             )
+             RawSession.start(script, [], event_tag: :requested_raw_session_tag)
 
-    assert session.event_tag == :transport_owned_raw_session
-    assert RawSession.delivery_info(session).tagged_event_tag == :transport_owned_raw_session
+    assert session.event_tag == :requested_raw_session_tag
+    assert RawSession.delivery_info(session).tagged_event_tag == :requested_raw_session_tag
 
-    assert %{delivery: %{tagged_event_tag: :transport_owned_raw_session}} =
+    assert %{delivery: %{tagged_event_tag: :requested_raw_session_tag}} =
              RawSession.info(session)
 
     assert :ok = RawSession.stop(session)
@@ -227,9 +177,22 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert :ok = RawSession.stop(session)
   end
 
-  test "raw sessions reject the legacy transport_module option name" do
-    assert {:error, {:unsupported_option, :transport_module}} =
-             RawSession.start("ignored", [], transport_module: TagDriftTransport)
+  test "raw sessions accept generic transport overrides" do
+    script = create_test_script("printf 'ready\\n'")
+
+    assert {:ok, session} =
+             RawSession.start(script, [],
+               transport: CliSubprocessCore.Transport,
+               stdin?: false
+             )
+
+    assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000)
+    assert result.output =~ "ready"
+  end
+
+  test "raw sessions reject the legacy module-selector option name" do
+    assert {:error, {:unsupported_option, :transport_selector}} =
+             RawSession.start("ignored", [], transport_module: CliSubprocessCore.Transport)
   end
 
   test "lazy startup surfaces subprocess spawn failures before returning a raw session" do

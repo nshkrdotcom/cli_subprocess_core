@@ -4,8 +4,9 @@ defmodule CliSubprocessCore.Transport.Info do
   """
 
   alias CliSubprocessCore.Command
-  alias CliSubprocessCore.Transport.ExecutionSurface
+  alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.Delivery
+  alias CliSubprocessCore.Transport.ExecutionSurface
 
   defstruct invocation: nil,
             pid: nil,
@@ -29,7 +30,7 @@ defmodule CliSubprocessCore.Transport.Info do
           invocation: Command.t() | nil,
           pid: pid() | nil,
           os_pid: pos_integer() | nil,
-          surface_kind: ExecutionSurface.surface_kind(),
+          surface_kind: Transport.surface_kind(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,

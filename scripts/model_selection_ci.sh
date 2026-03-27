@@ -27,12 +27,7 @@ ALL_TASKS=(
 workspace_deps_for_repo() {
   case "$1" in
     agent_session_manager)
-      printf '%s\n' \
-        "cli_subprocess_core" \
-        "claude_agent_sdk" \
-        "codex_sdk" \
-        "gemini_cli_sdk" \
-        "amp_sdk"
+      printf '%s\n' "cli_subprocess_core"
       ;;
     codex_sdk|gemini_cli_sdk|claude_agent_sdk|amp_sdk)
       printf '%s\n' "cli_subprocess_core"

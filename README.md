@@ -147,6 +147,12 @@ Use the raw session handle when you need long-lived exact-byte ownership:
 IO.inspect({result.stdout, result.exit.code})
 ```
 
+`CliSubprocessCore.RawSession` always starts through the public
+`CliSubprocessCore.Transport` facade by default. Common-lane callers can shape
+generic execution surfaces with `surface_kind` and `transport_options`;
+separate protocol families can still inject a generic `transport:` module when
+they need their own session contract.
+
 `end_input/1` and `close_input/1` use the correct EOF mechanism for the active
 transport contract:
 

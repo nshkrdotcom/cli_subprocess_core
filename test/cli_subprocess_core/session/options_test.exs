@@ -52,8 +52,8 @@ defmodule CliSubprocessCore.Session.OptionsTest do
     assert options.transport_options == [startup_mode: :lazy]
   end
 
-  test "rejects public transport_module selection" do
-    assert {:error, {:unsupported_option, :transport_module}} =
+  test "rejects public transport-selector overrides" do
+    assert {:error, {:unsupported_option, :transport_selector}} =
              Options.new(
                provider: :echo,
                prompt: "hello",

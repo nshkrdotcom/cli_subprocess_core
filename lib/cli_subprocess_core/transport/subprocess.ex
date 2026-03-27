@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Warning.StructFieldAmount
+
 defmodule CliSubprocessCore.Transport.Subprocess do
   @moduledoc false
 

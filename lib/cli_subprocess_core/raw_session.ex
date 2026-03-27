@@ -20,7 +20,6 @@ defmodule CliSubprocessCore.RawSession do
   @reserved_keys [
     :receiver,
     :event_tag,
-    :transport,
     :stdin?,
     :stdout_mode,
     :stdin_mode,
@@ -286,10 +285,9 @@ defmodule CliSubprocessCore.RawSession do
     transport_ref = make_ref()
 
     with {:ok, _started_apps} <- Application.ensure_all_started(:cli_subprocess_core),
-         :ok <- reject_legacy_transport_selector(opts),
+         :ok <- reject_public_transport_selectors(opts),
          :ok <- validate_receiver(receiver),
          :ok <- validate_event_tag(event_tag),
-         :ok <- validate_transport_api(transport_api),
          :ok <- validate_stdin_available(stdin?) do
       transport_opts =
         opts
@@ -351,28 +349,23 @@ defmodule CliSubprocessCore.RawSession do
          },
          transport
        ) do
-    case transport_api.info(transport) do
-      %Info{} = transport_info ->
-        {:ok,
-         %__MODULE__{
-           invocation: invocation,
-           receiver: receiver,
-           transport: transport,
-           transport_ref: transport_ref,
-           event_tag: resolve_delivery_event_tag(transport_info, event_tag),
-           transport_api: transport_api,
-           stdout_mode: resolve_transport_contract(transport_info, :stdout_mode, stdout_mode),
-           stdin_mode: resolve_transport_contract(transport_info, :stdin_mode, stdin_mode),
-           interrupt_mode:
-             resolve_transport_contract(transport_info, :interrupt_mode, interrupt_mode),
-           pty?: resolve_transport_contract(transport_info, :pty?, pty?),
-           stdin?: stdin?
-         }}
+    %Info{} = transport_info = transport_api.info(transport)
 
-      other ->
-        transport_api.close(transport)
-        {:error, {:invalid_transport_info, other}}
-    end
+    {:ok,
+     %__MODULE__{
+       invocation: invocation,
+       receiver: receiver,
+       transport: transport,
+       transport_ref: transport_ref,
+       event_tag: resolve_delivery_event_tag(transport_info, event_tag),
+       transport_api: transport_api,
+       stdout_mode: resolve_transport_contract(transport_info, :stdout_mode, stdout_mode),
+       stdin_mode: resolve_transport_contract(transport_info, :stdin_mode, stdin_mode),
+       interrupt_mode:
+         resolve_transport_contract(transport_info, :interrupt_mode, interrupt_mode),
+       pty?: resolve_transport_contract(transport_info, :pty?, pty?),
+       stdin?: stdin?
+     }}
   end
 
   defp do_collect(session, timeout, stdout, stderr) do
@@ -499,33 +492,9 @@ defmodule CliSubprocessCore.RawSession do
   defp validate_stdin_available(value) when is_boolean(value), do: :ok
   defp validate_stdin_available(value), do: {:error, {:invalid_stdin, value}}
 
-  defp validate_transport_api(module) when is_atom(module) do
-    callbacks = [
-      {:start, 1},
-      {:start_link, 1},
-      {:send, 2},
-      {:end_input, 1},
-      {:close, 1},
-      {:force_close, 1},
-      {:interrupt, 1},
-      {:status, 1},
-      {:stderr, 1},
-      {:info, 1}
-    ]
-
-    if Code.ensure_loaded?(module) and
-         Enum.all?(callbacks, fn {name, arity} -> function_exported?(module, name, arity) end) do
-      :ok
-    else
-      {:error, {:invalid_transport, module}}
-    end
-  end
-
-  defp validate_transport_api(module), do: {:error, {:invalid_transport, module}}
-
-  defp reject_legacy_transport_selector(opts) when is_list(opts) do
+  defp reject_public_transport_selectors(opts) when is_list(opts) do
     if Keyword.has_key?(opts, :transport_module) do
-      {:error, {:unsupported_option, :transport_module}}
+      {:error, {:unsupported_option, :transport_selector}}
     else
       :ok
     end

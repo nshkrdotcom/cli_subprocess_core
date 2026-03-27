@@ -578,10 +578,7 @@ defmodule CliSubprocessCore.Session do
 
   defp maybe_transport_info(module, transport_pid) do
     if function_exported?(module, :info, 1) do
-      case module.info(transport_pid) do
-        %Info{} = info -> info
-        _other -> nil
-      end
+      module.info(transport_pid)
     else
       nil
     end

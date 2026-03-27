@@ -53,7 +53,7 @@ defmodule CliSubprocessCore.Transport.Options do
 
   @type t :: %__MODULE__{
           command: String.t(),
-          surface_kind: ExecutionSurface.surface_kind(),
+          surface_kind: Transport.surface_kind(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,

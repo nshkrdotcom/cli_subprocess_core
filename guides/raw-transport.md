@@ -257,6 +257,10 @@ process so the core can drain its own transport events deterministically.
 `RawSession.start/2`, `start/3`, and `start_link/2` do not report success until
 the underlying transport has either connected or returned a startup failure,
 even if the transport itself is configured with `startup_mode: :lazy`.
+`RawSession` starts through `CliSubprocessCore.Transport` by default, so
+common-lane callers should shape execution via `surface_kind` and
+`transport_options`. Separate protocol families can still inject a generic
+`transport:` module when they need their own session contract.
 `RawSession.info/1` also returns `delivery` metadata with the effective
 receiver, tagged event atom, and transport ref for direct adapter code.
 

@@ -44,6 +44,9 @@ defmodule CliSubprocessCore.Transport do
   @typedoc "The tagged event atom prefix."
   @type event_tag :: atom()
 
+  @typedoc "Generic execution-surface placement kind."
+  @type surface_kind :: :local_subprocess | :static_ssh | :leased_ssh | :guest_bridge
+
   @typedoc "Transport events delivered to subscribers."
   @type message ::
           {:transport_message, binary()}
@@ -87,10 +90,10 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start(opts) when is_list(opts) do
-    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
-           ExecutionSurface.resolve(opts) do
-      adapter.start(adapter_options)
-    else
+    case ExecutionSurface.resolve(opts) do
+      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
+        adapter.start(adapter_options)
+
       {:error, reason} ->
         transport_error(reason)
     end
@@ -101,10 +104,10 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start_link(opts) when is_list(opts) do
-    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
-           ExecutionSurface.resolve(opts) do
-      adapter.start_link(adapter_options)
-    else
+    case ExecutionSurface.resolve(opts) do
+      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
+        adapter.start_link(adapter_options)
+
       {:error, reason} ->
         transport_error(reason)
     end
@@ -116,10 +119,10 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
   def run(%Command{} = command, opts \\ []) when is_list(opts) do
-    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
-           ExecutionSurface.resolve(opts) do
-      adapter.run(command, adapter_options)
-    else
+    case ExecutionSurface.resolve(opts) do
+      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
+        adapter.run(command, adapter_options)
+
       {:error, reason} ->
         transport_error(reason)
     end
@@ -232,7 +235,6 @@ defmodule CliSubprocessCore.Transport do
     end
   end
 
-  defp transport_error(%Error{} = error), do: {:error, {:transport, error}}
   defp transport_error(reason), do: {:error, {:transport, Error.transport_error(reason)}}
 
   defp extract_tagged_event({:message, line}) when is_binary(line), do: {:ok, {:message, line}}

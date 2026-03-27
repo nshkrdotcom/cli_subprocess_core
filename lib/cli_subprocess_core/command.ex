@@ -219,13 +219,6 @@ defmodule CliSubprocessCore.Command do
 
       {:error, {:transport, %CliSubprocessCore.Transport.Error{} = error}} ->
         {:error, Error.transport_error(error, %{invocation: invocation})}
-
-      other ->
-        {:error,
-         Error.command_plan_failed(
-           {:unexpected_transport_run_result, other},
-           %{invocation: invocation}
-         )}
     end
   end
 

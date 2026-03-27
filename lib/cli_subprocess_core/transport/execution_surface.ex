@@ -25,6 +25,14 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
             observability: %{}
 
   @type surface_kind :: :local_subprocess | :static_ssh | :leased_ssh | :guest_bridge
+  @type reserved_key ::
+          :surface_kind
+          | :transport_options
+          | :target_id
+          | :lease_ref
+          | :surface_ref
+          | :boundary_class
+          | :observability
 
   @type t :: %__MODULE__{
           surface_kind: surface_kind(),
@@ -57,10 +65,10 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
   @spec default_surface_kind() :: :local_subprocess
   def default_surface_kind, do: @default_surface_kind
 
-  @spec reserved_keys() :: keyword()
+  @spec reserved_keys() :: [reserved_key(), ...]
   def reserved_keys, do: @reserved_keys
 
-  @spec supported_surface_kinds() :: [surface_kind()]
+  @spec supported_surface_kinds() :: [surface_kind(), ...]
   def supported_surface_kinds, do: @surface_kinds
 
   @spec new(keyword()) :: {:ok, t()} | {:error, validation_error()}

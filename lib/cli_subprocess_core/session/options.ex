@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.Session.Options do
   Validated startup options for the common session engine.
   """
 
-  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry, Transport}
   alias CliSubprocessCore.Transport.ExecutionSurface
 
   @default_registry ProviderRegistry
@@ -50,7 +50,7 @@ defmodule CliSubprocessCore.Session.Options do
           subscriber: subscriber(),
           metadata: map(),
           session_event_tag: atom(),
-          surface_kind: ExecutionSurface.surface_kind(),
+          surface_kind: Transport.surface_kind(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
@@ -67,7 +67,7 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_profile, term()}
           | {:provider_profile_mismatch, atom(), atom()}
           | {:invalid_registry, term()}
-          | {:unsupported_option, :transport_module}
+          | {:unsupported_option, :transport_selector}
           | {:invalid_subscriber, term()}
           | {:invalid_metadata, term()}
           | {:invalid_session_event_tag, term()}
@@ -189,7 +189,7 @@ defmodule CliSubprocessCore.Session.Options do
 
   defp reject_transport_selector(opts) when is_list(opts) do
     if Keyword.has_key?(opts, :transport_module) do
-      {:error, {:unsupported_option, :transport_module}}
+      {:error, {:unsupported_option, :transport_selector}}
     else
       :ok
     end

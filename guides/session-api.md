@@ -157,10 +157,9 @@ For a session started with `session_event_tag: :sdk_runtime_session`,
 }
 ```
 
-When the selected transport module exports `info/1`, the session snapshot
-surfaces the full `%CliSubprocessCore.Transport.Info{}` under `transport.info`
-plus the most commonly consumed subprocess metadata as top-level transport map
-fields.
+The session snapshot surfaces the full `%CliSubprocessCore.Transport.Info{}`
+under `transport.info` plus the most commonly consumed subprocess metadata as
+top-level transport map fields.
 
 `transport.info` also carries generic execution-surface metadata such as
 `surface_kind`, `target_id`, `lease_ref`, `surface_ref`, `boundary_class`, and

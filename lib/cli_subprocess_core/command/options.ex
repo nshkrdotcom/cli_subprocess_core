@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry, Transport}
   alias CliSubprocessCore.Transport.ExecutionSurface
   alias CliSubprocessCore.Transport.RunOptions
 
@@ -51,7 +51,7 @@ defmodule CliSubprocessCore.Command.Options do
           timeout: timeout(),
           stderr: RunOptions.stderr_mode(),
           close_stdin: boolean(),
-          surface_kind: ExecutionSurface.surface_kind(),
+          surface_kind: Transport.surface_kind(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
@@ -73,7 +73,7 @@ defmodule CliSubprocessCore.Command.Options do
           | {:invalid_profile, term()}
           | {:provider_profile_mismatch, atom(), atom()}
           | {:invalid_registry, term()}
-          | {:unsupported_option, :transport_module}
+          | {:unsupported_option, :transport_selector}
           | {:invalid_timeout, term()}
           | {:invalid_stderr, term()}
           | {:invalid_close_stdin, term()}
@@ -198,7 +198,7 @@ defmodule CliSubprocessCore.Command.Options do
 
   defp reject_transport_selector(opts) when is_list(opts) do
     if Keyword.has_key?(opts, :transport_module) do
-      {:error, {:unsupported_option, :transport_module}}
+      {:error, {:unsupported_option, :transport_selector}}
     else
       :ok
     end
