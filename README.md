@@ -134,6 +134,12 @@ callers can pass:
 `CliSubprocessCore.Transport` resolves the concrete built-in adapter
 internally. Callers should not choose transport modules directly.
 
+Higher layers in this stack may also carry `workspace_root`,
+`allowed_tools`, `approval_posture`, and `permission_mode` as generic
+execution-surface metadata before their own policy/runtime handling. The core
+transport boundary remains generic and does not reintroduce public
+`transport_module` selection.
+
 Use the raw session handle when you need long-lived exact-byte ownership:
 
 ```elixir
