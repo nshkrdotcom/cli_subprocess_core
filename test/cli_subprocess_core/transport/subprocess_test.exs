@@ -425,7 +425,9 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
     script =
       create_test_script("""
       trap 'printf "interrupted\\n" >&2; exit 130' INT
-      sleep 60
+      while true; do
+        sleep 0.1
+      done
       """)
 
     assert {:ok, transport} = Subprocess.start(command: script, subscriber: {self(), ref})

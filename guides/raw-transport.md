@@ -35,8 +35,8 @@ Landed surfaces today are:
 - `:static_ssh`
 - `:leased_ssh`
 
-The SSH-backed surfaces resolve internally to
-`CliSubprocessCore.Transport.SSHExec`. Their `:transport_options` contract is:
+The SSH-backed surfaces resolve internally to the hidden `SSHExec` adapter.
+Their `:transport_options` contract is:
 
 - required `:destination`
 - optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`

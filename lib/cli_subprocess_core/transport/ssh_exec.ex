@@ -193,8 +193,7 @@ defmodule CliSubprocessCore.Transport.SSHExec do
         command.command
         | command.args
       ]
-      |> Enum.map(&shell_escape/1)
-      |> Enum.join(" ")
+      |> Enum.map_join(" ", &shell_escape/1)
 
     exec_command =
       case remote_env_command(command.env, command.clear_env?) do
@@ -218,8 +217,9 @@ defmodule CliSubprocessCore.Transport.SSHExec do
   defp remote_env_command(env, clear_env?) when is_map(env) do
     assignments =
       env
-      |> Enum.map(fn {key, value} -> "#{shell_env_key(key)}=#{shell_escape(value)}" end)
-      |> Enum.join(" ")
+      |> Enum.map_join(" ", fn {key, value} ->
+        "#{shell_env_key(key)}=#{shell_escape(value)}"
+      end)
 
     cond do
       clear_env? and assignments == "" -> "env -i"

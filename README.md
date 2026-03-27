@@ -137,8 +137,8 @@ Landed execution surfaces today are:
 - `:static_ssh`
 - `:leased_ssh`
 
-`CliSubprocessCore.Transport.SSHExec` is the built-in internal adapter for the
-two SSH-backed surfaces. Its `transport_options` lane accepts:
+The built-in internal `SSHExec` adapter backs the two SSH surfaces. Its
+`transport_options` lane accepts:
 
 - required `:destination`
 - optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
