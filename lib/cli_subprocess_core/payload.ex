@@ -126,7 +126,8 @@ defmodule CliSubprocessCore.Payload.AssistantDelta do
   use CliSubprocessCore.Payload,
     defaults: [content: "", index: nil, format: :text, metadata: %{}],
     schema_fields: %{
-      content: Conventions.default_trimmed_string(""),
+      # Stream deltas are byte-meaningful; trimming here corrupts rendered text.
+      content: Conventions.default_string(""),
       index: CliSubprocessCore.Payload.optional_non_neg_integer_schema(),
       format: Conventions.default_any(:text),
       metadata: Conventions.metadata()

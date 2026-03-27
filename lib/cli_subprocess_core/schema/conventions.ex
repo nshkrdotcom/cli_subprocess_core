@@ -23,6 +23,17 @@ defmodule CliSubprocessCore.Schema.Conventions do
     |> Zoi.trim()
   end
 
+  @spec string() :: Zoi.schema()
+  def string, do: Zoi.string()
+
+  @spec optional_string() :: Zoi.schema()
+  def optional_string, do: Zoi.optional(Zoi.nullish(string()))
+
+  @spec default_string(String.t()) :: Zoi.schema()
+  def default_string(default) when is_binary(default) do
+    Zoi.default(optional_string(), default)
+  end
+
   @spec optional_trimmed_string() :: Zoi.schema()
   def optional_trimmed_string, do: Zoi.optional(Zoi.nullish(trimmed_string()))
 

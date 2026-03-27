@@ -52,4 +52,12 @@ defmodule CliSubprocessCore.PayloadTest do
     assert {:ok, %Payload.Error{severity: :fatal}} =
              Payload.Error.parse(%{"message" => "boom", "severity" => "fatal"})
   end
+
+  test "Payload.AssistantDelta preserves significant whitespace" do
+    assert %Payload.AssistantDelta{content: "hello "} =
+             Payload.AssistantDelta.new(content: "hello ")
+
+    assert {:ok, %Payload.AssistantDelta{content: " hello "}} =
+             Payload.AssistantDelta.parse(%{"content" => " hello "})
+  end
 end
