@@ -192,13 +192,7 @@ defmodule CliSubprocessCore.Transport do
   """
   @spec force_close(t()) :: :ok | {:error, {:transport, Error.t()}}
   def force_close(transport) when is_pid(transport) do
-    case safe_call(transport, :force_close, @default_force_close_timeout_ms) do
-      {:ok, result} ->
-        normalize_call_result(result)
-
-      {:error, reason} ->
-        transport_error(reason)
-    end
+    do_force_close(transport, @default_force_close_timeout_ms)
   end
 
   @doc """
@@ -352,6 +346,23 @@ defmodule CliSubprocessCore.Transport do
 
   defp normalize_call_result(other),
     do: transport_error(Error.transport_error({:unexpected_task_result, other}))
+
+  defp do_force_close(transport, timeout_ms)
+       when is_pid(transport) and is_integer(timeout_ms) and timeout_ms >= 0 do
+    GenServer.stop(transport, :normal, timeout_ms)
+    :ok
+  catch
+    :exit, reason ->
+      transport_error(normalize_force_close_exit(reason))
+  end
+
+  defp normalize_force_close_exit({:noproc, _}), do: Error.not_connected()
+  defp normalize_force_close_exit(:noproc), do: Error.not_connected()
+  defp normalize_force_close_exit({:normal, _}), do: Error.not_connected()
+  defp normalize_force_close_exit({:shutdown, _}), do: Error.not_connected()
+  defp normalize_force_close_exit({:timeout, {GenServer, :stop, _}}), do: Error.timeout()
+  defp normalize_force_close_exit({:timeout, _}), do: Error.timeout()
+  defp normalize_force_close_exit(reason), do: Error.call_exit(reason)
 
   defp transport_error({:transport, %Error{}} = error), do: {:error, error}
   defp transport_error(%Error{} = error), do: {:error, {:transport, error}}

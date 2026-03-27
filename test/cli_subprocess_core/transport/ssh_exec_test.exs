@@ -59,11 +59,13 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
   test "interrupt/1 propagates through the SSH surface" do
     ref = make_ref()
     manifest_path = temp_path!("interrupt_manifest.txt")
+    ready_path = temp_path!("interrupt_ready.txt")
     ssh_path = create_fake_ssh!(manifest_path)
 
     script =
       create_test_script("""
       trap 'printf "interrupted\\n" >&2; exit 130' INT
+      : > "#{ready_path}"
       while true; do
         sleep 0.1
       done
@@ -83,6 +85,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
              )
 
     assert wait_until(fn -> File.exists?(manifest_path) end, 1_000) == :ok
+    assert wait_until(fn -> File.exists?(ready_path) end, 1_000) == :ok
     assert :ok = Transport.interrupt(transport)
 
     assert_receive {:cli_subprocess_core, ^ref, {:stderr, "interrupted\n"}}, 2_000
@@ -253,7 +256,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
       if System.monotonic_time(:millisecond) >= deadline_ms do
         :timeout
       else
-        Process.sleep(25)
+        Process.sleep(5)
         do_wait_until(fun, deadline_ms)
       end
     end

@@ -91,7 +91,8 @@ defmodule CliSubprocessCore.RawSessionTest do
 
         assert result.exit.code == 0
         assert result.output =~ "ready"
-        refute_receive {:DOWN, ^monitor_ref, :process, ^exec_pid, _reason}, 200
+        assert wait_until(fn -> not Process.alive?(session.transport) end, 1_000) == :ok
+        refute_receive {:DOWN, ^monitor_ref, :process, ^exec_pid, _reason}, 0
         assert Process.whereis(:exec) == exec_pid
 
         Process.demonitor(monitor_ref, [:flush])
@@ -236,6 +237,24 @@ defmodule CliSubprocessCore.RawSessionTest do
     end)
 
     path
+  end
+
+  defp wait_until(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_wait_until(fun, deadline)
+  end
+
+  defp do_wait_until(fun, deadline_ms) do
+    if fun.() do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) >= deadline_ms do
+        :timeout
+      else
+        Process.sleep(5)
+        do_wait_until(fun, deadline_ms)
+      end
+    end
   end
 
   defp create_python_test_script(body) do

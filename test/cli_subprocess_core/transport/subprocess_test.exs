@@ -268,11 +268,14 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
   test "stderr is dispatched in realtime, retained in a ring buffer, and callback lines flush on exit" do
     ref = make_ref()
     parent = self()
+    gate_path = temp_path!("stderr_gate")
 
     script =
       create_test_script("""
       printf 'err-one\\nerr-two' >&2
-      sleep 0.1
+      while [ ! -f "#{gate_path}" ]; do
+        sleep 0.01
+      done
       printf 'out\\n'
       """)
 
@@ -287,16 +290,8 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
     assert_receive {:stderr_line, "err-one"}, 2_000
     assert_receive {:cli_subprocess_core, ^ref, {:stderr, stderr_chunk}}, 2_000
 
-    trailing_stderr =
-      receive do
-        {:cli_subprocess_core, ^ref, {:stderr, chunk}} -> chunk
-      after
-        250 -> ""
-      end
-
-    combined_stderr = stderr_chunk <> trailing_stderr
-    assert combined_stderr =~ "err-one"
-    assert combined_stderr =~ "err-two"
+    assert stderr_chunk =~ "err-one"
+    File.write!(gate_path, "release")
     assert_receive {:cli_subprocess_core, ^ref, {:message, "out"}}, 2_000
     assert_receive {:stderr_line, "err-two"}, 2_000
 
@@ -312,11 +307,14 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
 
   test "late subscribers can receive the retained stderr tail from the core" do
     ref = make_ref()
+    gate_path = temp_path!("late_stderr_gate")
 
     script =
       create_test_script("""
       printf 'late stderr' >&2
-      sleep 0.1
+      while [ ! -f "#{gate_path}" ]; do
+        sleep 0.01
+      done
       """)
 
     assert {:ok, transport} =
@@ -325,11 +323,12 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
                replay_stderr_on_subscribe?: true
              )
 
-    Process.sleep(20)
+    assert wait_until(fn -> Transport.stderr(transport) == "late stderr" end, 1_000) == :ok
 
     assert :ok = Transport.subscribe(transport, self(), ref)
 
     assert_receive {:cli_subprocess_core, ^ref, {:stderr, "late stderr"}}, 2_000
+    File.write!(gate_path, "release")
 
     assert_receive {:cli_subprocess_core, ^ref,
                     {:exit, %ProcessExit{status: :success, code: 0, stderr: "late stderr"}}},
@@ -387,10 +386,7 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
 
     script =
       create_test_script("""
-      python3 - <<'PY'
-      import sys
-      sys.stdout.write("x" * 262144)
-      PY
+      head -c 262144 /dev/zero | tr '\\0' 'x'
       """)
 
     assert {:ok, _transport} =
@@ -421,16 +417,17 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
 
   test "interrupt supports in-flight subprocesses and surfaces the resulting exit" do
     ref = make_ref()
+    ready_path = temp_path!("interrupt_ready")
 
     script =
       create_test_script("""
       trap 'printf "interrupted\\n" >&2; exit 130' INT
-      while true; do
-        sleep 0.1
-      done
+      : > "#{ready_path}"
+      sleep 60
       """)
 
     assert {:ok, transport} = Subprocess.start(command: script, subscriber: {self(), ref})
+    assert wait_until(fn -> File.exists?(ready_path) end, 1_000) == :ok
 
     assert :ok = Transport.interrupt(transport)
 
@@ -476,7 +473,7 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
     assert_receive {:DOWN, ^monitor, :process, ^transport, :normal}, 2_000
   end
 
-  test "safe_call returns a timeout without killing a suspended transport" do
+  test "force_close stops a suspended transport through the system control path" do
     script = create_test_script("sleep 60")
 
     assert {:ok, transport} = Subprocess.start(command: script)
@@ -485,13 +482,7 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
       monitor = Process.monitor(transport)
       :ok = :sys.suspend(transport)
 
-      assert {:error, {:transport, %Error{reason: :timeout}}} =
-               Transport.force_close(transport)
-
-      assert Process.alive?(transport)
-      refute_received {:DOWN, ^monitor, :process, ^transport, _reason}
-
-      :ok = :sys.resume(transport)
+      assert :ok = Transport.force_close(transport)
       assert_receive {:DOWN, ^monitor, :process, ^transport, :normal}, 2_000
     after
       if Process.alive?(transport) do
@@ -545,5 +536,39 @@ defmodule CliSubprocessCore.Transport.SubprocessTest do
     end)
 
     path
+  end
+
+  defp temp_path!(name) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_transport_tmp_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+    end)
+
+    Path.join(dir, name)
+  end
+
+  defp wait_until(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_wait_until(fun, deadline)
+  end
+
+  defp do_wait_until(fun, deadline_ms) do
+    if fun.() do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) >= deadline_ms do
+        :timeout
+      else
+        Process.sleep(5)
+        do_wait_until(fun, deadline_ms)
+      end
+    end
   end
 end

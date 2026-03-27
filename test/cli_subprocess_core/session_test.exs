@@ -29,12 +29,16 @@ defmodule CliSubprocessCore.SessionTest do
   end
 
   test "subscribe, unsubscribe, send, and end_input drive the session transport" do
+    gate_path = temp_path!("session_result_gate")
+
     script =
       create_test_script("""
       while IFS= read -r line; do
         printf '{"type":"assistant_delta","delta":"%s","session_id":"stdin-session"}\\n' "$line"
       done
-      sleep 0.2
+      while [ ! -f "#{gate_path}" ]; do
+        sleep 0.01
+      done
       printf '{"type":"result","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}\\n'
       """)
 
@@ -76,10 +80,11 @@ defmodule CliSubprocessCore.SessionTest do
     assert %Payload.AssistantDelta{content: "hello"} = delta.payload
 
     assert :ok = Session.unsubscribe(session, self())
+    File.write!(gate_path, "release")
 
     monitor = Process.monitor(session)
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
-    refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
+    refute_receive {@session_event_tag, ^ref, {:event, _event}}, 0
   end
 
   test "start_link_session returns linked startup info through a public API" do
@@ -258,7 +263,7 @@ defmodule CliSubprocessCore.SessionTest do
                       )
            end) == ""
 
-    refute_receive {@session_event_tag, ^ref, {:event, _event}}, 200
+    refute_receive {@session_event_tag, ^ref, {:event, _event}}, 0
   end
 
   test "extract_event unwraps tagged session delivery without depending on the outer atom" do
@@ -375,5 +380,21 @@ defmodule CliSubprocessCore.SessionTest do
     end)
 
     path
+  end
+
+  defp temp_path!(name) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_session_tmp_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+    end)
+
+    Path.join(dir, name)
   end
 end

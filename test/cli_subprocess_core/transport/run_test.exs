@@ -126,7 +126,7 @@ defmodule CliSubprocessCore.Transport.RunTest do
       if System.monotonic_time(:millisecond) >= deadline_ms do
         :timeout
       else
-        Process.sleep(25)
+        Process.sleep(5)
         do_wait_until(fun, deadline_ms)
       end
     end
