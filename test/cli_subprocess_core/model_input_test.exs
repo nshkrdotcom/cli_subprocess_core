@@ -70,6 +70,27 @@ defmodule CliSubprocessCore.ModelInputTest do
              )
   end
 
+  test "validates Claude payload conflicts through the shared normalizer" do
+    {:ok, payload} = CliSubprocessCore.ModelRegistry.build_arg_payload(:claude, "sonnet", [])
+
+    assert {:error, {:model_payload_conflict, :model, "sonnet", "opus"}} =
+             ModelInput.normalize(:claude,
+               model_payload: payload,
+               model: "opus"
+             )
+  end
+
+  test "validates Gemini payload conflicts through the shared normalizer" do
+    {:ok, payload} =
+      CliSubprocessCore.ModelRegistry.build_arg_payload(:gemini, "gemini-2.5-flash", [])
+
+    assert {:error, {:model_payload_conflict, :model, "gemini-2.5-flash", "gemini-2.5-pro"}} =
+             ModelInput.normalize(:gemini,
+               model_payload: payload,
+               model: "gemini-2.5-pro"
+             )
+  end
+
   defp ollama_http(:get, "/api/version", nil, _opts) do
     {:ok, 200, %{"version" => "0.18.2"}}
   end

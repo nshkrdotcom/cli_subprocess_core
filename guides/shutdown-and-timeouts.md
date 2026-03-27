@@ -48,13 +48,19 @@ The resulting exit is surfaced to subscribers as a normalized
 
 ## EOF
 
-`end_input/1` sends `:eof` to stdin and is the correct way to finish a
+`end_input/1` uses the active stdin contract and is the correct way to finish a
 half-duplex or EOF-driven subprocess conversation.
+
+- non-PTY transports send `:eof`
+- PTY transports send the terminal EOF byte (`Ctrl-D`)
 
 This is separate from `close/1`:
 
 - `end_input/1` tells the child no more stdin is coming
 - `close/1` tears down the transport itself
+
+Interrupt and forced shutdown signal the subprocess process group directly from
+the core runtime. Startup does not depend on erlexec's `:kill_group` flag.
 
 ## Headless Timeout
 

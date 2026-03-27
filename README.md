@@ -60,6 +60,9 @@ The library is designed for two consumers:
 - `CliSubprocessCore.ModelRegistry` and `CliSubprocessCore.Ollama` own
   centralized model resolution, backend-aware validation, and the authoritative
   payload passed downstream to provider renderers.
+- `CliSubprocessCore.ModelInput` owns mixed raw-versus-payload normalization so
+  downstream SDKs and ASM can consume one canonical payload instead of
+  re-resolving provider model policy locally.
 - `CliSubprocessCore.Transport` and
   `CliSubprocessCore.Transport.Erlexec` own subprocess lifecycle, stdout/stderr
   dispatch, PTY startup, raw-byte versus line-oriented IO contracts,
@@ -130,6 +133,12 @@ Use the raw session handle when you need long-lived exact-byte ownership:
 IO.inspect({result.stdout, result.exit.code})
 ```
 
+`end_input/1` and `close_input/1` use the correct EOF mechanism for the active
+transport contract:
+
+- pipe-backed stdin sends `:eof`
+- PTY-backed stdin sends the terminal EOF byte (`Ctrl-D`)
+
 Use the command lane when you need one-shot non-PTY execution:
 
 ```elixir
@@ -198,6 +207,12 @@ Anthropic-compatible env in the resolved payload. It also includes the Codex
 local OSS path, where the core validates the Ollama runtime, validates the
 requested local model id, and carries the backend metadata used to render
 `--oss --local-provider ollama`.
+
+When a caller accepts either raw model knobs or an explicit `model_payload`,
+`CliSubprocessCore.ModelInput.normalize/3` is the single normalized handoff.
+Provider SDK repos should feed repo-local env defaults into that normalizer only
+when a payload was not supplied explicitly. Once a payload exists, it is the
+authoritative model-selection object for the rest of the call path.
 
 The default registry starts with these ids:
 

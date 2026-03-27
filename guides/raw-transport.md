@@ -57,9 +57,13 @@ Supported options are normalized by `CliSubprocessCore.Transport.Options`:
 - `:headless_timeout_ms` – no-subscriber auto-stop timeout, default `30_000`
 - `:max_buffer_size` – stdout partial-line limit, default `1_048_576`
 - `:max_stderr_buffer_size` – stderr ring-buffer limit, default `262_144`
+- `:max_buffered_events` – early-event replay buffer size when
+  `:buffer_events_until_subscribe?` is enabled, default `128`
 - `:stderr_callback` – optional per-line callback for stderr
 - `:replay_stderr_on_subscribe?` – replays the retained stderr tail to newly
   attached subscribers, default `false`
+- `:buffer_events_until_subscribe?` – buffers stdout/stderr/error events until
+  the first subscriber attaches, default `false`
 
 ## Event Model
 
@@ -114,14 +118,20 @@ migrations need exact byte chunks.
 :ok = CliSubprocessCore.Transport.end_input(transport)
 ```
 
-`end_input/1` closes stdin with `:eof`. Use it for EOF-driven CLIs such as
-non-streaming `cat`, `python`, or provider commands that wait for stdin
-closure before producing a final result.
+`end_input/1` uses the active stdin contract. Pipe-backed transports send
+`:eof`; PTY-backed transports send the terminal EOF byte (`Ctrl-D`). Use it for
+EOF-driven CLIs such as non-streaming `cat`, `python`, or provider commands
+that wait for stdin closure before producing a final result.
 
 `interrupt/1` uses the configured interrupt contract:
 
 - `:signal` sends `SIGINT` to the subprocess process group
 - `{:stdin, payload}` writes an exact interrupt payload such as `<<3>>`
+
+Process-group signaling is owned explicitly by the core at interrupt and
+shutdown time. The transport does not rely on erlexec's `:kill_group` startup
+flag, because that flag can destabilize the shared `:exec` worker on child
+exit.
 
 ## Metadata
 
@@ -169,6 +179,8 @@ stderr is handled in two ways at once:
 - the transport keeps a tail ring buffer retrievable via `stderr/1`
 - when `:replay_stderr_on_subscribe?` is enabled, late subscribers receive the
   currently retained stderr tail immediately after they subscribe
+- when `:buffer_events_until_subscribe?` is enabled, stdout/stderr/error events
+  emitted before the first subscriber attaches are replayed in order
 
 Optional `:stderr_callback` receives complete stderr lines. Partial trailing
 stderr fragments are flushed through the callback during process finalization.

@@ -88,6 +88,30 @@ defmodule CliSubprocessCore.Transport.ErlexecTest do
              Transport.extract_event(message, ref)
   end
 
+  test "buffers early events until the first subscriber attaches when configured" do
+    ref = make_ref()
+    long_line = String.duplicate("a", 64)
+    script = create_test_script("printf '#{long_line}\\nnext\\n'")
+
+    assert {:ok, transport} =
+             Erlexec.start(
+               command: script,
+               max_buffer_size: 16,
+               buffer_events_until_subscribe?: true
+             )
+
+    assert :ok = Transport.subscribe(transport, self(), ref)
+
+    assert_receive {:cli_subprocess_core, ^ref,
+                    {:error, %Error{reason: {:buffer_overflow, 64, 16}}}},
+                   2_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:message, "next"}}, 2_000
+
+    assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
+                   2_000
+  end
+
   test "raw stdout mode preserves exact bytes and exposes transport metadata" do
     ref = make_ref()
     script = create_test_script("cat")

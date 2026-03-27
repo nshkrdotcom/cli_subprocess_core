@@ -40,6 +40,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   defstruct subprocess: nil,
             invocation: nil,
             subscribers: %{},
+            buffered_events: :queue.new(),
+            buffered_event_count: 0,
             stdout_framer: %LineFraming{},
             pending_lines: :queue.new(),
             drain_scheduled?: false,
@@ -61,6 +63,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
             interrupt_mode: @default_interrupt_mode,
             stderr_callback: nil,
             replay_stderr_on_subscribe?: false,
+            buffer_events_until_subscribe?: false,
+            max_buffered_events: 128,
             startup_options: nil
 
   @type subscriber_info :: %{
@@ -260,9 +264,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   @impl GenServer
   def handle_call({:subscribe, pid, tag}, _from, state) do
+    first_subscriber? = map_size(state.subscribers) == 0
+
     state =
       state
       |> put_subscriber(pid, tag)
+      |> maybe_replay_buffered_events_to_subscriber(pid, first_subscriber?)
       |> maybe_replay_stderr_to_subscriber(pid)
 
     {:reply, :ok, state}
@@ -293,7 +300,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   def handle_call(:info, _from, state), do: {:reply, transport_info(state), state}
 
   def handle_call(:end_input, from, %{subprocess: {pid, _os_pid}} = state) do
-    case start_io_task(state, fn -> send_eof(pid) end) do
+    case start_io_task(state, fn -> end_input_subprocess(pid, state.pty?) end) do
       {:ok, task} ->
         {:noreply, put_pending_call(state, task.ref, from)}
 
@@ -386,11 +393,8 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       state = flush_stdout_fragment(state)
       state = flush_stderr_fragment(state)
 
-      send_event(
-        state.subscribers,
-        {:exit, ProcessExit.from_reason(reason, stderr: state.stderr_buffer)},
-        state.event_tag
-      )
+      state =
+        emit_event(state, {:exit, ProcessExit.from_reason(reason, stderr: state.stderr_buffer)})
 
       {:stop, :normal, %{state | status: :disconnected, subprocess: nil}}
     else
@@ -452,8 +456,11 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     %__MODULE__{
       invocation: build_invocation(options),
       status: :disconnected,
+      buffered_events: :queue.new(),
+      buffered_event_count: 0,
       max_buffer_size: options.max_buffer_size,
       max_stderr_buffer_size: options.max_stderr_buffer_size,
+      max_buffered_events: options.max_buffered_events,
       headless_timeout_ms: options.headless_timeout_ms,
       task_supervisor: options.task_supervisor,
       event_tag: options.event_tag,
@@ -463,6 +470,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       interrupt_mode: options.interrupt_mode,
       stderr_callback: options.stderr_callback,
       replay_stderr_on_subscribe?: options.replay_stderr_on_subscribe?,
+      buffer_events_until_subscribe?: options.buffer_events_until_subscribe?,
       startup_options: options
     }
   end
@@ -651,9 +659,10 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     |> maybe_put_env(env, clear_env?)
     |> maybe_put_user(user)
     |> maybe_put_pty(pty?)
-    # Put each subprocess in its own process group so control signals and
-    # force-close behavior reach shell wrappers and their active children.
-    |> Kernel.++([{:group, 0}, :kill_group, :stdin, :stdout, :stderr, :monitor])
+    |> maybe_put_process_group(pty?)
+    # Group signaling is managed explicitly by the core so child exit does not
+    # tear down erlexec's shared worker via :kill_group.
+    |> Kernel.++([:stdin, :stdout, :stderr, :monitor])
   end
 
   defp maybe_put_cwd(opts, nil), do: opts
@@ -678,6 +687,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp maybe_put_pty(opts, true), do: [:pty | opts]
   defp maybe_put_pty(opts, _pty?), do: opts
+
+  # erlexec's PTY path already calls setsid(), which creates an isolated
+  # session/process group. Adding {:group, 0} on top of that forces a redundant
+  # setpgid(0, 0) that can fail with EPERM under load.
+  defp maybe_put_process_group(opts, true), do: opts
+  defp maybe_put_process_group(opts, false), do: [{:group, 0} | opts]
 
   defp normalize_command_argv(command, args) when is_binary(command) and is_list(args) do
     [command | args] |> Enum.map(&to_charlist/1)
@@ -902,6 +917,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   end
 
   defp stop_run_exec_and_confirm_down(pid, os_pid) do
+    _ = kill_process_group(os_pid, "TERM")
     stop_exec(pid)
 
     case await_down(pid, os_pid, @run_stop_wait_ms) do
@@ -909,6 +925,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
         :ok
 
       :timeout ->
+        _ = kill_process_group(os_pid, "KILL")
         kill_exec(pid)
         _ = await_down(pid, os_pid, @run_kill_wait_ms)
         :ok
@@ -1021,6 +1038,39 @@ defmodule CliSubprocessCore.Transport.Erlexec do
 
   defp maybe_replay_stderr_to_subscriber(state, _pid), do: state
 
+  defp maybe_replay_buffered_events_to_subscriber(
+         %{buffer_events_until_subscribe?: true, buffered_event_count: count} = state,
+         pid,
+         true
+       )
+       when count > 0 do
+    case Map.fetch(state.subscribers, pid) do
+      {:ok, subscriber_info} ->
+        Enum.each(:queue.to_list(state.buffered_events), fn event ->
+          dispatch_event(pid, subscriber_info, event, state.event_tag)
+        end)
+
+        %{state | buffered_events: :queue.new(), buffered_event_count: 0}
+
+      :error ->
+        state
+    end
+  end
+
+  defp maybe_replay_buffered_events_to_subscriber(state, _pid, _first_subscriber?), do: state
+
+  defp buffer_event(%{buffered_events: events, buffered_event_count: count} = state, event) do
+    events = :queue.in(event, events)
+    count = count + 1
+
+    if count > state.max_buffered_events do
+      {{:value, _dropped}, events} = :queue.out(events)
+      %{state | buffered_events: events, buffered_event_count: count - 1}
+    else
+      %{state | buffered_events: events, buffered_event_count: count}
+    end
+  end
+
   defp handle_subscriber_down(ref, pid, state) do
     subscribers =
       case Map.pop(state.subscribers, pid) do
@@ -1094,8 +1144,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
   end
 
   defp append_stdout_chunk(%{stdout_mode: :raw} = state, data) when is_binary(data) do
-    send_event(state.subscribers, {:data, data}, state.event_tag)
-    state
+    emit_event(state, {:data, data})
   end
 
   defp append_stdout_chunk(state, data) when is_binary(data) do
@@ -1107,7 +1156,7 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     {stderr_lines, stderr_framer} = LineFraming.push(state.stderr_framer, data)
 
     dispatch_stderr_callback(state.stderr_callback, stderr_lines)
-    send_event(state.subscribers, {:stderr, data}, state.event_tag)
+    state = emit_event(state, {:stderr, data})
 
     %{state | stderr_buffer: stderr_buffer, stderr_framer: stderr_framer}
   end
@@ -1132,6 +1181,12 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     kind, reason ->
       transport_error(Error.send_failed({kind, reason}))
   end
+
+  # PTY sessions need terminal EOF semantics rather than closing the underlying
+  # file descriptor. Sending Ctrl-D preserves the PTY session while allowing the
+  # foreground program to observe EOF in canonical mode.
+  defp end_input_subprocess(pid, true), do: send_payload(pid, <<4>>, :raw)
+  defp end_input_subprocess(pid, false), do: send_eof(pid)
 
   defp interrupt_subprocess(pid, _os_pid, {:stdin, payload})
        when is_pid(pid) and is_binary(payload) do
@@ -1168,6 +1223,17 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       dispatch_event(pid, info, event, event_tag)
     end)
   end
+
+  defp emit_event(%{subscribers: subscribers} = state, event) when map_size(subscribers) > 0 do
+    send_event(subscribers, event, state.event_tag)
+    state
+  end
+
+  defp emit_event(%{buffer_events_until_subscribe?: true} = state, event) do
+    buffer_event(state, event)
+  end
+
+  defp emit_event(state, _event), do: state
 
   defp dispatch_event(pid, %{tag: :legacy}, {:message, line}, _event_tag),
     do: Kernel.send(pid, {:transport_message, line})
@@ -1216,16 +1282,16 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     }
 
     if byte_size(stdout_framer.buffer) > state.max_buffer_size do
-      send_event(
-        state.subscribers,
-        {:error,
-         Error.buffer_overflow(
-           byte_size(stdout_framer.buffer),
-           state.max_buffer_size,
-           preview(stdout_framer.buffer)
-         )},
-        state.event_tag
-      )
+      state =
+        emit_event(
+          state,
+          {:error,
+           Error.buffer_overflow(
+             byte_size(stdout_framer.buffer),
+             state.max_buffer_size,
+             preview(stdout_framer.buffer)
+           )}
+        )
 
       %{state | stdout_framer: LineFraming.new(), overflowed?: true}
     else
@@ -1243,16 +1309,16 @@ defmodule CliSubprocessCore.Transport.Erlexec do
       {{:value, line}, queue} ->
         state = %{state | pending_lines: queue}
 
-        if byte_size(line) > state.max_buffer_size do
-          send_event(
-            state.subscribers,
-            {:error,
-             Error.buffer_overflow(byte_size(line), state.max_buffer_size, preview(line))},
-            state.event_tag
-          )
-        else
-          send_event(state.subscribers, {:message, line}, state.event_tag)
-        end
+        state =
+          if byte_size(line) > state.max_buffer_size do
+            emit_event(
+              state,
+              {:error,
+               Error.buffer_overflow(byte_size(line), state.max_buffer_size, preview(line))}
+            )
+          else
+            emit_event(state, {:message, line})
+          end
 
         drain_stdout_lines(state, remaining - 1)
     end
@@ -1281,16 +1347,16 @@ defmodule CliSubprocessCore.Transport.Erlexec do
         %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
 
       byte_size(line) > state.max_buffer_size ->
-        send_event(
-          state.subscribers,
-          {:error, Error.buffer_overflow(byte_size(line), state.max_buffer_size, preview(line))},
-          state.event_tag
-        )
+        state =
+          emit_event(
+            state,
+            {:error, Error.buffer_overflow(byte_size(line), state.max_buffer_size, preview(line))}
+          )
 
         %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
 
       true ->
-        send_event(state.subscribers, {:message, line}, state.event_tag)
+        state = emit_event(state, {:message, line})
         %{state | stdout_framer: stdout_framer, overflowed?: false, drain_scheduled?: false}
     end
   end
@@ -1356,20 +1422,35 @@ defmodule CliSubprocessCore.Transport.Erlexec do
     end)
   end
 
-  defp force_stop_subprocess(%{subprocess: {pid, _os_pid}} = state) do
-    stop_subprocess(pid)
+  defp force_stop_subprocess(%{subprocess: {pid, os_pid}} = state) do
+    stop_subprocess(pid, os_pid)
     %{state | subprocess: nil, status: :disconnected}
   end
 
   defp force_stop_subprocess(state), do: state
 
-  defp stop_subprocess(pid) when is_pid(pid) do
-    :exec.stop(pid)
+  defp stop_subprocess(pid, os_pid) when is_pid(pid) do
+    _ = kill_process_group(os_pid, "KILL")
     _ = :exec.kill(pid, 9)
     :ok
   catch
     _, _ -> :ok
   end
+
+  defp kill_process_group(os_pid, signal) when is_integer(os_pid) and os_pid > 0 do
+    case System.find_executable("kill") do
+      nil ->
+        :ok
+
+      kill_executable ->
+        _ =
+          System.cmd(kill_executable, ["-#{signal}", "--", "-#{os_pid}"], stderr_to_stdout: true)
+
+        :ok
+    end
+  end
+
+  defp kill_process_group(_os_pid, _signal), do: :ok
 
   defp drop_until_next_newline(data) when is_binary(data) do
     case :binary.match(data, "\n") do

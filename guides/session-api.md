@@ -68,7 +68,9 @@ startup to finish before returning.
 - `info/1`
 
 `send/2` and `send_input/3` forward stdin to the underlying transport.
-`end_input/1` sends EOF. `interrupt/1` sends SIGINT through the raw transport.
+`end_input/1` sends the correct EOF form for the active transport contract:
+`:eof` for pipe-backed stdin and `Ctrl-D` for PTY-backed stdin. `interrupt/1`
+sends SIGINT through the raw transport.
 `close/1` stops the session process and closes the transport.
 
 ## Subscriber Mailbox Contract

@@ -23,7 +23,9 @@ defmodule CliSubprocessCore.Transport do
 
   When `:replay_stderr_on_subscribe?` is enabled at startup, newly attached
   subscribers also receive the retained stderr tail immediately after
-  subscription.
+  subscription. When `:buffer_events_until_subscribe?` is enabled, stdout,
+  stderr, and error events emitted before the first subscriber attaches are
+  replayed in order.
   """
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
@@ -148,6 +150,9 @@ defmodule CliSubprocessCore.Transport do
 
   @doc """
   Closes stdin for EOF-driven CLIs.
+
+  Pipe-backed transports send `:eof`; PTY-backed transports send the terminal
+  EOF byte (`Ctrl-D`).
   """
   @spec end_input(t()) :: :ok | {:error, {:transport, Error.t()}}
   def end_input(transport), do: Erlexec.end_input(transport)

@@ -158,6 +158,16 @@ mixed-input boundary. It accepts raw attrs or `model_payload`, validates
 consistency when both are present, and returns normalized attrs with the
 authoritative payload attached.
 
+Across the current first-party provider SDK repos, that means:
+
+- `claude_agent_sdk`, `codex_sdk`, and `gemini_cli_sdk` should route mixed
+  raw-versus-payload model input through `CliSubprocessCore.ModelInput`
+- repo-local env defaults are fallback inputs only when no explicit payload was
+  supplied
+- `amp_sdk` is intentionally different today because it does not expose a raw
+  model-selection surface; it carries an optional payload-only model contract
+  instead of inventing a second model-input path
+
 For Claude/Ollama, a caller can keep canonical Claude names while mapping them
 to an installed external model:
 

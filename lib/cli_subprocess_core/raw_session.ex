@@ -170,6 +170,9 @@ defmodule CliSubprocessCore.RawSession do
 
   @doc """
   Closes stdin for EOF-driven subprocesses.
+
+  Pipe-backed sessions send `:eof`; PTY-backed sessions send the terminal EOF
+  byte (`Ctrl-D`).
   """
   @spec close_input(t()) :: :ok | {:error, term()}
   def close_input(%__MODULE__{stdin?: false}), do: {:error, :stdin_unavailable}

@@ -414,22 +414,16 @@ defmodule CliSubprocessCore.ModelInput do
   defp normalize_reasoning_value(value), do: value
 
   defp fetch_string_or_known_atom(map, key) when is_map(map) and is_binary(key) do
-    atom_key =
-      case key do
-        "model_provider" -> :model_provider
-        "oss_provider" -> :oss_provider
-        "ANTHROPIC_BASE_URL" -> :ANTHROPIC_BASE_URL
-        "ANTHROPIC_AUTH_TOKEN" -> :ANTHROPIC_AUTH_TOKEN
-        "CODEX_OSS_BASE_URL" -> :CODEX_OSS_BASE_URL
-        _other -> nil
-      end
-
-    case atom_key do
-      nil ->
-        Map.get(map, key)
-
-      known_atom ->
-        Map.get(map, key, Map.get(map, known_atom))
+    case known_atom_key(key) do
+      nil -> Map.get(map, key)
+      known_atom -> Map.get(map, key, Map.get(map, known_atom))
     end
   end
+
+  defp known_atom_key("model_provider"), do: :model_provider
+  defp known_atom_key("oss_provider"), do: :oss_provider
+  defp known_atom_key("ANTHROPIC_BASE_URL"), do: :ANTHROPIC_BASE_URL
+  defp known_atom_key("ANTHROPIC_AUTH_TOKEN"), do: :ANTHROPIC_AUTH_TOKEN
+  defp known_atom_key("CODEX_OSS_BASE_URL"), do: :CODEX_OSS_BASE_URL
+  defp known_atom_key(_key), do: nil
 end

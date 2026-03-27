@@ -103,6 +103,85 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert_receive {:DOWN, ^monitor, :process, ^transport, :normal}, 2_000
   end
 
+  test "PTY raw sessions can collect short-lived processes without process-group startup errors" do
+    script = create_test_script("printf 'ready\\n'")
+
+    assert {:ok, session} =
+             RawSession.start(script, [],
+               pty?: true,
+               stdin?: false
+             )
+
+    assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000)
+    assert result.exit.code == 0
+    assert result.output =~ "ready"
+    refute result.output =~ "Cannot set effective group to 0"
+  end
+
+  test "short-lived raw sessions do not restart the shared exec worker on exit" do
+    script = create_test_script("printf 'ready\\n'")
+
+    Enum.each(
+      [
+        {"pipe", [stdin?: false]},
+        {"pty", [pty?: true, stdin?: true]}
+      ],
+      fn {label, session_opts} ->
+        assert {:ok, session} = RawSession.start(script, [], session_opts),
+               "failed to start #{label} short-lived session"
+
+        exec_pid = Process.whereis(:exec)
+        assert is_pid(exec_pid), "expected erlexec worker for #{label} session"
+        monitor_ref = Process.monitor(exec_pid)
+
+        assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000),
+               "failed to collect #{label} short-lived session"
+
+        assert result.exit.code == 0
+        assert result.output =~ "ready"
+        refute_receive {:DOWN, ^monitor_ref, :process, ^exec_pid, _reason}, 200
+        assert Process.whereis(:exec) == exec_pid
+
+        Process.demonitor(monitor_ref, [:flush])
+      end
+    )
+  end
+
+  test "PTY close_input sends terminal EOF instead of tearing down the PTY" do
+    script =
+      create_python_test_script("""
+      import sys
+
+      sys.stdout.write("ready\\n")
+      sys.stdout.flush()
+
+      for line in sys.stdin:
+          sys.stdout.write("ack:" + line)
+          sys.stdout.flush()
+      """)
+
+    assert {:ok, session} =
+             RawSession.start(script, [],
+               pty?: true,
+               stdin?: true,
+               stdout_mode: :raw,
+               stdin_mode: :raw
+             )
+
+    transport_ref = session.transport_ref
+
+    assert_receive {:cli_subprocess_core_raw_session, ^transport_ref, {:data, "ready\r\n"}}, 2_000
+    assert :ok = RawSession.send_input(session, "hello\n")
+
+    assert_receive {:cli_subprocess_core_raw_session, ^transport_ref, {:data, "ack:hello\r\n"}},
+                   2_000
+
+    assert :ok = RawSession.close_input(session)
+
+    assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000)
+    assert result.exit.code == 0
+  end
+
   test "raw session delivery metadata reflects the transport's effective tagged event atom" do
     assert {:ok, session} =
              RawSession.start("ignored", [],
@@ -151,6 +230,31 @@ defmodule CliSubprocessCore.RawSessionTest do
     File.write!(path, """
     #!/usr/bin/env bash
     set -euo pipefail
+    #{body}
+    """)
+
+    File.chmod!(path, 0o755)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+    end)
+
+    path
+  end
+
+  defp create_python_test_script(body) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_raw_session_py_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    path = Path.join(dir, "fixture.py")
+
+    File.write!(path, """
+    #!/usr/bin/env python3
     #{body}
     """)
 
