@@ -157,6 +157,47 @@ defmodule CliSubprocessCore.ProviderCLITest do
       end
     end
 
+    test "Codex stabilizes asdf shims discovered through PATH" do
+      {root, shim_path, resolved_path} = build_fake_asdf_codex()
+      path = Path.dirname(shim_path) <> ":/nonexistent_dir_only"
+
+      try do
+        TestSupport.with_env(%{"PATH" => path, "ASDF_DIR" => Path.join(root, ".asdf")}, fn ->
+          assert {:ok, %CommandSpec{program: ^resolved_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:codex, [], resolution_cwd: root)
+        end)
+      after
+        File.rm_rf(root)
+      end
+    end
+
+    test "Codex stabilizes explicit asdf shim overrides" do
+      {root, shim_path, resolved_path} = build_fake_asdf_codex()
+
+      try do
+        TestSupport.with_env(%{"ASDF_DIR" => Path.join(root, ".asdf")}, fn ->
+          assert {:ok, %CommandSpec{program: ^resolved_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:codex, command: shim_path, resolution_cwd: root)
+        end)
+      after
+        File.rm_rf(root)
+      end
+    end
+
+    test "Codex stabilizes shebang launchers that depend on node shims" do
+      {root, shim_path, script_path, node_path} = build_fake_asdf_codex_js()
+      path = Path.dirname(shim_path) <> ":/nonexistent_dir_only"
+
+      try do
+        TestSupport.with_env(%{"PATH" => path, "ASDF_DIR" => Path.join(root, ".asdf")}, fn ->
+          assert {:ok, %CommandSpec{program: ^node_path, argv_prefix: [^script_path]}} =
+                   ProviderCLI.resolve(:codex, [], resolution_cwd: root)
+        end)
+      after
+        File.rm_rf(root)
+      end
+    end
+
     test "Amp honors AMP_CLI_PATH" do
       dir = TestSupport.tmp_dir!("core_amp_cli")
       amp_path = TestSupport.write_executable!(dir, "amp", "#!/bin/bash\nexit 0\n")
@@ -189,5 +230,122 @@ defmodule CliSubprocessCore.ProviderCLITest do
   test "explicit command overrides are preserved without filesystem discovery" do
     assert {:ok, %CommandSpec{program: "custom-gemini", argv_prefix: []}} =
              ProviderCLI.resolve(:gemini, command: "custom-gemini")
+  end
+
+  defp build_fake_asdf_codex do
+    root = TestSupport.tmp_dir!("core_codex_asdf")
+    asdf_root = Path.join(root, ".asdf")
+    bin_dir = Path.join(asdf_root, "bin")
+    shim_dir = Path.join(asdf_root, "shims")
+    installs_dir = Path.join(root, "installs/nodejs/25.1.0/bin")
+
+    File.mkdir_p!(bin_dir)
+    File.mkdir_p!(shim_dir)
+    File.mkdir_p!(installs_dir)
+
+    resolved_path =
+      TestSupport.write_executable!(
+        installs_dir,
+        "codex",
+        "#!/bin/bash\nprintf 'codex-cli 0.0.0\\n'\n"
+      )
+
+    asdf_path =
+      TestSupport.write_executable!(
+        bin_dir,
+        "asdf",
+        """
+        #!/bin/sh
+        if [ "$1" = "which" ] && [ "$2" = "codex" ]; then
+          printf '%s\\n' "#{resolved_path}"
+          exit 0
+        fi
+
+        printf 'unsupported asdf invocation: %s %s\\n' "$1" "$2" >&2
+        exit 1
+        """
+      )
+
+    shim_path =
+      TestSupport.write_executable!(
+        shim_dir,
+        "codex",
+        """
+        #!/bin/sh
+        exec "#{asdf_path}" exec "codex" "$@"
+        """
+      )
+
+    {root, shim_path, resolved_path}
+  end
+
+  defp build_fake_asdf_codex_js do
+    root = TestSupport.tmp_dir!("core_codex_asdf_js")
+    asdf_root = Path.join(root, ".asdf")
+    bin_dir = Path.join(asdf_root, "bin")
+    shim_dir = Path.join(asdf_root, "shims")
+    node_bin_dir = Path.join(root, "installs/nodejs/25.1.0/bin")
+    codex_bin_dir = Path.join(root, "installs/nodejs/25.1.0/lib/node_modules/@openai/codex/bin")
+
+    File.mkdir_p!(bin_dir)
+    File.mkdir_p!(shim_dir)
+    File.mkdir_p!(node_bin_dir)
+    File.mkdir_p!(codex_bin_dir)
+
+    node_path =
+      TestSupport.write_executable!(
+        node_bin_dir,
+        "node",
+        "#!/bin/sh\nprintf 'node 25.1.0\\n'\n"
+      )
+
+    script_path =
+      TestSupport.write_executable!(
+        codex_bin_dir,
+        "codex.js",
+        "#!/usr/bin/env node\nconsole.log('codex');\n"
+      )
+
+    asdf_path =
+      TestSupport.write_executable!(
+        bin_dir,
+        "asdf",
+        """
+        #!/bin/sh
+        if [ "$1" = "which" ] && [ "$2" = "codex" ]; then
+          printf '%s\\n' "#{script_path}"
+          exit 0
+        fi
+
+        if [ "$1" = "which" ] && [ "$2" = "node" ]; then
+          printf '%s\\n' "#{node_path}"
+          exit 0
+        fi
+
+        printf 'unsupported asdf invocation: %s %s\\n' "$1" "$2" >&2
+        exit 1
+        """
+      )
+
+    codex_shim_path =
+      TestSupport.write_executable!(
+        shim_dir,
+        "codex",
+        """
+        #!/bin/sh
+        exec "#{asdf_path}" exec "codex" "$@"
+        """
+      )
+
+    TestSupport.write_executable!(
+      shim_dir,
+      "node",
+      """
+      #!/bin/sh
+      exec "#{asdf_path}" exec "node" "$@"
+      """
+    )
+
+    {root, codex_shim_path, script_path, node_path}
   end
 end
