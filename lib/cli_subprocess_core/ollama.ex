@@ -97,6 +97,32 @@ defmodule CliSubprocessCore.Ollama do
   @spec default_base_url() :: String.t()
   def default_base_url, do: @default_base_url
 
+  @doc """
+  Normalizes an Ollama base URL for Codex's OpenAI-compatible OSS route.
+
+  Raw Ollama roots such as `http://localhost:11434` are promoted to `/v1`
+  because current Codex CLI OSS requests target OpenAI-style endpoints below
+  that prefix. Explicit non-root paths are preserved.
+  """
+  @spec codex_base_url(String.t() | nil) :: String.t() | nil
+  def codex_base_url(nil), do: nil
+
+  def codex_base_url(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> case do
+      "" ->
+        nil
+
+      trimmed ->
+        trimmed
+        |> URI.parse()
+        |> normalize_codex_base_uri()
+        |> URI.to_string()
+        |> String.trim_trailing("/")
+    end
+  end
+
   defp unknown_model_error(model, provider, opts) do
     suggestions =
       case list_model_names(opts) do
@@ -233,6 +259,20 @@ defmodule CliSubprocessCore.Ollama do
     |> to_string()
     |> String.trim()
     |> String.trim_trailing("/")
+  end
+
+  defp normalize_codex_base_uri(%URI{} = uri) do
+    %{uri | path: normalize_codex_base_path(uri.path)}
+  end
+
+  defp normalize_codex_base_path(nil), do: "/v1"
+
+  defp normalize_codex_base_path(path) when is_binary(path) do
+    case path |> String.trim() |> String.trim_trailing("/") do
+      "" -> "/v1"
+      "/v1" -> "/v1"
+      other -> other
+    end
   end
 
   defp model_name(model) when is_map(model) do

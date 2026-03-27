@@ -19,7 +19,7 @@ defmodule CliSubprocessCore.ModelInputTest do
     assert normalized.selection.resolved_model == "llama3.2"
 
     assert normalized.selection.env_overrides == %{
-             "CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434"
+             "CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434/v1"
            }
 
     assert normalized.attrs[:model_payload] == normalized.selection
@@ -45,7 +45,7 @@ defmodule CliSubprocessCore.ModelInputTest do
         visibility: :public,
         provider_backend: :oss,
         model_source: :external,
-        env_overrides: %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434"},
+        env_overrides: %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434/v1"},
         settings_patch: %{},
         backend_metadata: %{
           "provider_backend" => "oss",
@@ -62,12 +62,46 @@ defmodule CliSubprocessCore.ModelInputTest do
              )
 
     assert {:error,
-            {:model_payload_conflict, :ollama_base_url, "http://127.0.0.1:22434",
-             "http://127.0.0.1:11434"}} =
+            {:model_payload_conflict, :ollama_base_url, "http://127.0.0.1:22434/v1",
+             "http://127.0.0.1:11434/v1"}} =
              ModelInput.normalize(:codex,
                model_payload: payload,
                ollama_base_url: "http://127.0.0.1:11434"
              )
+  end
+
+  test "treats raw Codex Ollama roots and /v1 payload overrides as equivalent" do
+    payload =
+      Selection.new(%{
+        provider: :codex,
+        requested_model: "llama3.2",
+        resolved_model: "llama3.2",
+        resolution_source: :explicit,
+        reasoning: "high",
+        reasoning_effort: nil,
+        normalized_reasoning_effort: nil,
+        model_family: "llama",
+        catalog_version: nil,
+        visibility: :public,
+        provider_backend: :oss,
+        model_source: :external,
+        env_overrides: %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434/v1"},
+        settings_patch: %{},
+        backend_metadata: %{
+          "provider_backend" => "oss",
+          "oss_provider" => "ollama",
+          "external_model" => "llama3.2"
+        },
+        errors: []
+      })
+
+    assert {:ok, normalized} =
+             ModelInput.normalize(:codex,
+               model_payload: payload,
+               ollama_base_url: "http://127.0.0.1:22434"
+             )
+
+    assert normalized.selection == payload
   end
 
   test "validates Claude payload conflicts through the shared normalizer" do

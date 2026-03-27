@@ -579,7 +579,7 @@ defmodule CliSubprocessCore.ModelRegistry do
   defp external_codex_env_overrides(opts) do
     case Keyword.get(opts, :ollama_base_url) do
       value when is_binary(value) and value != "" ->
-        %{"CODEX_OSS_BASE_URL" => value}
+        %{"CODEX_OSS_BASE_URL" => Ollama.codex_base_url(value)}
 
       _other ->
         %{}

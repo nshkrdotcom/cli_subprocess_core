@@ -208,8 +208,9 @@ rejection.
 If the caller also needs a non-default local Ollama endpoint, pass
 `ollama_base_url:` when building the payload. The normalized Codex/Ollama
 payload carries that transport choice in `selection.env_overrides` as
-`CODEX_OSS_BASE_URL`, so downstream CLI renderers and SDK transports can rely
-on the payload alone after normalization.
+`CODEX_OSS_BASE_URL`. Raw Ollama roots such as `http://localhost:11434` are
+normalized to the OpenAI-compatible `/v1` base, so downstream CLI renderers
+and SDK transports can rely on the payload alone after normalization.
 
 ## Reviewer Checklist
 

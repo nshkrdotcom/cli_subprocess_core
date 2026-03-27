@@ -131,10 +131,22 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.provider_backend == :oss
       assert payload.model_source == :external
       assert payload.model_family == "llama"
-      assert payload.env_overrides == %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434"}
+      assert payload.env_overrides == %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434/v1"}
       assert payload.backend_metadata["oss_provider"] == "ollama"
       assert payload.backend_metadata["external_model"] == "llama3.2"
       assert payload.backend_metadata["support_tier"] == "runtime_validated_only"
+    end
+
+    test "preserves explicit Codex Ollama /v1 endpoints in payload env overrides" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "llama3.2",
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_base_url: "http://127.0.0.1:22434/v1",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert payload.env_overrides == %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434/v1"}
     end
 
     test "defaults Codex Ollama model selection to gpt-oss:20b" do

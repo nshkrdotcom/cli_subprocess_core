@@ -8,7 +8,7 @@ defmodule CliSubprocessCore.ModelInput do
   canonical payload instead of re-resolving model policy locally.
   """
 
-  alias CliSubprocessCore.ModelRegistry
+  alias CliSubprocessCore.{ModelRegistry, Ollama}
   alias CliSubprocessCore.ModelRegistry.Selection
 
   @raw_resolution_keys [
@@ -269,7 +269,7 @@ defmodule CliSubprocessCore.ModelInput do
   defp validate_provider_transport_consistency(_provider, _payload, _attrs), do: :ok
 
   defp validate_env_override_consistency(%Selection{} = payload, attrs, attr_key, env_key) do
-    case fetch_attr(attrs, attr_key) |> normalize_string() do
+    case normalize_transport_attr_value(attr_key, env_key, fetch_attr(attrs, attr_key)) do
       nil ->
         :ok
 
@@ -283,6 +283,15 @@ defmodule CliSubprocessCore.ModelInput do
         end
     end
   end
+
+  defp normalize_transport_attr_value(:ollama_base_url, "CODEX_OSS_BASE_URL", value) do
+    case normalize_string(value) do
+      nil -> nil
+      normalized -> Ollama.codex_base_url(normalized)
+    end
+  end
+
+  defp normalize_transport_attr_value(_attr_key, _env_key, value), do: normalize_string(value)
 
   defp attach_selection(attrs, %Selection{} = selection, opts) when is_list(attrs) do
     strip_keys = Keyword.get(opts, :strip_keys, [])
