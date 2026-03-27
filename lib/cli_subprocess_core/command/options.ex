@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.Command.Options do
   """
 
   alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.Transport.ExecutionSurface
   alias CliSubprocessCore.Transport.RunOptions
 
   @default_registry ProviderRegistry
@@ -14,7 +15,14 @@ defmodule CliSubprocessCore.Command.Options do
     :stdin,
     :timeout,
     :stderr,
-    :close_stdin
+    :close_stdin,
+    :surface_kind,
+    :transport_options,
+    :target_id,
+    :lease_ref,
+    :surface_ref,
+    :boundary_class,
+    :observability
   ]
 
   defstruct invocation: nil,
@@ -25,6 +33,13 @@ defmodule CliSubprocessCore.Command.Options do
             timeout: RunOptions.default_timeout_ms(),
             stderr: :separate,
             close_stdin: true,
+            surface_kind: ExecutionSurface.default_surface_kind(),
+            transport_options: [],
+            target_id: nil,
+            lease_ref: nil,
+            surface_ref: nil,
+            boundary_class: nil,
+            observability: %{},
             provider_options: []
 
   @type t :: %__MODULE__{
@@ -36,6 +51,13 @@ defmodule CliSubprocessCore.Command.Options do
           timeout: timeout(),
           stderr: RunOptions.stderr_mode(),
           close_stdin: boolean(),
+          surface_kind: ExecutionSurface.surface_kind(),
+          transport_options: keyword(),
+          target_id: String.t() | nil,
+          lease_ref: String.t() | nil,
+          surface_ref: String.t() | nil,
+          boundary_class: atom() | nil,
+          observability: map(),
           provider_options: keyword()
         }
 
@@ -55,6 +77,13 @@ defmodule CliSubprocessCore.Command.Options do
           | {:invalid_timeout, term()}
           | {:invalid_stderr, term()}
           | {:invalid_close_stdin, term()}
+          | {:invalid_surface_kind, term()}
+          | {:invalid_transport_options, term()}
+          | {:invalid_target_id, term()}
+          | {:invalid_lease_ref, term()}
+          | {:invalid_surface_ref, term()}
+          | {:invalid_boundary_class, term()}
+          | {:invalid_observability, term()}
 
   @doc """
   Builds validated command-lane options around a normalized invocation.
@@ -63,6 +92,7 @@ defmodule CliSubprocessCore.Command.Options do
   def new(%Command{} = invocation, opts) when is_list(opts) do
     with :ok <- validate_invocation(invocation),
          :ok <- reject_transport_selector(opts),
+         {:ok, execution_surface} <- ExecutionSurface.new(opts),
          {:ok, run_options} <- RunOptions.new(invocation, opts) do
       {:ok,
        %__MODULE__{
@@ -70,7 +100,14 @@ defmodule CliSubprocessCore.Command.Options do
          stdin: run_options.stdin,
          timeout: run_options.timeout,
          stderr: run_options.stderr,
-         close_stdin: run_options.close_stdin
+         close_stdin: run_options.close_stdin,
+         surface_kind: execution_surface.surface_kind,
+         transport_options: execution_surface.transport_options,
+         target_id: execution_surface.target_id,
+         lease_ref: execution_surface.lease_ref,
+         surface_ref: execution_surface.surface_ref,
+         boundary_class: execution_surface.boundary_class,
+         observability: execution_surface.observability
        }}
     else
       {:error, {:invalid_run_options, reason}} -> {:error, reason}
@@ -90,6 +127,7 @@ defmodule CliSubprocessCore.Command.Options do
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
+         {:ok, execution_surface} <- ExecutionSurface.new(opts),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, RunOptions.default_timeout_ms())),
          :ok <- validate_stderr(Keyword.get(opts, :stderr, :separate)),
          :ok <- validate_close_stdin(Keyword.get(opts, :close_stdin, true)) do
@@ -102,6 +140,13 @@ defmodule CliSubprocessCore.Command.Options do
          timeout: Keyword.get(opts, :timeout, RunOptions.default_timeout_ms()),
          stderr: Keyword.get(opts, :stderr, :separate),
          close_stdin: Keyword.get(opts, :close_stdin, true),
+         surface_kind: execution_surface.surface_kind,
+         transport_options: execution_surface.transport_options,
+         target_id: execution_surface.target_id,
+         lease_ref: execution_surface.lease_ref,
+         surface_ref: execution_surface.surface_ref,
+         boundary_class: execution_surface.boundary_class,
+         observability: execution_surface.observability,
          provider_options: provider_options
        }}
     end

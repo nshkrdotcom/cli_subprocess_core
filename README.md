@@ -120,6 +120,20 @@ receive do
 end
 ```
 
+Generic execution-surface input stays transport-neutral above the core. Public
+callers can pass:
+
+- `surface_kind`
+- `transport_options`
+- `target_id`
+- `lease_ref`
+- `surface_ref`
+- `boundary_class`
+- `observability`
+
+`CliSubprocessCore.Transport` resolves the concrete built-in adapter
+internally. Callers should not choose transport modules directly.
+
 Use the raw session handle when you need long-lived exact-byte ownership:
 
 ```elixir

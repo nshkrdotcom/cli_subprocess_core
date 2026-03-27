@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.Transport.Options do
   """
 
   alias CliSubprocessCore.{Command, Transport}
+  alias CliSubprocessCore.Transport.ExecutionSurface
 
   @default_event_tag :cli_subprocess_core
   @default_headless_timeout_ms 30_000
@@ -19,6 +20,12 @@ defmodule CliSubprocessCore.Transport.Options do
   @enforce_keys [:command]
   defstruct [
     :command,
+    :surface_kind,
+    :target_id,
+    :lease_ref,
+    :surface_ref,
+    :boundary_class,
+    :observability,
     args: [],
     cwd: nil,
     env: %{},
@@ -46,6 +53,12 @@ defmodule CliSubprocessCore.Transport.Options do
 
   @type t :: %__MODULE__{
           command: String.t(),
+          surface_kind: ExecutionSurface.surface_kind(),
+          target_id: String.t() | nil,
+          lease_ref: String.t() | nil,
+          surface_ref: String.t() | nil,
+          boundary_class: atom() | nil,
+          observability: map(),
           args: [String.t()],
           cwd: String.t() | nil,
           env: Command.env_map(),
@@ -71,6 +84,12 @@ defmodule CliSubprocessCore.Transport.Options do
 
   @type validation_error ::
           :missing_command
+          | {:invalid_surface_kind, term()}
+          | {:invalid_target_id, term()}
+          | {:invalid_lease_ref, term()}
+          | {:invalid_surface_ref, term()}
+          | {:invalid_boundary_class, term()}
+          | {:invalid_observability, term()}
           | {:invalid_command, term()}
           | {:invalid_args, term()}
           | {:invalid_cwd, term()}
@@ -100,6 +119,8 @@ defmodule CliSubprocessCore.Transport.Options do
   @spec new(keyword()) :: {:ok, t()} | {:error, {:invalid_transport_options, validation_error()}}
   def new(opts) when is_list(opts) do
     with {:ok, normalized} <- normalize_invocation(opts),
+         {:ok, surface} <- normalize_surface(opts),
+         :ok <- validate_surface_kind(surface.surface_kind),
          :ok <- validate_command(normalized.command),
          :ok <- validate_args(normalized.args),
          :ok <- validate_cwd(normalized.cwd),
@@ -123,7 +144,7 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_replay_stderr_on_subscribe(normalized.replay_stderr_on_subscribe?),
          :ok <-
            validate_buffer_events_until_subscribe(normalized.buffer_events_until_subscribe?) do
-      {:ok, struct!(__MODULE__, normalized)}
+      {:ok, struct!(__MODULE__, Map.merge(normalized, surface_metadata(surface)))}
     else
       {:error, reason} -> {:error, {:invalid_transport_options, reason}}
     end
@@ -255,8 +276,29 @@ defmodule CliSubprocessCore.Transport.Options do
 
   defp normalize_env(_other), do: :invalid_env
 
+  defp normalize_surface(opts) when is_list(opts) do
+    case ExecutionSurface.new(opts) do
+      {:ok, surface} -> {:ok, surface}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp surface_metadata(%ExecutionSurface{} = surface) do
+    %{
+      surface_kind: surface.surface_kind,
+      target_id: surface.target_id,
+      lease_ref: surface.lease_ref,
+      surface_ref: surface.surface_ref,
+      boundary_class: surface.boundary_class,
+      observability: surface.observability
+    }
+  end
+
   defp validate_command(command) when is_binary(command) and byte_size(command) > 0, do: :ok
   defp validate_command(command), do: {:error, {:invalid_command, command}}
+
+  defp validate_surface_kind(:local_subprocess), do: :ok
+  defp validate_surface_kind(surface_kind), do: {:error, {:invalid_surface_kind, surface_kind}}
 
   defp validate_args(args) when is_list(args) do
     if Enum.all?(args, &is_binary/1) do

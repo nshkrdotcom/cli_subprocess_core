@@ -382,13 +382,25 @@ defmodule CliSubprocessCore.Session do
   defp start_transport(options, profile, invocation) do
     transport_ref = make_ref()
 
-    transport_opts =
+    transport_options =
       options.provider_options
       |> profile.transport_options()
       |> Keyword.drop([:command, :args, :cwd, :env, :subscriber, :event_tag])
-      |> Keyword.merge(command: invocation)
-      |> Keyword.put(:subscriber, {self(), transport_ref})
-      |> Keyword.put(:event_tag, @transport_event_tag)
+      |> Keyword.merge(options.transport_options)
+
+    transport_opts =
+      [
+        command: invocation,
+        subscriber: {self(), transport_ref},
+        event_tag: @transport_event_tag,
+        surface_kind: options.surface_kind,
+        transport_options: transport_options,
+        target_id: options.target_id,
+        lease_ref: options.lease_ref,
+        surface_ref: options.surface_ref,
+        boundary_class: options.boundary_class,
+        observability: options.observability
+      ]
 
     case CliSubprocessCore.Transport.start(transport_opts) do
       {:ok, transport_pid} ->

@@ -43,9 +43,18 @@ Common session-level options:
 - `:registry`
 - `:session_event_tag` for low-level adapter-controlled tagged delivery; higher-level
   callers should keep that raw tag below their projected public event surface
+- `:surface_kind`
+- `:transport_options`
+- `:target_id`
+- `:lease_ref`
+- `:surface_ref`
+- `:boundary_class`
+- `:observability`
 
 All other options are passed through to the provider profile for command
-construction, parser initialization, and transport overrides. If the selected
+construction, parser initialization, and profile-owned transport defaults. The
+core merges those defaults with the public `:transport_options` lane and then
+resolves the concrete adapter internally from `:surface_kind`. If the selected
 transport is configured for lazy startup, the session still waits for that
 startup to finish before returning. Legacy backend-selection overrides are
 rejected.
@@ -152,6 +161,10 @@ When the selected transport module exports `info/1`, the session snapshot
 surfaces the full `%CliSubprocessCore.Transport.Info{}` under `transport.info`
 plus the most commonly consumed subprocess metadata as top-level transport map
 fields.
+
+`transport.info` also carries generic execution-surface metadata such as
+`surface_kind`, `target_id`, `lease_ref`, `surface_ref`, `boundary_class`, and
+`observability`.
 
 `session_event_tag` remains in the info map as a direct-adapter compatibility
 alias. `delivery.tagged_event_tag` is the explicit mailbox-delivery contract.

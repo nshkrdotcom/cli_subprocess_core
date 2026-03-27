@@ -76,9 +76,18 @@ Reserved command-lane options are:
 - `:timeout`
 - `:stderr`
 - `:close_stdin`
+- `:surface_kind`
+- `:transport_options`
+- `:target_id`
+- `:lease_ref`
+- `:surface_ref`
+- `:boundary_class`
+- `:observability`
 
 All remaining options are passed to `build_invocation/1` on the resolved
-provider profile. Legacy backend-selection overrides are rejected.
+provider profile. The core resolves the concrete transport adapter internally
+from `:surface_kind`, so callers should not choose transport modules directly.
+Legacy backend-selection overrides are rejected.
 
 ## Transport Boundary
 

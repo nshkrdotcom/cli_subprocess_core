@@ -30,9 +30,10 @@ defmodule CliSubprocessCore.Transport do
 
   alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
   alias CliSubprocessCore.Transport.Delivery
+  alias CliSubprocessCore.Transport.ExecutionSurface
   alias CliSubprocessCore.Transport.Info
+  alias CliSubprocessCore.Transport.LocalSubprocess
   alias CliSubprocessCore.Transport.RunResult
-  alias CliSubprocessCore.Transport.Subprocess
 
   @typedoc "Opaque transport reference."
   @type t :: pid()
@@ -85,68 +86,92 @@ defmodule CliSubprocessCore.Transport do
   Starts the default raw transport implementation.
   """
   @spec start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
-  def start(opts), do: Subprocess.start(opts)
+  def start(opts) when is_list(opts) do
+    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
+           ExecutionSurface.resolve(opts) do
+      adapter.start(adapter_options)
+    else
+      {:error, reason} ->
+        transport_error(reason)
+    end
+  end
 
   @doc """
   Starts the default raw transport implementation and links it to the caller.
   """
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
-  def start_link(opts), do: Subprocess.start_link(opts)
+  def start_link(opts) when is_list(opts) do
+    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
+           ExecutionSurface.resolve(opts) do
+      adapter.start_link(adapter_options)
+    else
+      {:error, reason} ->
+        transport_error(reason)
+    end
+  end
 
   @doc """
   Runs a one-shot non-PTY command and captures exact stdout, stderr, and exit
   data.
   """
   @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
-  def run(%Command{} = command, opts \\ []) when is_list(opts), do: Subprocess.run(command, opts)
+  def run(%Command{} = command, opts \\ []) when is_list(opts) do
+    with {:ok, %{adapter: adapter, adapter_options: adapter_options}} <-
+           ExecutionSurface.resolve(opts) do
+      adapter.run(command, adapter_options)
+    else
+      {:error, reason} ->
+        transport_error(reason)
+    end
+  end
 
   @doc """
   Sends data to the subprocess stdin.
   """
   @spec send(t(), iodata() | map() | list()) :: :ok | {:error, {:transport, Error.t()}}
-  def send(transport, message), do: Subprocess.send(transport, message)
+  def send(transport, message), do: LocalSubprocess.send(transport, message)
 
   @doc """
   Subscribes the caller in legacy mode.
   """
   @spec subscribe(t(), pid()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid), do: Subprocess.subscribe(transport, pid)
+  def subscribe(transport, pid), do: LocalSubprocess.subscribe(transport, pid)
 
   @doc """
   Subscribes a process with an explicit tag mode.
   """
   @spec subscribe(t(), pid(), subscription_tag()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid, tag), do: Subprocess.subscribe(transport, pid, tag)
+  def subscribe(transport, pid, tag), do: LocalSubprocess.subscribe(transport, pid, tag)
 
   @doc """
   Removes a subscriber.
   """
   @spec unsubscribe(t(), pid()) :: :ok
-  def unsubscribe(transport, pid), do: Subprocess.unsubscribe(transport, pid)
+  def unsubscribe(transport, pid), do: LocalSubprocess.unsubscribe(transport, pid)
 
   @doc """
   Stops the transport.
   """
   @spec close(t()) :: :ok
-  def close(transport), do: Subprocess.close(transport)
+  def close(transport), do: LocalSubprocess.close(transport)
 
   @doc """
   Forces the subprocess down immediately.
   """
   @spec force_close(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def force_close(transport), do: Subprocess.force_close(transport)
+  def force_close(transport), do: LocalSubprocess.force_close(transport)
 
   @doc """
   Sends SIGINT to the subprocess.
   """
   @spec interrupt(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def interrupt(transport), do: Subprocess.interrupt(transport)
+  def interrupt(transport), do: LocalSubprocess.interrupt(transport)
 
   @doc """
   Returns transport connectivity status.
   """
   @spec status(t()) :: :connected | :disconnected | :error
-  def status(transport), do: Subprocess.status(transport)
+  def status(transport), do: LocalSubprocess.status(transport)
 
   @doc """
   Closes stdin for EOF-driven CLIs.
@@ -155,19 +180,19 @@ defmodule CliSubprocessCore.Transport do
   EOF byte (`Ctrl-D`).
   """
   @spec end_input(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def end_input(transport), do: Subprocess.end_input(transport)
+  def end_input(transport), do: LocalSubprocess.end_input(transport)
 
   @doc """
   Returns the stderr ring buffer tail.
   """
   @spec stderr(t()) :: binary()
-  def stderr(transport), do: Subprocess.stderr(transport)
+  def stderr(transport), do: LocalSubprocess.stderr(transport)
 
   @doc """
   Returns the current transport metadata snapshot.
   """
   @spec info(t()) :: Info.t()
-  def info(transport), do: Subprocess.info(transport)
+  def info(transport), do: LocalSubprocess.info(transport)
 
   @doc """
   Extracts a normalized transport event from a legacy mailbox message.
@@ -206,6 +231,9 @@ defmodule CliSubprocessCore.Transport do
       _other -> Delivery.new(:cli_subprocess_core)
     end
   end
+
+  defp transport_error(%Error{} = error), do: {:error, {:transport, error}}
+  defp transport_error(reason), do: {:error, {:transport, Error.transport_error(reason)}}
 
   defp extract_tagged_event({:message, line}) when is_binary(line), do: {:ok, {:message, line}}
   defp extract_tagged_event({:data, chunk}) when is_binary(chunk), do: {:ok, {:data, chunk}}

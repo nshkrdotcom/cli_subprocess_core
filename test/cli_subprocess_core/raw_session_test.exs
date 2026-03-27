@@ -199,6 +199,34 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert :ok = RawSession.stop(session)
   end
 
+  test "raw sessions surface generic execution metadata through transport info" do
+    script = create_test_script("cat")
+
+    assert {:ok, session} =
+             RawSession.start(script, [],
+               surface_kind: :local_subprocess,
+               target_id: "target-1",
+               lease_ref: "lease-1",
+               surface_ref: "surface-1",
+               boundary_class: :local,
+               observability: %{suite: :phase_b},
+               transport_options: [startup_mode: :lazy]
+             )
+
+    assert %{
+             transport: %{
+               surface_kind: :local_subprocess,
+               target_id: "target-1",
+               lease_ref: "lease-1",
+               surface_ref: "surface-1",
+               boundary_class: :local,
+               observability: %{suite: :phase_b}
+             }
+           } = RawSession.info(session)
+
+    assert :ok = RawSession.stop(session)
+  end
+
   test "raw sessions reject the legacy transport_module option name" do
     assert {:error, {:unsupported_option, :transport_module}} =
              RawSession.start("ignored", [], transport_module: TagDriftTransport)

@@ -20,7 +20,14 @@ directly.
 ## Start A Transport
 
 You can pass either a normalized `CliSubprocessCore.Command` or explicit
-transport keywords:
+transport keywords. Above the core, execution-surface input stays generic:
+
+- `:surface_kind` selects the generic execution surface, default
+  `:local_subprocess`
+- `:transport_options` carries adapter-specific startup settings without
+  exposing adapter module names publicly
+- `:target_id`, `:lease_ref`, `:surface_ref`, `:boundary_class`, and
+  `:observability` carry generic surface metadata into `Transport.Info`
 
 ```elixir
 command =
@@ -34,11 +41,13 @@ ref = make_ref()
   CliSubprocessCore.Transport.start(
     command: command,
     subscriber: {self(), ref},
-    startup_mode: :eager
+    transport_options: [startup_mode: :eager]
   )
 ```
 
-Supported options are normalized by `CliSubprocessCore.Transport.Options`:
+Supported local-subprocess startup options are normalized by
+`CliSubprocessCore.Transport.Options` and can still be passed directly to
+`CliSubprocessCore.Transport.start/1` when you are already inside the core:
 
 - `:command` – required executable path or binary name
 - `:args` – argv tail
@@ -135,9 +144,19 @@ child exit.
 ## Metadata
 
 `info/1` returns `%CliSubprocessCore.Transport.Info{}` with the normalized
-invocation, raw subprocess pid/os pid, current status, stderr tail, delivery
-metadata, and the active `stdout_mode`, `stdin_mode`, `pty?`, and
-`interrupt_mode` contract.
+invocation, generic execution-surface metadata, raw subprocess pid/os pid,
+current status, stderr tail, delivery metadata, and the active `stdout_mode`,
+`stdin_mode`, `pty?`, and `interrupt_mode` contract.
+
+The generic metadata fields are:
+
+- `surface_kind`
+- `target_id`
+- `lease_ref`
+- `surface_ref`
+- `boundary_class`
+- `observability`
+- `adapter_metadata`
 
 `info.delivery.tagged_event_tag` exposes the actual tagged mailbox atom for
 direct adapter seams. Outside the core, do not inspect the global `:exec`

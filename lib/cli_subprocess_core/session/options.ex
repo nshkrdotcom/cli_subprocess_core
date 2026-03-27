@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.Session.Options do
   """
 
   alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.Transport.ExecutionSurface
 
   @default_registry ProviderRegistry
   @default_session_event_tag :cli_subprocess_core_session
@@ -14,7 +15,14 @@ defmodule CliSubprocessCore.Session.Options do
     :subscriber,
     :metadata,
     :session_event_tag,
-    :starter
+    :starter,
+    :surface_kind,
+    :transport_options,
+    :target_id,
+    :lease_ref,
+    :surface_ref,
+    :boundary_class,
+    :observability
   ]
 
   defstruct provider: nil,
@@ -23,6 +31,13 @@ defmodule CliSubprocessCore.Session.Options do
             subscriber: nil,
             metadata: %{},
             session_event_tag: @default_session_event_tag,
+            surface_kind: ExecutionSurface.default_surface_kind(),
+            transport_options: [],
+            target_id: nil,
+            lease_ref: nil,
+            surface_ref: nil,
+            boundary_class: nil,
+            observability: %{},
             provider_options: [],
             starter: nil
 
@@ -35,6 +50,13 @@ defmodule CliSubprocessCore.Session.Options do
           subscriber: subscriber(),
           metadata: map(),
           session_event_tag: atom(),
+          surface_kind: ExecutionSurface.surface_kind(),
+          transport_options: keyword(),
+          target_id: String.t() | nil,
+          lease_ref: String.t() | nil,
+          surface_ref: String.t() | nil,
+          boundary_class: atom() | nil,
+          observability: map(),
           provider_options: keyword(),
           starter: {pid(), reference()} | nil
         }
@@ -49,6 +71,13 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_subscriber, term()}
           | {:invalid_metadata, term()}
           | {:invalid_session_event_tag, term()}
+          | {:invalid_surface_kind, term()}
+          | {:invalid_transport_options, term()}
+          | {:invalid_target_id, term()}
+          | {:invalid_lease_ref, term()}
+          | {:invalid_surface_ref, term()}
+          | {:invalid_boundary_class, term()}
+          | {:invalid_observability, term()}
           | {:invalid_starter, term()}
 
   @doc """
@@ -66,6 +95,7 @@ defmodule CliSubprocessCore.Session.Options do
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
+         {:ok, execution_surface} <- ExecutionSurface.new(opts),
          :ok <- validate_subscriber(Keyword.get(opts, :subscriber)),
          :ok <- validate_metadata(Keyword.get(opts, :metadata, %{})),
          :ok <-
@@ -81,6 +111,13 @@ defmodule CliSubprocessCore.Session.Options do
          subscriber: Keyword.get(opts, :subscriber),
          metadata: Keyword.get(opts, :metadata, %{}),
          session_event_tag: Keyword.get(opts, :session_event_tag, @default_session_event_tag),
+         surface_kind: execution_surface.surface_kind,
+         transport_options: execution_surface.transport_options,
+         target_id: execution_surface.target_id,
+         lease_ref: execution_surface.lease_ref,
+         surface_ref: execution_surface.surface_ref,
+         boundary_class: execution_surface.boundary_class,
+         observability: execution_surface.observability,
          provider_options: provider_options,
          starter: Keyword.get(opts, :starter)
        }}

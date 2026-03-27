@@ -205,7 +205,14 @@ defmodule CliSubprocessCore.Command do
            stdin: options.stdin,
            timeout: options.timeout,
            stderr: options.stderr,
-           close_stdin: options.close_stdin
+           close_stdin: options.close_stdin,
+           surface_kind: options.surface_kind,
+           transport_options: options.transport_options,
+           target_id: options.target_id,
+           lease_ref: options.lease_ref,
+           surface_ref: options.surface_ref,
+           boundary_class: options.boundary_class,
+           observability: options.observability
          ) do
       {:ok, %RunResult{} = result} ->
         {:ok, result}

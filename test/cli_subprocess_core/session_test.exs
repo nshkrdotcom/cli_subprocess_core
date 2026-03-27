@@ -103,6 +103,36 @@ defmodule CliSubprocessCore.SessionTest do
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
   end
 
+  test "session startup carries generic execution metadata and transport_options through the core" do
+    script = create_test_script("sleep 60")
+
+    assert {:ok, session, info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "surface metadata",
+               command: script,
+               target_id: "target-1",
+               lease_ref: "lease-1",
+               surface_ref: "surface-1",
+               boundary_class: :local,
+               observability: %{suite: :phase_b},
+               transport_options: [headless_timeout_ms: 321, startup_mode: :lazy]
+             )
+
+    assert %Transport.Info{} = info.transport.info
+    assert info.transport.info.surface_kind == :local_subprocess
+    assert info.transport.info.target_id == "target-1"
+    assert info.transport.info.lease_ref == "lease-1"
+    assert info.transport.info.surface_ref == "surface-1"
+    assert info.transport.info.boundary_class == :local
+    assert info.transport.info.observability == %{suite: :phase_b}
+
+    %{transport_pid: transport_pid} = :sys.get_state(session)
+    assert %{headless_timeout_ms: 321} = :sys.get_state(transport_pid)
+
+    assert :ok = Session.close(session)
+  end
+
   test "interrupt requests propagate through the session and surface a terminal error" do
     ref = make_ref()
 
