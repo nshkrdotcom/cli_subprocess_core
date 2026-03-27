@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.ModelRegistry do
   alias CliSubprocessCore.ModelCatalog
   alias CliSubprocessCore.ModelRegistry.{Model, Selection}
   alias CliSubprocessCore.Ollama
+  alias CliSubprocessCore.ProviderFeatures
 
   @type resolution_error ::
           {:unknown_model, String.t() | nil, [String.t()], atom()}
@@ -78,8 +79,11 @@ defmodule CliSubprocessCore.ModelRegistry do
 
       {:codex, :oss} ->
         case resolve_codex_oss_provider(provider, opts) do
-          {:ok, "ollama"} -> Ollama.list_model_names(ollama_opts(opts))
-          {:error, _reason} = error -> error
+          {:ok, "ollama"} ->
+            Ollama.list_model_names(ollama_opts(opts))
+
+          {:error, _reason} = error ->
+            error
         end
 
       _other ->
@@ -514,7 +518,7 @@ defmodule CliSubprocessCore.ModelRegistry do
     }
   end
 
-  defp selection_payload_attrs(%Model{} = model, :oss, requested_model, _opts)
+  defp selection_payload_attrs(%Model{} = model, :oss, requested_model, opts)
        when model.provider == :codex do
     %{
       resolved_model: model.id,
@@ -522,7 +526,7 @@ defmodule CliSubprocessCore.ModelRegistry do
       catalog_version: nil,
       visibility: :public,
       model_source: :external,
-      env_overrides: %{},
+      env_overrides: external_codex_env_overrides(opts),
       settings_patch: %{},
       backend_metadata:
         model.metadata
@@ -572,6 +576,16 @@ defmodule CliSubprocessCore.ModelRegistry do
     }
   end
 
+  defp external_codex_env_overrides(opts) do
+    case Keyword.get(opts, :ollama_base_url) do
+      value when is_binary(value) and value != "" ->
+        %{"CODEX_OSS_BASE_URL" => value}
+
+      _other ->
+        %{}
+    end
+  end
+
   defp external_claude_model(requested_model, request, models) when is_binary(requested_model) do
     overrides = normalize_external_model_overrides(request.external_model_overrides)
 
@@ -614,12 +628,15 @@ defmodule CliSubprocessCore.ModelRegistry do
   end
 
   defp build_external_codex_model(requested_model, details, running_models, ollama_version) do
+    support_tier = codex_ollama_support_tier(requested_model)
+
     metadata =
       %{
         "backend" => "ollama",
         "oss_provider" => "ollama",
         "requested_model" => requested_model,
         "external_model" => requested_model,
+        "support_tier" => support_tier,
         "capabilities" => Map.get(details, "capabilities", []),
         "modified_at" => Map.get(details, "modified_at"),
         "details" => Map.get(details, "details", %{}),
@@ -695,6 +712,28 @@ defmodule CliSubprocessCore.ModelRegistry do
     name
     |> String.trim()
     |> String.trim_trailing(":latest")
+  end
+
+  defp codex_ollama_compatibility do
+    :codex
+    |> ProviderFeatures.partial_feature!(:ollama)
+    |> Map.fetch!(:compatibility)
+  end
+
+  defp codex_ollama_support_tier(requested_model) when is_binary(requested_model) do
+    normalized_requested_model = normalize_external_model_name(requested_model)
+
+    if normalized_requested_model in codex_ollama_validated_models() do
+      "validated_default"
+    else
+      "runtime_validated_only"
+    end
+  end
+
+  defp codex_ollama_validated_models do
+    codex_ollama_compatibility()
+    |> Map.get(:validated_models, [])
+    |> Enum.map(&normalize_external_model_name/1)
   end
 
   defp maybe_put_metadata(metadata, _key, nil), do: metadata

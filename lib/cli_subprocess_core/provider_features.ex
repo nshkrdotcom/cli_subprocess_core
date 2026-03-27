@@ -19,6 +19,7 @@ defmodule CliSubprocessCore.ProviderFeatures do
           supported?: boolean(),
           activation: map() | nil,
           model_strategy: atom() | nil,
+          compatibility: map() | nil,
           notes: [String.t()]
         }
 
@@ -47,6 +48,7 @@ defmodule CliSubprocessCore.ProviderFeatures do
           supported?: false,
           activation: nil,
           model_strategy: nil,
+          compatibility: nil,
           notes: ["Amp does not expose an Ollama backend through the common CLI surface."]
         }
       }
@@ -96,6 +98,7 @@ defmodule CliSubprocessCore.ProviderFeatures do
           supported?: true,
           activation: %{provider_backend: :ollama},
           model_strategy: :canonical_or_direct_external,
+          compatibility: nil,
           notes: [
             "Claude/Ollama can run a direct external model id or keep canonical Claude names mapped via external_model_overrides.",
             "Claude/Ollama has no silent default model; callers must provide model intent."
@@ -126,9 +129,17 @@ defmodule CliSubprocessCore.ProviderFeatures do
           supported?: true,
           activation: %{provider_backend: :oss, oss_provider: "ollama"},
           model_strategy: :direct_external,
+          compatibility: %{
+            acceptance: :runtime_validated_external_model,
+            default_model: "gpt-oss:20b",
+            validated_models: ["gpt-oss:20b"]
+          },
           notes: [
             "Codex/Ollama uses OSS routing with oss_provider=ollama.",
-            "Codex/Ollama model selection uses the direct external model id."
+            "Codex/Ollama model selection uses the direct external model id.",
+            "Any Ollama model that the upstream Codex CLI can start is allowed on the shared route.",
+            "gpt-oss:20b remains the default validated Codex/Ollama example and default OSS bootstrap target.",
+            "Non-catalog models may run with upstream fallback metadata, which can degrade behavior."
           ]
         }
       }
@@ -156,6 +167,7 @@ defmodule CliSubprocessCore.ProviderFeatures do
           supported?: false,
           activation: nil,
           model_strategy: nil,
+          compatibility: nil,
           notes: ["Gemini does not expose an Ollama backend through the common CLI surface."]
         }
       }

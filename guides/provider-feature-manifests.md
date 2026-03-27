@@ -51,12 +51,37 @@ iex> CliSubprocessCore.ProviderFeatures.partial_feature!(:claude, :ollama)
 }
 ```
 
+Codex's manifest also carries compatibility metadata for the shared Ollama
+route:
+
+```elixir
+iex> CliSubprocessCore.ProviderFeatures.partial_feature!(:codex, :ollama)
+%{
+  supported?: true,
+  activation: %{provider_backend: :oss, oss_provider: "ollama"},
+  model_strategy: :direct_external,
+  compatibility: %{
+    acceptance: :runtime_validated_external_model,
+    default_model: "gpt-oss:20b",
+    validated_models: ["gpt-oss:20b"]
+  },
+  notes: [...]
+}
+```
+
 Current built-in `:ollama` support:
 
 - Claude: supported through `provider_backend: :ollama`
 - Codex: supported through `provider_backend: :oss, oss_provider: "ollama"`
 - Gemini: unsupported on the common CLI surface
 - Amp: unsupported on the common CLI surface
+
+For Codex, the compatibility manifest describes the validated default and the
+acceptance rule separately:
+
+- acceptance: any Ollama model that passes runtime validation
+- validated default: `gpt-oss:20b`
+- non-default models: allowed, but may run with upstream fallback metadata
 
 ## Design Rule
 

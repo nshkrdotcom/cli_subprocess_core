@@ -41,11 +41,25 @@ implementation landed:
 Direct CLI check:
 
 ```bash
-codex exec --oss --local-provider ollama -m llama3.2 "Respond with exactly: OK"
+codex exec --oss --local-provider ollama -m gpt-oss:20b \
+  "Respond with exactly: OK"
 ```
 
-That path succeeded locally, so the core implementation is aligned to the
-actual checked-out CLI behavior rather than a guessed abstraction.
+The more general local route also runs with arbitrary installed models such as
+`llama3.2`:
+
+```bash
+codex exec --oss --local-provider ollama -m llama3.2 \
+  "Respond with exactly: OK"
+```
+
+Upstream does not hard-reject that model. Instead, when the slug is missing
+from Codex's own model metadata catalog, the CLI warns and uses fallback model
+metadata. That distinction matters:
+
+- `gpt-oss:20b` is the default validated OSS model
+- arbitrary Ollama models can still run
+- fallback metadata can degrade behavior on those non-catalog models
 
 ## What Core Owns
 
@@ -74,9 +88,14 @@ Core rules:
 
 - minimum Ollama version: `0.13.4`
 - default Codex OSS model: `gpt-oss:20b`
+- arbitrary installed Ollama models are accepted on the shared Codex/Ollama
+  route
 - explicit local provider required conceptually, even though the current core
-  defaults the OSS provider to `ollama` for the supported local path
+  defaults the OSS provider to `ollama` for the local path
 - model ids are validated through Ollama before the payload is returned
+- the feature manifest records which models are the validated defaults, not a
+  hard allowlist
+- non-default models may still trigger upstream fallback metadata behavior
 
 The resolved payload includes:
 
@@ -85,6 +104,7 @@ The resolved payload includes:
 - `provider_backend`
 - `backend_metadata["oss_provider"]`
 - `backend_metadata["loaded"]`
+- `backend_metadata["support_tier"]`
 - model-family and catalog visibility fields
 
 ## Downstream Consumption
@@ -106,7 +126,7 @@ In this stack:
 {:ok, selection} =
   CliSubprocessCore.ModelRegistry.build_arg_payload(
     :codex,
-    "llama3.2",
+    "gpt-oss:20b",
     provider_backend: :oss,
     oss_provider: "ollama"
   )
@@ -125,5 +145,6 @@ When reviewing Codex backend changes, verify:
 - backend policy stays in `CliSubprocessCore.ModelRegistry`
 - provider renderers only read payload fields
 - local Ollama validation stays explicit and hard-failing
+- validated defaults stay metadata, not an invented hard allowlist
 - blank or placeholder model ids still fail
 - no renderer emits synthetic Codex backend flags without payload support

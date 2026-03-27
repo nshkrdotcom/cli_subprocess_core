@@ -97,11 +97,32 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.backend_metadata["external_model"] == "llama3.2"
     end
 
-    test "resolves Codex Ollama models through the core payload" do
+    test "resolves compatible Codex Ollama models through the core payload" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "gpt-oss:20b",
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert payload.requested_model == "gpt-oss:20b"
+      assert payload.resolved_model == "gpt-oss:20b"
+      assert payload.provider_backend == :oss
+      assert payload.model_source == :external
+      assert payload.reasoning == "high"
+      assert payload.model_family == "gpt-oss"
+      assert payload.backend_metadata["oss_provider"] == "ollama"
+      assert payload.backend_metadata["external_model"] == "gpt-oss:20b"
+      assert payload.backend_metadata["support_tier"] == "validated_default"
+      assert payload.backend_metadata["loaded"] == true
+    end
+
+    test "resolves arbitrary Codex Ollama models when Ollama can show them" do
       assert {:ok, %Selection{} = payload} =
                ModelRegistry.resolve(:codex, "llama3.2",
                  provider_backend: :oss,
                  oss_provider: "ollama",
+                 ollama_base_url: "http://127.0.0.1:22434",
                  ollama_http: &ollama_http/4
                )
 
@@ -109,11 +130,11 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.resolved_model == "llama3.2"
       assert payload.provider_backend == :oss
       assert payload.model_source == :external
-      assert payload.reasoning == "high"
       assert payload.model_family == "llama"
+      assert payload.env_overrides == %{"CODEX_OSS_BASE_URL" => "http://127.0.0.1:22434"}
       assert payload.backend_metadata["oss_provider"] == "ollama"
       assert payload.backend_metadata["external_model"] == "llama3.2"
-      assert payload.backend_metadata["loaded"] == true
+      assert payload.backend_metadata["support_tier"] == "runtime_validated_only"
     end
 
     test "defaults Codex Ollama model selection to gpt-oss:20b" do
@@ -174,8 +195,8 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                  ollama_http: &ollama_http/4
                )
 
-      assert "llama3.2:latest" in models
       assert "gpt-oss:20b" in models
+      assert "llama3.2:latest" in models
     end
   end
 
@@ -224,7 +245,23 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert model.metadata["backend"] == "ollama"
     end
 
-    test "validates direct Codex Ollama model ids through the backend-aware request map" do
+    test "validates compatible Codex Ollama model ids through the backend-aware request map" do
+      assert {:ok, model} =
+               ModelRegistry.validate(:codex,
+                 model: "gpt-oss:20b",
+                 provider_backend: :oss,
+                 oss_provider: "ollama",
+                 ollama_http: &ollama_http/4
+               )
+
+      assert model.id == "gpt-oss:20b"
+      assert model.family == "gpt-oss"
+      assert model.metadata["backend"] == "ollama"
+      assert model.metadata["support_tier"] == "validated_default"
+      assert model.metadata["loaded"] == true
+    end
+
+    test "validates arbitrary direct Codex Ollama model ids through the backend-aware request map" do
       assert {:ok, model} =
                ModelRegistry.validate(:codex,
                  model: "llama3.2",
@@ -236,7 +273,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert model.id == "llama3.2"
       assert model.family == "llama"
       assert model.metadata["backend"] == "ollama"
-      assert model.metadata["loaded"] == true
+      assert model.metadata["support_tier"] == "runtime_validated_only"
     end
   end
 
@@ -291,7 +328,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     {:ok, 200,
      %{
        "models" => [
-         %{"name" => "llama3.2:latest", "model" => "llama3.2:latest"}
+         %{"name" => "gpt-oss:20b", "model" => "gpt-oss:20b"}
        ]
      }}
   end

@@ -47,22 +47,26 @@ defmodule CliSubprocessCore.ModelRegistry.Selection do
     attrs = Enum.into(attrs, %{})
 
     %__MODULE__{
-      provider: Map.get(attrs, :provider),
-      requested_model: Map.get(attrs, :requested_model),
-      resolved_model: Map.get(attrs, :resolved_model),
-      resolution_source: Map.get(attrs, :resolution_source),
-      reasoning: Map.get(attrs, :reasoning),
-      reasoning_effort: Map.get(attrs, :reasoning_effort),
-      normalized_reasoning_effort: Map.get(attrs, :normalized_reasoning_effort),
-      model_family: Map.get(attrs, :model_family),
-      catalog_version: Map.get(attrs, :catalog_version),
-      visibility: Map.get(attrs, :visibility, :public),
-      provider_backend: Map.get(attrs, :provider_backend),
-      model_source: Map.get(attrs, :model_source, :catalog),
-      env_overrides: Map.get(attrs, :env_overrides, %{}),
-      settings_patch: Map.get(attrs, :settings_patch, %{}),
-      backend_metadata: Map.get(attrs, :backend_metadata, %{}),
-      errors: Map.get(attrs, :errors, [])
+      provider: fetch_attr(attrs, :provider),
+      requested_model: fetch_attr(attrs, :requested_model),
+      resolved_model: fetch_attr(attrs, :resolved_model),
+      resolution_source: fetch_attr(attrs, :resolution_source),
+      reasoning: fetch_attr(attrs, :reasoning),
+      reasoning_effort: fetch_attr(attrs, :reasoning_effort),
+      normalized_reasoning_effort: fetch_attr(attrs, :normalized_reasoning_effort),
+      model_family: fetch_attr(attrs, :model_family),
+      catalog_version: fetch_attr(attrs, :catalog_version),
+      visibility: fetch_attr(attrs, :visibility, :public),
+      provider_backend: fetch_attr(attrs, :provider_backend),
+      model_source: fetch_attr(attrs, :model_source, :catalog),
+      env_overrides: fetch_attr(attrs, :env_overrides, %{}),
+      settings_patch: fetch_attr(attrs, :settings_patch, %{}),
+      backend_metadata: fetch_attr(attrs, :backend_metadata, %{}),
+      errors: fetch_attr(attrs, :errors, [])
     }
+  end
+
+  defp fetch_attr(attrs, key, default \\ nil) when is_map(attrs) and is_atom(key) do
+    Map.get(attrs, key, Map.get(attrs, Atom.to_string(key), default))
   end
 end

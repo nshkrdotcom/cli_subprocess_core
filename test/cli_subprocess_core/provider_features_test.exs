@@ -44,6 +44,9 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert codex.supported? == true
     assert codex.activation == %{provider_backend: :oss, oss_provider: "ollama"}
     assert codex.model_strategy == :direct_external
+    assert codex.compatibility.default_model == "gpt-oss:20b"
+    assert codex.compatibility.acceptance == :runtime_validated_external_model
+    assert codex.compatibility.validated_models == ["gpt-oss:20b"]
 
     assert gemini.supported? == false
     assert amp.supported? == false

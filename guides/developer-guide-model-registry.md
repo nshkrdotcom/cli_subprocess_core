@@ -152,6 +152,12 @@ selection.resolved_model
 After that, provider-specific command building can safely use the resolved
 selection without re-deciding the model.
 
+When a caller may receive either raw model knobs or an already-resolved
+selection, use `CliSubprocessCore.ModelInput.normalize/3` as the canonical
+mixed-input boundary. It accepts raw attrs or `model_payload`, validates
+consistency when both are present, and returns normalized attrs with the
+authoritative payload attached.
+
 For Claude/Ollama, a caller can keep canonical Claude names while mapping them
 to an installed external model:
 
@@ -170,7 +176,7 @@ selection.resolved_model
 ```
 
 For Codex local OSS via Ollama, the caller should pass the backend intent into
-the core and let the registry validate the local model:
+the core and let the registry validate that the local model exists:
 
 ```elixir
 {:ok, selection} =
@@ -184,6 +190,16 @@ the core and let the registry validate the local model:
 selection.provider_backend
 # => :oss
 ```
+
+If the local model is not one of Codex's validated defaults, the shared core
+still accepts it. The distinction is carried as metadata rather than as a hard
+rejection.
+
+If the caller also needs a non-default local Ollama endpoint, pass
+`ollama_base_url:` when building the payload. The normalized Codex/Ollama
+payload carries that transport choice in `selection.env_overrides` as
+`CODEX_OSS_BASE_URL`, so downstream CLI renderers and SDK transports can rely
+on the payload alone after normalization.
 
 ## Reviewer Checklist
 
