@@ -1,11 +1,9 @@
 defmodule CliSubprocessCore.Transport.ExecutionSurfaceTest do
   use ExUnit.Case, async: true
 
-  alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.ExecutionSurface
-  alias CliSubprocessCore.Transport.LocalSubprocess
 
-  test "resolves the default local execution surface and normalizes the transport_options lane" do
+  test "resolve/1 keeps adapter-module selection internal while normalizing the transport lane" do
     assert {:ok, resolved} =
              ExecutionSurface.resolve(
                command: "cat",
@@ -13,22 +11,16 @@ defmodule CliSubprocessCore.Transport.ExecutionSurfaceTest do
                transport_options: %{startup_mode: :lazy, stdout_mode: :raw}
              )
 
-    assert resolved.adapter == LocalSubprocess
+    refute Map.has_key?(resolved, :adapter)
+    assert is_function(resolved.dispatch.start, 1)
+    assert is_function(resolved.dispatch.start_link, 1)
+    assert is_function(resolved.dispatch.run, 2)
     assert resolved.surface.surface_kind == :local_subprocess
     assert resolved.surface.target_id == "target-1"
     assert resolved.adapter_options[:command] == "cat"
     assert resolved.adapter_options[:startup_mode] == :lazy
     assert resolved.adapter_options[:stdout_mode] == :raw
     assert resolved.adapter_options[:target_id] == "target-1"
-  end
-
-  test "adapter modules resolved by the surface layer satisfy the transport contract" do
-    assert {:ok, %{adapter: adapter}} = ExecutionSurface.resolve(command: "cat")
-
-    Enum.each(Transport.behaviour_info(:callbacks), fn {name, arity} ->
-      assert function_exported?(adapter, name, arity),
-             "#{inspect(adapter)} is missing #{name}/#{arity}"
-    end)
   end
 
   test "rejects unsupported surface kinds before adapter startup" do

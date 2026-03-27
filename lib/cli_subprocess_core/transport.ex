@@ -28,12 +28,14 @@ defmodule CliSubprocessCore.Transport do
   replayed in order.
   """
 
-  alias CliSubprocessCore.{Command, ProcessExit, Transport.Error}
+  alias CliSubprocessCore.{Command, ProcessExit, TaskSupport, Transport.Error}
   alias CliSubprocessCore.Transport.Delivery
   alias CliSubprocessCore.Transport.ExecutionSurface
   alias CliSubprocessCore.Transport.Info
-  alias CliSubprocessCore.Transport.LocalSubprocess
   alias CliSubprocessCore.Transport.RunResult
+
+  @default_call_timeout_ms 5_000
+  @default_force_close_timeout_ms 5_000
 
   @typedoc "Opaque transport reference."
   @type t :: pid()
@@ -91,8 +93,8 @@ defmodule CliSubprocessCore.Transport do
   @spec start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start(opts) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
-        adapter.start(adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
+        dispatch.start.(adapter_options)
 
       {:error, reason} ->
         transport_error(reason)
@@ -105,8 +107,8 @@ defmodule CliSubprocessCore.Transport do
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start_link(opts) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
-        adapter.start_link(adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
+        dispatch.start_link.(adapter_options)
 
       {:error, reason} ->
         transport_error(reason)
@@ -120,8 +122,8 @@ defmodule CliSubprocessCore.Transport do
   @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
   def run(%Command{} = command, opts \\ []) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{adapter: adapter, adapter_options: adapter_options}} ->
-        adapter.run(command, adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
+        dispatch.run.(command, adapter_options)
 
       {:error, reason} ->
         transport_error(reason)
@@ -132,49 +134,98 @@ defmodule CliSubprocessCore.Transport do
   Sends data to the subprocess stdin.
   """
   @spec send(t(), iodata() | map() | list()) :: :ok | {:error, {:transport, Error.t()}}
-  def send(transport, message), do: LocalSubprocess.send(transport, message)
+  def send(transport, message) when is_pid(transport) do
+    case safe_call(transport, {:send, message}) do
+      {:ok, result} -> result
+      {:error, reason} -> transport_error(reason)
+    end
+  end
 
   @doc """
   Subscribes the caller in legacy mode.
   """
   @spec subscribe(t(), pid()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid), do: LocalSubprocess.subscribe(transport, pid)
+  def subscribe(transport, pid) when is_pid(transport) and is_pid(pid) do
+    subscribe(transport, pid, :legacy)
+  end
 
   @doc """
   Subscribes a process with an explicit tag mode.
   """
   @spec subscribe(t(), pid(), subscription_tag()) :: :ok | {:error, {:transport, Error.t()}}
-  def subscribe(transport, pid, tag), do: LocalSubprocess.subscribe(transport, pid, tag)
+  def subscribe(transport, pid, tag)
+      when is_pid(transport) and is_pid(pid) and (tag == :legacy or is_reference(tag)) do
+    case safe_call(transport, {:subscribe, pid, tag}) do
+      {:ok, result} -> result
+      {:error, reason} -> transport_error(reason)
+    end
+  end
+
+  def subscribe(_transport, _pid, tag) do
+    transport_error(Error.invalid_options({:invalid_subscriber, tag}))
+  end
 
   @doc """
   Removes a subscriber.
   """
   @spec unsubscribe(t(), pid()) :: :ok
-  def unsubscribe(transport, pid), do: LocalSubprocess.unsubscribe(transport, pid)
+  def unsubscribe(transport, pid) when is_pid(transport) and is_pid(pid) do
+    case safe_call(transport, {:unsubscribe, pid}) do
+      {:ok, :ok} -> :ok
+      {:error, _reason} -> :ok
+    end
+  end
 
   @doc """
   Stops the transport.
   """
   @spec close(t()) :: :ok
-  def close(transport), do: LocalSubprocess.close(transport)
+  def close(transport) when is_pid(transport) do
+    GenServer.stop(transport, :normal)
+  catch
+    :exit, {:noproc, _} -> :ok
+    :exit, :noproc -> :ok
+  end
 
   @doc """
   Forces the subprocess down immediately.
   """
   @spec force_close(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def force_close(transport), do: LocalSubprocess.force_close(transport)
+  def force_close(transport) when is_pid(transport) do
+    case safe_call(transport, :force_close, @default_force_close_timeout_ms) do
+      {:ok, result} ->
+        normalize_call_result(result)
+
+      {:error, reason} ->
+        transport_error(reason)
+    end
+  end
 
   @doc """
   Sends SIGINT to the subprocess.
   """
   @spec interrupt(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def interrupt(transport), do: LocalSubprocess.interrupt(transport)
+  def interrupt(transport) when is_pid(transport) do
+    case safe_call(transport, :interrupt) do
+      {:ok, result} ->
+        normalize_call_result(result)
+
+      {:error, reason} ->
+        transport_error(reason)
+    end
+  end
 
   @doc """
   Returns transport connectivity status.
   """
   @spec status(t()) :: :connected | :disconnected | :error
-  def status(transport), do: LocalSubprocess.status(transport)
+  def status(transport) when is_pid(transport) do
+    case safe_call(transport, :status) do
+      {:ok, status} when status in [:connected, :disconnected, :error] -> status
+      {:ok, _other} -> :error
+      {:error, _reason} -> :disconnected
+    end
+  end
 
   @doc """
   Closes stdin for EOF-driven CLIs.
@@ -183,19 +234,34 @@ defmodule CliSubprocessCore.Transport do
   EOF byte (`Ctrl-D`).
   """
   @spec end_input(t()) :: :ok | {:error, {:transport, Error.t()}}
-  def end_input(transport), do: LocalSubprocess.end_input(transport)
+  def end_input(transport) when is_pid(transport) do
+    case safe_call(transport, :end_input) do
+      {:ok, result} -> result
+      {:error, reason} -> transport_error(reason)
+    end
+  end
 
   @doc """
   Returns the stderr ring buffer tail.
   """
   @spec stderr(t()) :: binary()
-  def stderr(transport), do: LocalSubprocess.stderr(transport)
+  def stderr(transport) when is_pid(transport) do
+    case safe_call(transport, :stderr) do
+      {:ok, data} when is_binary(data) -> data
+      _ -> ""
+    end
+  end
 
   @doc """
   Returns the current transport metadata snapshot.
   """
   @spec info(t()) :: Info.t()
-  def info(transport), do: LocalSubprocess.info(transport)
+  def info(transport) when is_pid(transport) do
+    case safe_call(transport, :info) do
+      {:ok, %Info{} = info} -> info
+      _other -> Info.disconnected()
+    end
+  end
 
   @doc """
   Extracts a normalized transport event from a legacy mailbox message.
@@ -235,12 +301,59 @@ defmodule CliSubprocessCore.Transport do
     end
   end
 
-  defp transport_error(reason), do: {:error, {:transport, Error.transport_error(reason)}}
-
   defp extract_tagged_event({:message, line}) when is_binary(line), do: {:ok, {:message, line}}
   defp extract_tagged_event({:data, chunk}) when is_binary(chunk), do: {:ok, {:data, chunk}}
   defp extract_tagged_event({:error, %Error{} = error}), do: {:ok, {:error, error}}
   defp extract_tagged_event({:stderr, chunk}) when is_binary(chunk), do: {:ok, {:stderr, chunk}}
   defp extract_tagged_event({:exit, %ProcessExit{} = exit}), do: {:ok, {:exit, exit}}
   defp extract_tagged_event(_event), do: :error
+
+  defp safe_call(transport, message, timeout \\ @default_call_timeout_ms)
+
+  defp safe_call(transport, message, timeout)
+       when is_pid(transport) and is_integer(timeout) and timeout >= 0 do
+    case TaskSupport.async_nolink(fn ->
+           try do
+             {:ok, GenServer.call(transport, message, :infinity)}
+           catch
+             :exit, reason -> {:error, normalize_call_exit(reason)}
+           end
+         end) do
+      {:ok, task} ->
+        await_task_result(task, timeout)
+
+      {:error, reason} ->
+        {:error, normalize_call_task_start_error(reason)}
+    end
+  end
+
+  defp await_task_result(task, timeout) do
+    case TaskSupport.await(task, timeout, :brutal_kill) do
+      {:ok, result} -> result
+      {:exit, reason} -> {:error, normalize_call_exit(reason)}
+      {:error, :timeout} -> {:error, Error.timeout()}
+    end
+  end
+
+  defp normalize_call_task_start_error(:noproc), do: Error.transport_stopped()
+  defp normalize_call_task_start_error(reason), do: Error.call_exit(reason)
+
+  defp normalize_call_exit({:noproc, _}), do: Error.not_connected()
+  defp normalize_call_exit(:noproc), do: Error.not_connected()
+  defp normalize_call_exit({:normal, _}), do: Error.not_connected()
+  defp normalize_call_exit({:shutdown, _}), do: Error.not_connected()
+  defp normalize_call_exit({:timeout, _}), do: Error.timeout()
+  defp normalize_call_exit(reason), do: Error.call_exit(reason)
+
+  defp normalize_call_result(:ok), do: :ok
+  defp normalize_call_result({:error, {:transport, %Error{}}} = error), do: error
+  defp normalize_call_result({:error, %Error{} = error}), do: transport_error(error)
+  defp normalize_call_result({:error, reason}), do: transport_error(reason)
+
+  defp normalize_call_result(other),
+    do: transport_error(Error.transport_error({:unexpected_task_result, other}))
+
+  defp transport_error({:transport, %Error{}} = error), do: {:error, error}
+  defp transport_error(%Error{} = error), do: {:error, {:transport, error}}
+  defp transport_error(reason), do: {:error, {:transport, Error.transport_error(reason)}}
 end

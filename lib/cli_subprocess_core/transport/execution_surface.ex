@@ -56,8 +56,14 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
 
   @type resolution_error :: {:unsupported_surface_kind, surface_kind()}
 
+  @type dispatch :: %{
+          start: function(),
+          start_link: function(),
+          run: function()
+        }
+
   @type resolved :: %{
-          adapter: module(),
+          dispatch: dispatch(),
           adapter_options: keyword(),
           surface: t()
         }
@@ -102,7 +108,7 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
          :ok <- ensure_adapter_loaded(adapter) do
       {:ok,
        %{
-         adapter: adapter,
+         dispatch: adapter_dispatch(adapter),
          adapter_options:
            opts
            |> Keyword.drop(@reserved_keys)
@@ -161,6 +167,14 @@ defmodule CliSubprocessCore.Transport.ExecutionSurface do
 
   defp resolve_adapter(:local_subprocess), do: {:ok, LocalSubprocess}
   defp resolve_adapter(surface_kind), do: {:error, {:unsupported_surface_kind, surface_kind}}
+
+  defp adapter_dispatch(adapter) when is_atom(adapter) do
+    %{
+      start: &adapter.start/1,
+      start_link: &adapter.start_link/1,
+      run: &adapter.run/2
+    }
+  end
 
   defp ensure_adapter_loaded(adapter) when is_atom(adapter) do
     if Code.ensure_loaded?(adapter) do
