@@ -334,9 +334,7 @@ defmodule CliSubprocessCore.ProtocolSession do
         {:noreply, state}
 
       {%{task: task, timer_ref: timer_ref, correlation_key: correlation_key}, rest} ->
-        _ = Process.cancel_timer(timer_ref)
-        _ = Task.shutdown(task, :brutal_kill)
-        Process.demonitor(task.ref, [:flush])
+        :ok = cancel_peer_request_task(task, timer_ref)
 
         case send_peer_reply(%{state | peer_requests: rest}, correlation_key, {:error, :timeout}) do
           {:ok, next_state} -> {:noreply, next_state}
@@ -689,14 +687,20 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   defp cancel_peer_request_timers(peer_requests) do
     Enum.each(peer_requests, fn {_ref, %{task: task, timer_ref: timer_ref}} ->
-      _ = Process.cancel_timer(timer_ref)
-      _ = Task.shutdown(task, :brutal_kill)
-      Process.demonitor(task.ref, [:flush])
+      :ok = cancel_peer_request_task(task, timer_ref)
     end)
   end
 
   defp cancel_startup_timer(nil), do: :ok
   defp cancel_startup_timer(timer_ref), do: Process.cancel_timer(timer_ref)
+
+  @spec cancel_peer_request_task(Task.t(), reference()) :: :ok
+  defp cancel_peer_request_task(%Task{} = task, timer_ref) when is_reference(timer_ref) do
+    _ = Process.cancel_timer(timer_ref)
+    _ = Task.shutdown(task, :brutal_kill)
+    _ = Process.demonitor(task.ref, [:flush])
+    :ok
+  end
 
   defp session_info(state) do
     %{
