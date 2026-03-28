@@ -698,7 +698,6 @@ defmodule CliSubprocessCore.ProtocolSession do
   defp cancel_peer_request_task(%Task{} = task, timer_ref) when is_reference(timer_ref) do
     _ = Process.cancel_timer(timer_ref)
     _ = safe_shutdown_task(task)
-    _ = safe_demonitor(task.ref)
     :ok
   end
 
@@ -708,15 +707,6 @@ defmodule CliSubprocessCore.ProtocolSession do
       Task.shutdown(task, :brutal_kill)
     catch
       :exit, reason -> {:exit, reason}
-    end
-  end
-
-  @spec safe_demonitor(reference()) :: boolean()
-  defp safe_demonitor(ref) when is_reference(ref) do
-    try do
-      Process.demonitor(ref, [:flush])
-    catch
-      :error, :badarg -> false
     end
   end
 
