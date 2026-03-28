@@ -71,6 +71,42 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
     assert FakeSSH.read_manifest!(fake_ssh) =~ "destination=protocol.test.example"
   end
 
+  test "peer request notifier preserves inbound ordering relative to later notifications" do
+    test_pid = self()
+
+    {:ok, session} =
+      start_protocol_session(
+        fn _request ->
+          Process.sleep(50)
+          {:ok, %{"ack" => true}}
+        end,
+        peer_request_notifier: fn correlation_key, request ->
+          send(test_pid, {:peer_request_notified, correlation_key, request["method"]})
+        end
+      )
+
+    on_exit(fn -> ProtocolSession.close(session) end)
+
+    assert :ok = ProtocolSession.await_ready(session, 1_000)
+    assert_receive {:protocol_notification, %{"method" => "server_ready"}}, 1_000
+
+    task =
+      Task.async(fn ->
+        ProtocolSession.request(session, %{
+          method: "trigger_peer_and_notice",
+          params: %{id: "peer-order", method: "client.echo", params: %{"value" => "pong"}}
+        })
+      end)
+
+    assert_receive {:peer_request_notified, "peer-order", "client.echo"}, 1_000
+
+    assert_receive {:protocol_notification,
+                    %{"method" => "after_peer", "params" => %{"id" => "peer-order"}}},
+                   1_000
+
+    assert {:ok, %{"peer_reply" => %{"result" => %{"ack" => true}}}} = Task.await(task, 1_000)
+  end
+
   test "peer request handler error replies at the protocol level and keeps the session alive" do
     assert_peer_request_failure(
       fn _request -> {:error, %{"code" => -32_011, "message" => "denied"}} end,
@@ -225,6 +261,18 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
                       "params": peer.get("params", {}),
                   }
               )
+              reply = json.loads(sys.stdin.readline())
+              send({"id": message["id"], "result": {"peer_reply": reply}})
+          elif message.get("method") == "trigger_peer_and_notice":
+              peer = message.get("params", {})
+              send(
+                  {
+                      "id": peer.get("id", "peer-1"),
+                      "method": peer.get("method", "client.echo"),
+                      "params": peer.get("params", {}),
+                  }
+              )
+              send({"method": "after_peer", "params": {"id": peer.get("id", "peer-1")}})
               reply = json.loads(sys.stdin.readline())
               send({"id": message["id"], "result": {"peer_reply": reply}})
           elif message.get("method") == "shutdown":

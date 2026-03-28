@@ -35,6 +35,7 @@ defmodule CliSubprocessCore.ProtocolSession do
     :notification_handler,
     :protocol_error_handler,
     :stderr_handler,
+    :peer_request_notifier,
     :peer_request_handler
   ]
 
@@ -57,6 +58,7 @@ defmodule CliSubprocessCore.ProtocolSession do
             notification_handler: nil,
             protocol_error_handler: nil,
             stderr_handler: nil,
+            peer_request_notifier: nil,
             peer_request_handler: nil
 
   @type t :: pid()
@@ -187,6 +189,8 @@ defmodule CliSubprocessCore.ProtocolSession do
          :ok <-
            validate_handler(Keyword.get(opts, :protocol_error_handler), :protocol_error_handler),
          :ok <- validate_handler(Keyword.get(opts, :stderr_handler), :stderr_handler),
+         :ok <-
+           validate_handler(Keyword.get(opts, :peer_request_notifier), :peer_request_notifier, 2),
          :ok <- validate_handler(Keyword.get(opts, :peer_request_handler), :peer_request_handler),
          {:ok, channel, channel_ref} <- start_channel(opts) do
       state = %__MODULE__{
@@ -208,6 +212,7 @@ defmodule CliSubprocessCore.ProtocolSession do
         notification_handler: Keyword.get(opts, :notification_handler),
         protocol_error_handler: Keyword.get(opts, :protocol_error_handler),
         stderr_handler: Keyword.get(opts, :stderr_handler),
+        peer_request_notifier: Keyword.get(opts, :peer_request_notifier),
         peer_request_handler: Keyword.get(opts, :peer_request_handler)
       }
 
@@ -471,6 +476,7 @@ defmodule CliSubprocessCore.ProtocolSession do
   end
 
   defp process_inbound_event({:peer_request, correlation_key, request}, state) do
+    safe_invoke_handler(state.peer_request_notifier, correlation_key, request)
     {:ok, dispatch_peer_request(state, correlation_key, request)}
   end
 
@@ -735,9 +741,11 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   defp validate_timeout(timeout_ms, label), do: {:error, {label, timeout_ms}}
 
-  defp validate_handler(nil, _label), do: :ok
-  defp validate_handler(handler, _label) when is_function(handler, 1), do: :ok
-  defp validate_handler(handler, label), do: {:error, {label, handler}}
+  defp validate_handler(handler, label), do: validate_handler(handler, label, 1)
+
+  defp validate_handler(nil, _label, _arity), do: :ok
+  defp validate_handler(handler, _label, arity) when is_function(handler, arity), do: :ok
+  defp validate_handler(handler, label, _arity), do: {:error, {label, handler}}
 
   defp normalize_ready_mode(nil, startup_requests) when is_list(startup_requests) do
     if startup_requests == [], do: {:ok, :immediate}, else: {:ok, :startup_complete}
@@ -753,6 +761,15 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   defp safe_invoke_handler(handler, value) when is_function(handler, 1) do
     handler.(value)
+    :ok
+  catch
+    _, _ -> :ok
+  end
+
+  defp safe_invoke_handler(nil, _value, _other), do: :ok
+
+  defp safe_invoke_handler(handler, value, other) when is_function(handler, 2) do
+    handler.(value, other)
     :ok
   catch
     _, _ -> :ok
