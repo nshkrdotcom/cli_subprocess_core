@@ -9,11 +9,11 @@ TAG_FILTER=()
 
 ALL_REPOS=(
   "cli_subprocess_core"
-  "agent_session_manager"
   "codex_sdk"
   "gemini_cli_sdk"
   "claude_agent_sdk"
   "amp_sdk"
+  "agent_session_manager"
 )
 
 ALL_TASKS=(
