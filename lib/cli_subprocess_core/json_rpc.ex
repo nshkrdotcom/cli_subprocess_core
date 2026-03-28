@@ -88,7 +88,13 @@ defmodule CliSubprocessCore.JSONRPC do
       id = Map.get(request, :id) || Map.get(request, "id") || next_id
 
       if is_binary(method) do
-        {:ok, id, put_optional(%{"id" => id, "method" => method}, "params", params)}
+        base =
+          request
+          |> Map.new(fn {key, value} -> {to_string(key), value} end)
+          |> Map.put("id", id)
+          |> Map.put("method", method)
+
+        {:ok, id, put_optional(base, "params", params)}
       else
         {:error, {:invalid_request, request}}
       end
@@ -109,7 +115,12 @@ defmodule CliSubprocessCore.JSONRPC do
       params = Map.get(notification, :params) || Map.get(notification, "params")
 
       if is_binary(method) do
-        {:ok, put_optional(%{"method" => method}, "params", params)}
+        base =
+          notification
+          |> Map.new(fn {key, value} -> {to_string(key), value} end)
+          |> Map.put("method", method)
+
+        {:ok, put_optional(base, "params", params)}
       else
         {:error, {:invalid_notification, notification}}
       end

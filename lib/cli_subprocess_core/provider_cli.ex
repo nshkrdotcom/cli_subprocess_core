@@ -872,7 +872,4 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp reason_message(env_var, value, :node_not_found),
     do: "#{env_var} points to a JavaScript launcher but node could not be found: #{value}"
-
-  defp reason_message(env_var, value, reason),
-    do: "#{env_var} could not be resolved from #{value}: #{inspect(reason)}"
 end
