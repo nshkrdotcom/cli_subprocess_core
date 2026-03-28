@@ -9,6 +9,9 @@ defmodule CliSubprocessCore.JSONRPC do
 
   alias CliSubprocessCore.ProtocolSession
 
+  @type t :: ProtocolSession.t()
+  @type info_t :: ProtocolSession.info_t()
+
   defmodule Adapter do
     @moduledoc false
 
@@ -218,7 +221,7 @@ defmodule CliSubprocessCore.JSONRPC do
   @doc """
   Starts an unlinked JSON-RPC session.
   """
-  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  @spec start(keyword()) :: {:ok, t()} | {:error, term()}
   def start(opts) when is_list(opts) do
     ProtocolSession.start(protocol_session_opts(opts))
   end
@@ -234,13 +237,13 @@ defmodule CliSubprocessCore.JSONRPC do
   @doc """
   Waits for the JSON-RPC session to become ready.
   """
-  @spec await_ready(pid(), pos_integer()) :: :ok | {:error, term()}
+  @spec await_ready(t(), pos_integer()) :: :ok | {:error, term()}
   def await_ready(session, timeout_ms), do: ProtocolSession.await_ready(session, timeout_ms)
 
   @doc """
   Sends a JSON-RPC request.
   """
-  @spec request(pid(), String.t(), map() | list() | nil, keyword()) ::
+  @spec request(t(), String.t(), map() | list() | nil, keyword()) ::
           {:ok, term()} | {:error, term()}
   def request(session, method, params \\ nil, opts \\ [])
       when is_pid(session) and is_binary(method) and is_list(opts) do
@@ -250,7 +253,7 @@ defmodule CliSubprocessCore.JSONRPC do
   @doc """
   Sends a JSON-RPC notification.
   """
-  @spec notify(pid(), String.t(), map() | list() | nil) :: :ok | {:error, term()}
+  @spec notify(t(), String.t(), map() | list() | nil) :: :ok | {:error, term()}
   def notify(session, method, params \\ nil) when is_pid(session) and is_binary(method) do
     ProtocolSession.notify(session, %{method: method, params: params})
   end
@@ -258,19 +261,19 @@ defmodule CliSubprocessCore.JSONRPC do
   @doc """
   Interrupts the underlying session.
   """
-  @spec interrupt(pid()) :: :ok | {:error, term()}
+  @spec interrupt(t()) :: :ok | {:error, term()}
   def interrupt(session), do: ProtocolSession.interrupt(session)
 
   @doc """
   Stops the JSON-RPC session.
   """
-  @spec close(pid()) :: :ok
+  @spec close(t()) :: :ok
   def close(session), do: ProtocolSession.close(session)
 
   @doc """
   Returns JSON-RPC session information.
   """
-  @spec info(pid()) :: map()
+  @spec info(t()) :: info_t()
   def info(session), do: ProtocolSession.info(session)
 
   defp protocol_session_opts(opts) do

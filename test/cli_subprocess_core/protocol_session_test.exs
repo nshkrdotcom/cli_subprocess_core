@@ -1,6 +1,8 @@
 defmodule CliSubprocessCore.ProtocolSessionTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias CliSubprocessCore.ProtocolSession
   alias CliSubprocessCore.TestSupport
   alias CliSubprocessCore.TestSupport.FakeSSH
@@ -81,29 +83,43 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
   end
 
   test "peer request handler throw replies at the protocol level and keeps the session alive" do
-    assert_peer_request_failure(
-      fn _request -> throw(:boom) end,
-      fn reply ->
-        assert %{
-                 "error" => %{"code" => -32_000, "message" => "peer request handler exited"},
-                 "id" => "peer-failure"
-               } = reply
-      end,
-      peer_request_timeout_ms: 50
-    )
+    log =
+      capture_log(fn ->
+        assert_peer_request_failure(
+          fn _request -> throw(:boom) end,
+          fn reply ->
+            assert %{
+                     "error" => %{"code" => -32_000, "message" => "peer request handler exited"},
+                     "id" => "peer-failure"
+                   } = reply
+          end,
+          peer_request_timeout_ms: 50
+        )
+      end)
+
+    assert log =~ "Task #PID<"
+    assert log =~ "terminating"
+    assert log =~ "{:nocatch, :boom}"
   end
 
   test "peer request handler exit replies at the protocol level and keeps the session alive" do
-    assert_peer_request_failure(
-      fn _request -> exit(:boom) end,
-      fn reply ->
-        assert %{
-                 "error" => %{"code" => -32_000, "message" => "peer request handler exited"},
-                 "id" => "peer-failure"
-               } = reply
-      end,
-      peer_request_timeout_ms: 50
-    )
+    log =
+      capture_log(fn ->
+        assert_peer_request_failure(
+          fn _request -> exit(:boom) end,
+          fn reply ->
+            assert %{
+                     "error" => %{"code" => -32_000, "message" => "peer request handler exited"},
+                     "id" => "peer-failure"
+                   } = reply
+          end,
+          peer_request_timeout_ms: 50
+        )
+      end)
+
+    assert log =~ "Task #PID<"
+    assert log =~ "terminating"
+    assert log =~ "** (stop) :boom"
   end
 
   test "peer request handler timeout replies at the protocol level and keeps the session alive" do
