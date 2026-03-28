@@ -3,8 +3,7 @@ defmodule CliSubprocessCore.Transport.Options do
   Normalized startup options for the raw transport layer.
   """
 
-  alias CliSubprocessCore.{Command, Transport}
-  alias CliSubprocessCore.Transport.ExecutionSurface
+  alias CliSubprocessCore.{Command, ExecutionSurface, Transport}
 
   @default_event_tag :cli_subprocess_core
   @default_headless_timeout_ms 30_000

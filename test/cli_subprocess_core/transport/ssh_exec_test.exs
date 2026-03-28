@@ -3,14 +3,15 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.ProcessExit
+  alias CliSubprocessCore.TestSupport.FakeSSH
   alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.Error
   alias CliSubprocessCore.Transport.RunResult
 
   test "start/1 streams over the SSH surface and exposes generic plus adapter metadata" do
     ref = make_ref()
-    manifest_path = temp_path!("manifest.txt")
-    ssh_path = create_fake_ssh!(manifest_path)
+    fake_ssh = FakeSSH.new!()
+    on_exit(fn -> FakeSSH.cleanup(fake_ssh) end)
 
     script =
       create_test_script("""
@@ -27,7 +28,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
                surface_kind: :static_ssh,
                target_id: "ssh-target-1",
                transport_options: [
-                 ssh_path: ssh_path,
+                 ssh_path: fake_ssh.ssh_path,
                  destination: "ssh.test.example",
                  port: 2222,
                  ssh_options: [BatchMode: "yes"]
@@ -39,7 +40,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
     assert info.target_id == "ssh-target-1"
     assert info.adapter_metadata.destination == "ssh.test.example"
     assert info.adapter_metadata.port == 2222
-    assert info.adapter_metadata.ssh_path == ssh_path
+    assert info.adapter_metadata.ssh_path == fake_ssh.ssh_path
 
     assert :ok = Transport.send(transport, "alpha")
     assert :ok = Transport.end_input(transport)
@@ -49,18 +50,18 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
     assert_receive {:cli_subprocess_core, ^ref, {:exit, %ProcessExit{status: :success, code: 0}}},
                    2_000
 
-    assert wait_until(fn -> File.exists?(manifest_path) end, 1_000) == :ok
+    assert FakeSSH.wait_until_written(fake_ssh, 1_000) == :ok
 
-    manifest = File.read!(manifest_path)
+    manifest = FakeSSH.read_manifest!(fake_ssh)
     assert manifest =~ "destination=ssh.test.example"
     assert manifest =~ "port=2222"
   end
 
   test "interrupt/1 propagates through the SSH surface" do
     ref = make_ref()
-    manifest_path = temp_path!("interrupt_manifest.txt")
     ready_path = temp_path!("interrupt_ready.txt")
-    ssh_path = create_fake_ssh!(manifest_path)
+    fake_ssh = FakeSSH.new!()
+    on_exit(fn -> FakeSSH.cleanup(fake_ssh) end)
 
     script =
       create_test_script("""
@@ -79,12 +80,12 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
                lease_ref: "lease-1",
                surface_ref: "surface-1",
                transport_options: [
-                 ssh_path: ssh_path,
+                 ssh_path: fake_ssh.ssh_path,
                  destination: "leased.test.example"
                ]
              )
 
-    assert wait_until(fn -> File.exists?(manifest_path) end, 1_000) == :ok
+    assert FakeSSH.wait_until_written(fake_ssh, 1_000) == :ok
     assert wait_until(fn -> File.exists?(ready_path) end, 1_000) == :ok
     assert :ok = Transport.interrupt(transport)
 
@@ -95,8 +96,8 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
   end
 
   test "run/2 captures exact stdout, stderr, and exit data over SSHExec" do
-    manifest_path = temp_path!("run_manifest.txt")
-    ssh_path = create_fake_ssh!(manifest_path)
+    fake_ssh = FakeSSH.new!()
+    on_exit(fn -> FakeSSH.cleanup(fake_ssh) end)
 
     script =
       create_test_script("""
@@ -111,7 +112,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
                stderr: :separate,
                surface_kind: :static_ssh,
                transport_options: [
-                 ssh_path: ssh_path,
+                 ssh_path: fake_ssh.ssh_path,
                  destination: "run.test.example"
                ]
              )
@@ -128,78 +129,6 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
              Transport.start(command: "cat", surface_kind: :static_ssh)
 
     assert error.reason == {:invalid_options, {:missing_ssh_destination, nil}}
-  end
-
-  defp create_fake_ssh!(manifest_path) do
-    dir =
-      Path.join(
-        System.tmp_dir!(),
-        "cli_subprocess_core_fake_ssh_#{System.unique_integer([:positive])}"
-      )
-
-    File.mkdir_p!(dir)
-
-    path = Path.join(dir, "ssh")
-
-    File.write!(path, """
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    destination=""
-    port=""
-    user=""
-    ssh_opts=()
-
-    while [ "$#" -gt 0 ]; do
-      case "$1" in
-        -p)
-          port="$2"
-          shift 2
-          ;;
-        -l)
-          user="$2"
-          shift 2
-          ;;
-        -o)
-          ssh_opts+=("$2")
-          shift 2
-          ;;
-        --)
-          shift
-          break
-          ;;
-        -*)
-          ssh_opts+=("$1")
-          shift
-          ;;
-        *)
-          destination="$1"
-          shift
-          break
-          ;;
-      esac
-    done
-
-    remote_command="${1:-}"
-
-    cat > "#{manifest_path}" <<EOF
-    destination=${destination}
-    port=${port}
-    user=${user}
-    options=${ssh_opts[*]:-}
-    remote_command=${remote_command}
-    EOF
-
-    exec /bin/sh -lc "$remote_command"
-    """)
-
-    File.chmod!(path, 0o755)
-
-    on_exit(fn ->
-      File.rm_rf!(dir)
-    end)
-
-    path
   end
 
   defp create_test_script(body) do
@@ -245,8 +174,8 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
   end
 
   defp wait_until(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
-    deadline = System.monotonic_time(:millisecond) + timeout_ms
-    do_wait_until(fun, deadline)
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+    do_wait_until(fun, deadline_ms)
   end
 
   defp do_wait_until(fun, deadline_ms) do

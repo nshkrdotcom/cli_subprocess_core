@@ -3,10 +3,9 @@ defmodule CliSubprocessCore.Transport.Info do
   Snapshot of a long-lived transport's execution-surface metadata and IO contract.
   """
 
-  alias CliSubprocessCore.Command
+  alias CliSubprocessCore.{Command, ExecutionSurface}
   alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.Delivery
-  alias CliSubprocessCore.Transport.ExecutionSurface
 
   defstruct invocation: nil,
             pid: nil,

@@ -28,15 +28,20 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   @type resolve_opt ::
-          {:default_command, String.t()}
+          {:allow_js_entrypoint, boolean()}
+          | {:default_command, String.t()}
           | {:display_name, String.t()}
           | {:env_var, String.t() | nil}
           | {:extra_keys, [atom()]}
           | {:install_hint, String.t() | nil}
+          | {:known_locations, [String.t()]}
+          | {:known_locations_first?, boolean()}
+          | {:node_command, String.t()}
           | {:npm_global_bin, String.t() | nil}
           | {:npx_command, String.t() | nil}
           | {:npx_disable_env, String.t() | nil}
           | {:npx_package, String.t() | nil}
+          | {:path_candidates, [String.t()]}
           | {:resolution_cwd, String.t() | nil}
 
   @provider_settings %{
@@ -45,40 +50,53 @@ defmodule CliSubprocessCore.ProviderCLI do
       display_name: "Amp CLI",
       env_var: "AMP_CLI_PATH",
       install_hint: "npm install -g @sourcegraph/amp",
+      allow_js_entrypoint: true,
+      known_locations_first?: true,
+      node_command: "node",
       npm_global_bin: nil,
       npx_command: nil,
       npx_disable_env: nil,
-      npx_package: nil
+      npx_package: nil,
+      path_candidates: ["amp"]
     },
     claude: %{
-      default_command: "claude",
+      default_command: "claude-code",
       display_name: "Claude CLI",
       env_var: "CLAUDE_CLI_PATH",
       install_hint: "npm install -g @anthropic-ai/claude-code",
+      allow_js_entrypoint: false,
+      node_command: "node",
       npm_global_bin: nil,
       npx_command: nil,
       npx_disable_env: nil,
-      npx_package: nil
+      npx_package: nil,
+      path_candidates: ["claude-code", "claude"]
     },
     codex: %{
       default_command: "codex",
       display_name: "Codex CLI",
       env_var: "CODEX_PATH",
       install_hint: "npm install -g @openai/codex",
+      allow_js_entrypoint: false,
+      node_command: "node",
       npm_global_bin: nil,
       npx_command: nil,
       npx_disable_env: nil,
-      npx_package: nil
+      npx_package: nil,
+      path_candidates: ["codex"]
     },
     gemini: %{
       default_command: "gemini",
       display_name: "Gemini CLI",
       env_var: "GEMINI_CLI_PATH",
       install_hint: "npm install -g @google/gemini-cli",
+      allow_js_entrypoint: false,
+      node_command: "node",
       npm_global_bin: "gemini",
       npx_command: "gemini",
       npx_disable_env: "GEMINI_NO_NPX",
-      npx_package: "@google/gemini-cli"
+      npx_package: "@google/gemini-cli",
+      path_candidates: ["gemini"]
     }
   }
   @env_launchers ["/usr/bin/env", "/bin/env", "env"]
@@ -111,6 +129,11 @@ defmodule CliSubprocessCore.ProviderCLI do
       base_settings
       |> Map.merge(Map.new(opts))
       |> Map.put_new(:extra_keys, [])
+      |> Map.put_new_lazy(:path_candidates, fn -> [Map.get(base_settings, :default_command)] end)
+      |> Map.put_new_lazy(:known_locations, fn -> default_known_locations(provider) end)
+      |> Map.put_new(:known_locations_first?, false)
+      |> Map.put_new(:allow_js_entrypoint, false)
+      |> Map.put_new(:node_command, "node")
       |> Map.put_new_lazy(:resolution_cwd, &File.cwd!/0)
       |> Map.put(:provider, provider)
 
@@ -129,9 +152,16 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp resolve_spec(provider_opts, settings) do
+    path_steps =
+      if Map.get(settings, :known_locations_first?, false) do
+        [&known_location_lookup/1, &path_lookup/1]
+      else
+        [&path_lookup/1, &known_location_lookup/1]
+      end
+
     with :miss <- explicit_override(provider_opts, settings),
          :miss <- env_override(settings),
-         :miss <- path_lookup(settings.default_command),
+         :miss <- run_lookup_steps(path_steps, settings),
          :miss <- npm_global_lookup(settings),
          :miss <- npx_lookup(settings) do
       {:error, cli_not_found(settings.provider, settings)}
@@ -162,8 +192,8 @@ defmodule CliSubprocessCore.ProviderCLI do
     end)
   end
 
-  defp explicit_string_override(value, _settings) when is_binary(value) do
-    case explicit_path(value) do
+  defp explicit_string_override(value, settings) when is_binary(value) do
+    case explicit_path(value, settings) do
       {:ok, %CommandSpec{} = spec} -> {:ok, spec}
       :miss -> {:ok, CommandSpec.new(value)}
       {:error, _reason} = error -> error
@@ -197,15 +227,15 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp env_override(_settings), do: :miss
 
-  defp env_string_override(value, _settings) when is_binary(value) do
-    case explicit_path(value) do
+  defp env_string_override(value, settings) when is_binary(value) do
+    case explicit_path(value, settings) do
       {:ok, %CommandSpec{} = spec} ->
         {:ok, spec}
 
       :miss ->
-        case System.find_executable(value) do
+        case find_executable_candidate(value, settings) do
           nil -> {:error, :missing}
-          path -> {:ok, CommandSpec.new(path)}
+          path -> explicit_path(path, settings)
         end
 
       {:error, _reason} = error ->
@@ -213,23 +243,44 @@ defmodule CliSubprocessCore.ProviderCLI do
     end
   end
 
-  defp path_lookup(command) when is_binary(command) and command != "" do
-    case System.find_executable(command) do
-      nil -> :miss
-      path -> {:ok, CommandSpec.new(path)}
-    end
+  defp path_lookup(%{path_candidates: candidates} = settings) when is_list(candidates) do
+    Enum.find_value(candidates, :miss, fn
+      candidate when is_binary(candidate) and candidate != "" ->
+        case find_executable_candidate(candidate, settings) do
+          nil -> false
+          path -> explicit_path(path, settings)
+        end
+
+      _other ->
+        false
+    end)
   end
 
-  defp path_lookup(_command), do: :miss
+  defp path_lookup(_settings), do: :miss
+
+  defp known_location_lookup(%{known_locations: locations} = settings) when is_list(locations) do
+    Enum.find_value(locations, :miss, fn
+      path when is_binary(path) and path != "" ->
+        case explicit_path(path, settings) do
+          {:ok, %CommandSpec{} = spec} -> {:ok, spec}
+          _other -> false
+        end
+
+      _other ->
+        false
+    end)
+  end
+
+  defp known_location_lookup(_settings), do: :miss
 
   defp npm_global_lookup(%{npm_global_bin: nil}), do: :miss
 
-  defp npm_global_lookup(%{npm_global_bin: binary}) when is_binary(binary) do
+  defp npm_global_lookup(%{npm_global_bin: binary} = settings) when is_binary(binary) do
     with {:ok, npm_path} <- find_npm(),
          {:ok, prefix} <- npm_global_prefix(npm_path) do
       candidate = Path.join([prefix, "bin", binary])
 
-      case explicit_path(candidate) do
+      case explicit_path(candidate, settings) do
         {:ok, %CommandSpec{} = spec} -> {:ok, spec}
         _other -> :miss
       end
@@ -262,9 +313,15 @@ defmodule CliSubprocessCore.ProviderCLI do
     end
   end
 
-  defp explicit_path(value) when is_binary(value) do
+  defp explicit_path(value, settings) when is_binary(value) do
     if path_like?(value) do
       cond do
+        js_entrypoint?(value, settings) and not File.regular?(value) ->
+          {:error, :missing}
+
+        js_entrypoint?(value, settings) ->
+          wrap_js_entrypoint(value, settings)
+
         not File.exists?(value) ->
           {:error, :missing}
 
@@ -398,7 +455,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp resolve_command_path(command) when is_binary(command) do
-    case explicit_path(command) do
+    case explicit_path(command, %{allow_js_entrypoint: false}) do
       {:ok, %CommandSpec{program: program}} ->
         {:ok, program}
 
@@ -721,6 +778,68 @@ defmodule CliSubprocessCore.ProviderCLI do
       String.contains?(value, "/")
   end
 
+  defp default_known_locations(:amp) do
+    home = System.get_env("HOME") || System.user_home!()
+
+    [
+      Path.join([home, ".amp", "bin", "amp"]),
+      Path.join([home, ".local", "bin", "amp"])
+    ]
+  end
+
+  defp default_known_locations(:claude) do
+    home = System.user_home!()
+
+    [
+      Path.join([home, ".npm-global", "bin", "claude"]),
+      "/usr/local/bin/claude",
+      Path.join([home, ".local", "bin", "claude"]),
+      Path.join([home, "node_modules", ".bin", "claude"]),
+      Path.join([home, ".yarn", "bin", "claude"]),
+      Path.join([home, ".claude", "local", "claude"])
+    ]
+  end
+
+  defp default_known_locations(_provider), do: []
+
+  defp run_lookup_steps(steps, settings) when is_list(steps) do
+    Enum.reduce_while(steps, :miss, fn step, :miss ->
+      case step.(settings) do
+        :miss -> {:cont, :miss}
+        result -> {:halt, result}
+      end
+    end)
+  end
+
+  defp find_executable_candidate(command, _settings) when is_binary(command) do
+    System.find_executable(command)
+  end
+
+  defp js_entrypoint?(path, %{allow_js_entrypoint: true}) when is_binary(path) do
+    String.ends_with?(path, ".js")
+  end
+
+  defp js_entrypoint?(_path, _settings), do: false
+
+  defp wrap_js_entrypoint(path, settings) when is_binary(path) do
+    node_command = Map.get(settings, :node_command, "node")
+
+    case resolve_command_path(node_command) do
+      {:ok, node_path} ->
+        stabilized_node_path =
+          case stabilize_program(node_path, settings) do
+            :unchanged -> node_path
+            {:ok, stabilized} -> stabilized
+            {:error, _reason} -> node_path
+          end
+
+        {:ok, CommandSpec.new(stabilized_node_path, argv_prefix: [path])}
+
+      :miss ->
+        {:error, :node_not_found}
+    end
+  end
+
   defp cli_not_found(provider, settings) do
     display_name = Map.get(settings, :display_name, "#{provider} CLI")
     install_hint = Map.get(settings, :install_hint)
@@ -750,4 +869,10 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp reason_message(env_var, value, :not_executable),
     do: "#{env_var} points to non-executable file: #{value}"
+
+  defp reason_message(env_var, value, :node_not_found),
+    do: "#{env_var} points to a JavaScript launcher but node could not be found: #{value}"
+
+  defp reason_message(env_var, value, reason),
+    do: "#{env_var} could not be resolved from #{value}: #{inspect(reason)}"
 end

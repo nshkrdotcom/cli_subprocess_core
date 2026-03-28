@@ -37,4 +37,22 @@ defmodule CliSubprocessCore.TestSupport do
       end)
     end
   end
+
+  def wait_until(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+    do_wait_until(fun, deadline_ms)
+  end
+
+  defp do_wait_until(fun, deadline_ms) do
+    if fun.() do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) >= deadline_ms do
+        :timeout
+      else
+        Process.sleep(5)
+        do_wait_until(fun, deadline_ms)
+      end
+    end
+  end
 end

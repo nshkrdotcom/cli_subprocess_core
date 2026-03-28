@@ -1,5 +1,17 @@
-defmodule CliSubprocessCore.Transport.ExecutionSurface do
-  @moduledoc false
+defmodule CliSubprocessCore.ExecutionSurface do
+  @moduledoc """
+  Public execution-surface contract for process placement and transport routing.
+
+  This contract is intentionally narrow:
+
+  - `surface_kind` selects the runtime surface
+  - `transport_options` carries transport-only data
+  - `target_id`, `lease_ref`, `surface_ref`, and `boundary_class` stay typed
+  - `observability` remains an opaque metadata bag
+
+  Provider family, command selection, and process launch arguments do not
+  belong in `ExecutionSurface`.
+  """
 
   alias CliSubprocessCore.Transport.{LocalSubprocess, SSHExec}
 

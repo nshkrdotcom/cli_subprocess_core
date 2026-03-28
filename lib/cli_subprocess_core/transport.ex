@@ -29,8 +29,8 @@ defmodule CliSubprocessCore.Transport do
   """
 
   alias CliSubprocessCore.{Command, ProcessExit, TaskSupport, Transport.Error}
+  alias CliSubprocessCore.ExecutionSurface
   alias CliSubprocessCore.Transport.Delivery
-  alias CliSubprocessCore.Transport.ExecutionSurface
   alias CliSubprocessCore.Transport.Info
   alias CliSubprocessCore.Transport.RunResult
 

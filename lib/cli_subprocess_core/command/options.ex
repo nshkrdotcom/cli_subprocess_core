@@ -3,8 +3,14 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry, Transport}
-  alias CliSubprocessCore.Transport.ExecutionSurface
+  alias CliSubprocessCore.{
+    Command,
+    ExecutionSurface,
+    ProviderProfile,
+    ProviderRegistry,
+    Transport
+  }
+
   alias CliSubprocessCore.Transport.RunOptions
 
   @default_registry ProviderRegistry

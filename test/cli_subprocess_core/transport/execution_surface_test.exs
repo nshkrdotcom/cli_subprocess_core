@@ -1,7 +1,7 @@
-defmodule CliSubprocessCore.Transport.ExecutionSurfaceTest do
+defmodule CliSubprocessCore.ExecutionSurfaceTest do
   use ExUnit.Case, async: true
 
-  alias CliSubprocessCore.Transport.ExecutionSurface
+  alias CliSubprocessCore.ExecutionSurface
 
   test "resolve/1 keeps adapter-module selection internal while normalizing the transport lane" do
     assert {:ok, resolved} =

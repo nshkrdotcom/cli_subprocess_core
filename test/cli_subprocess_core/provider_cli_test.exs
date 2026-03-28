@@ -212,6 +212,37 @@ defmodule CliSubprocessCore.ProviderCLITest do
       end
     end
 
+    test "Amp wraps JavaScript launchers from AMP_CLI_PATH with node" do
+      dir = TestSupport.tmp_dir!("core_amp_cli_js")
+      js_path = TestSupport.write_file!(dir, "amp.js", "console.log('amp');\n")
+      node_path = TestSupport.write_executable!(dir, "node", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"AMP_CLI_PATH" => js_path, "PATH" => dir}, fn ->
+          assert {:ok, %CommandSpec{program: ^node_path, argv_prefix: [^js_path]}} =
+                   ProviderCLI.resolve(:amp)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Amp finds the default home binary locations" do
+      home = TestSupport.tmp_dir!("core_amp_cli_home")
+      bin_dir = Path.join([home, ".amp", "bin"])
+      File.mkdir_p!(bin_dir)
+      amp_path = TestSupport.write_executable!(bin_dir, "amp", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"HOME" => home, "PATH" => "/nonexistent_dir_only"}, fn ->
+          assert {:ok, %CommandSpec{program: ^amp_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:amp)
+        end)
+      after
+        File.rm_rf(home)
+      end
+    end
+
     test "Claude honors CLAUDE_CLI_PATH" do
       dir = TestSupport.tmp_dir!("core_claude_cli")
       claude_path = TestSupport.write_executable!(dir, "claude", "#!/bin/bash\nexit 0\n")
@@ -220,6 +251,38 @@ defmodule CliSubprocessCore.ProviderCLITest do
         TestSupport.with_env(%{"CLAUDE_CLI_PATH" => claude_path}, fn ->
           assert {:ok, %CommandSpec{program: ^claude_path, argv_prefix: []}} =
                    ProviderCLI.resolve(:claude)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Claude prefers claude-code on PATH" do
+      dir = TestSupport.tmp_dir!("core_claude_cli_path")
+
+      claude_code_path =
+        TestSupport.write_executable!(dir, "claude-code", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"CLAUDE_CLI_PATH" => nil, "PATH" => dir}, fn ->
+          assert {:ok, %CommandSpec{program: ^claude_code_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:claude)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Claude falls back to known locations when PATH is empty" do
+      dir = TestSupport.tmp_dir!("core_claude_cli_home")
+      bin_dir = Path.join([dir, ".local", "bin"])
+      File.mkdir_p!(bin_dir)
+      claude_path = TestSupport.write_executable!(bin_dir, "claude", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"CLAUDE_CLI_PATH" => nil, "PATH" => "/nonexistent_dir_only"}, fn ->
+          assert {:ok, %CommandSpec{program: ^claude_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:claude, [], known_locations: [claude_path])
         end)
       after
         File.rm_rf(dir)
