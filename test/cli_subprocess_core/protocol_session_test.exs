@@ -174,6 +174,25 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
     )
   end
 
+  test "successful channel exit stops the protocol session normally" do
+    original = Process.flag(:trap_exit, true)
+    on_exit(fn -> Process.flag(:trap_exit, original) end)
+
+    {:ok, session} =
+      start_protocol_session(fn request ->
+        {:ok, %{"method" => request["method"], "params" => request["params"]}}
+      end)
+
+    ref = Process.monitor(session)
+
+    assert :ok = ProtocolSession.await_ready(session, 1_000)
+
+    assert {:ok, %{"ok" => true}} =
+             ProtocolSession.request(session, %{method: "shutdown", params: %{}})
+
+    assert_receive {:DOWN, ^ref, :process, ^session, :normal}, 1_000
+  end
+
   defp assert_peer_request_failure(handler, assert_reply, opts) do
     {:ok, session} = start_protocol_session(handler, opts)
     on_exit(fn -> ProtocolSession.close(session) end)

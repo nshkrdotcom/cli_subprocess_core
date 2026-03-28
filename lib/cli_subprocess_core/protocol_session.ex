@@ -16,7 +16,7 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   use GenServer
 
-  alias CliSubprocessCore.{Channel, TaskSupport}
+  alias CliSubprocessCore.{Channel, ProcessExit, TaskSupport}
 
   @default_request_timeout_ms 30_000
   @default_peer_request_timeout_ms 30_000
@@ -293,7 +293,7 @@ defmodule CliSubprocessCore.ProtocolSession do
         {:stop, {:channel_error, reason}, fail_pending(state, {:channel_error, reason})}
 
       {:ok, {:exit, exit}} ->
-        {:stop, {:channel_exit, exit}, fail_pending(state, {:channel_exit, exit})}
+        {:stop, channel_exit_stop_reason(exit), fail_pending(state, {:channel_exit, exit})}
 
       :error ->
         handle_other_info(message, state)
@@ -740,6 +740,10 @@ defmodule CliSubprocessCore.ProtocolSession do
     do: {:ok, timeout_ms}
 
   defp validate_timeout(timeout_ms, label), do: {:error, {label, timeout_ms}}
+
+  defp channel_exit_stop_reason(%ProcessExit{} = exit) do
+    if ProcessExit.successful?(exit), do: :normal, else: {:channel_exit, exit}
+  end
 
   defp validate_handler(handler, label), do: validate_handler(handler, label, 1)
 
