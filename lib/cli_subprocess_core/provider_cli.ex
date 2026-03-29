@@ -6,7 +6,8 @@ defmodule CliSubprocessCore.ProviderCLI do
   module instead of duplicating discovery logic in downstream adapters.
   """
 
-  alias CliSubprocessCore.{CommandSpec, ExecutionSurface}
+  alias CliSubprocessCore.{CommandSpec, ExecutionSurface, ProcessExit}
+  alias CliSubprocessCore.Transport.Error, as: TransportError
 
   defmodule Error do
     @moduledoc """
@@ -20,6 +21,40 @@ defmodule CliSubprocessCore.ProviderCLI do
             kind: :cli_not_found | :unsupported_provider,
             provider: atom(),
             message: String.t(),
+            cause: term()
+          }
+
+    @impl true
+    def message(%__MODULE__{message: message}), do: message
+  end
+
+  defmodule ErrorRuntimeFailure do
+    @moduledoc """
+    Structured provider CLI runtime failure.
+
+    This is used after a provider command has already been selected and a
+    process was started, but the runtime still failed due to missing
+    executables, invalid working-directory placement, authentication problems,
+    or a generic process/transport failure.
+    """
+
+    @enforce_keys [:kind, :provider, :message]
+    defexception [:kind, :provider, :message, :exit_code, :stderr, :context, :cause]
+
+    @type kind ::
+            :auth_error
+            | :cli_not_found
+            | :cwd_not_found
+            | :process_exit
+            | :transport_error
+
+    @type t :: %__MODULE__{
+            kind: kind(),
+            provider: atom(),
+            message: String.t(),
+            exit_code: integer() | nil,
+            stderr: String.t() | nil,
+            context: map(),
             cause: term()
           }
 
@@ -44,6 +79,12 @@ defmodule CliSubprocessCore.ProviderCLI do
           | {:npx_package, String.t() | nil}
           | {:path_candidates, [String.t()]}
           | {:resolution_cwd, String.t() | nil}
+
+  @type runtime_failure_opt ::
+          {:command, String.t() | nil}
+          | {:cwd, String.t() | nil}
+          | {:execution_surface, ExecutionSurface.t() | map() | keyword() | nil}
+          | {:stderr, String.t() | nil}
 
   @provider_settings %{
     amp: %{
@@ -124,6 +165,51 @@ defmodule CliSubprocessCore.ProviderCLI do
     end
   end
 
+  @doc """
+  Classifies a provider runtime failure after launch selection has already
+  completed.
+
+  This covers both local transport errors (for example `{:command_not_found,
+  "gemini"}`) and remote execution failures that only become visible after the
+  provider command is invoked over an execution surface such as SSH.
+  """
+  @spec runtime_failure(atom(), term(), [runtime_failure_opt()]) :: ErrorRuntimeFailure.t()
+  def runtime_failure(provider, reason, opts \\ [])
+      when is_atom(provider) and is_list(opts) do
+    settings =
+      case build_settings(provider, []) do
+        {:ok, settings} -> settings
+        {:error, _reason} -> fallback_settings(provider)
+      end
+
+    context = runtime_failure_context(settings, opts)
+
+    case unwrap_runtime_reason(reason) do
+      %ErrorRuntimeFailure{} = failure ->
+        failure
+
+      %TransportError{} = error ->
+        transport_runtime_failure(settings, error, context)
+
+      %ProcessExit{} = exit ->
+        process_exit_runtime_failure(settings, exit, context)
+
+      other ->
+        generic_runtime_failure(settings, other, context)
+    end
+  end
+
+  @doc """
+  Maps a classified runtime failure to the stable public error code used across
+  the shared provider/runtime stack.
+  """
+  @spec runtime_failure_code(ErrorRuntimeFailure.t()) :: String.t()
+  def runtime_failure_code(%ErrorRuntimeFailure{kind: :auth_error}), do: "auth_error"
+  def runtime_failure_code(%ErrorRuntimeFailure{kind: :cli_not_found}), do: "cli_not_found"
+  def runtime_failure_code(%ErrorRuntimeFailure{kind: :cwd_not_found}), do: "config_invalid"
+  def runtime_failure_code(%ErrorRuntimeFailure{kind: :process_exit}), do: "transport_exit"
+  def runtime_failure_code(%ErrorRuntimeFailure{kind: :transport_error}), do: "transport_error"
+
   defp build_settings(provider, opts) do
     base_settings = Map.get(@provider_settings, provider, %{})
 
@@ -151,6 +237,18 @@ defmodule CliSubprocessCore.ProviderCLI do
            message: "unsupported provider #{inspect(provider)} for CLI resolution"
          }}
     end
+  end
+
+  defp fallback_settings(provider) do
+    base_settings = Map.get(@provider_settings, provider, %{})
+
+    %{
+      provider: provider,
+      default_command: Map.get(base_settings, :default_command, Atom.to_string(provider)),
+      display_name: Map.get(base_settings, :display_name, "#{provider} CLI"),
+      install_hint: Map.get(base_settings, :install_hint),
+      path_candidates: Map.get(base_settings, :path_candidates, [Atom.to_string(provider)])
+    }
   end
 
   defp resolve_spec(provider_opts, settings) do
@@ -958,4 +1056,314 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp reason_message(env_var, value, :node_not_found),
     do: "#{env_var} points to a JavaScript launcher but node could not be found: #{value}"
+
+  defp unwrap_runtime_reason({:transport, %TransportError{} = error}), do: error
+  defp unwrap_runtime_reason(%TransportError{} = error), do: error
+  defp unwrap_runtime_reason(%ProcessExit{} = exit), do: exit
+  defp unwrap_runtime_reason(reason), do: reason
+
+  defp transport_runtime_failure(settings, %TransportError{} = error, context) do
+    case error.reason do
+      {:command_not_found, _command} ->
+        runtime_failure_struct(
+          settings,
+          :cli_not_found,
+          cli_not_found_message(settings, context),
+          error,
+          context
+        )
+
+      {:cwd_not_found, cwd} ->
+        runtime_failure_struct(
+          settings,
+          :cwd_not_found,
+          cwd_not_found_message(context, cwd),
+          error,
+          Map.put(context, :cwd, cwd)
+        )
+
+      other ->
+        runtime_failure_struct(
+          settings,
+          :transport_error,
+          "#{settings.display_name} transport failed#{placement_suffix(context)}: #{inspect(other)}",
+          error,
+          context
+        )
+    end
+  end
+
+  defp process_exit_runtime_failure(settings, %ProcessExit{} = exit, context) do
+    context =
+      context
+      |> Map.put(:exit_code, exit.code)
+      |> maybe_put(:stderr, exit.stderr)
+
+    cond do
+      cwd_not_found_exit?(exit, context) ->
+        runtime_failure_struct(
+          settings,
+          :cwd_not_found,
+          cwd_not_found_message(context, detect_cwd_from_exit(exit, context)),
+          exit,
+          context
+        )
+
+      cli_not_found_exit?(settings, exit) ->
+        runtime_failure_struct(
+          settings,
+          :cli_not_found,
+          cli_not_found_message(settings, context),
+          exit,
+          context
+        )
+
+      auth_error_exit?(exit) ->
+        runtime_failure_struct(
+          settings,
+          :auth_error,
+          auth_error_message(settings, context),
+          exit,
+          context
+        )
+
+      true ->
+        runtime_failure_struct(
+          settings,
+          :process_exit,
+          generic_exit_message(settings, exit, context),
+          exit,
+          context
+        )
+    end
+  end
+
+  defp generic_runtime_failure(settings, reason, context) do
+    runtime_failure_struct(
+      settings,
+      :transport_error,
+      "#{settings.display_name} failed#{placement_suffix(context)}: #{inspect(reason)}",
+      reason,
+      context
+    )
+  end
+
+  defp runtime_failure_struct(settings, kind, message, cause, context) do
+    %ErrorRuntimeFailure{
+      kind: kind,
+      provider: settings.provider,
+      message: message,
+      exit_code: Map.get(context, :exit_code),
+      stderr: Map.get(context, :stderr),
+      context: context,
+      cause: cause
+    }
+  end
+
+  defp runtime_failure_context(settings, opts) do
+    execution_surface = Keyword.get(opts, :execution_surface)
+    command = Keyword.get(opts, :command)
+    cwd = Keyword.get(opts, :cwd)
+    stderr = normalize_stderr(Keyword.get(opts, :stderr))
+    remote? = ExecutionSurface.remote_surface?(execution_surface)
+    destination = surface_destination(execution_surface)
+
+    %{
+      provider: settings.provider,
+      display_name: settings.display_name,
+      command: command,
+      cwd: cwd,
+      remote?: remote?,
+      destination: destination,
+      stderr: stderr
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp cli_not_found_exit?(settings, %ProcessExit{} = exit) do
+    stderr = normalize_stderr(exit.stderr)
+
+    cond do
+      match?({:command_not_found, _}, exit.reason) ->
+        true
+
+      exit.code == 127 and command_not_found_stderr?(settings, stderr) ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp cwd_not_found_exit?(%ProcessExit{} = exit, context) do
+    stderr = normalize_stderr(exit.stderr)
+    cwd = Map.get(context, :cwd)
+
+    cond do
+      is_binary(cwd) and stderr =~ "cd: #{cwd}: No such file or directory" ->
+        true
+
+      is_binary(stderr) and Regex.match?(~r/\bcd:\s+.+No such file or directory/i, stderr) ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp auth_error_exit?(%ProcessExit{} = exit) do
+    stderr = normalize_stderr(exit.stderr)
+
+    is_binary(stderr) and
+      Regex.match?(
+        ~r/(not authenticated|authentication required|please log in|please login|run .* login|requires login)/i,
+        stderr
+      )
+  end
+
+  defp command_not_found_stderr?(settings, stderr) when is_binary(stderr) do
+    command_names =
+      [
+        Map.get(settings, :default_command),
+        Map.get(settings, :path_candidates, [])
+      ]
+      |> List.flatten()
+      |> Enum.filter(&(is_binary(&1) and &1 != ""))
+      |> Enum.uniq()
+
+    missing_phrase? =
+      Regex.match?(~r/(command not found|not found|No such file or directory)/i, stderr)
+
+    cond do
+      not missing_phrase? ->
+        false
+
+      command_names == [] ->
+        true
+
+      true ->
+        stderr_downcased = String.downcase(stderr)
+
+        Enum.any?(command_names, fn command_name ->
+          stderr_downcased =~ String.downcase(command_name)
+        end)
+    end
+  end
+
+  defp command_not_found_stderr?(_settings, _stderr), do: false
+
+  defp detect_cwd_from_exit(%ProcessExit{} = exit, context) do
+    Map.get(context, :cwd) || parse_missing_cwd(normalize_stderr(exit.stderr))
+  end
+
+  defp parse_missing_cwd(stderr) when is_binary(stderr) do
+    case Regex.run(~r/\bcd:\s+(.+?):\s+No such file or directory/i, stderr) do
+      [_, cwd] -> cwd
+      _ -> nil
+    end
+  end
+
+  defp parse_missing_cwd(_stderr), do: nil
+
+  defp cli_not_found_message(settings, context) do
+    base = cli_not_found(settings.provider, settings).message
+
+    if Map.get(context, :remote?) do
+      base
+      |> String.replace(
+        " not found.",
+        " not found#{placement_suffix(context)}."
+      )
+      |> Kernel.<>(remote_path_hint())
+    else
+      base
+    end
+  end
+
+  defp cwd_not_found_message(context, cwd) do
+    target = cwd || "the requested working directory"
+    "Working directory #{target} does not exist#{placement_suffix(context)}"
+  end
+
+  defp auth_error_message(settings, context) do
+    "#{settings.display_name} requires authentication#{placement_suffix(context)}. #{auth_hint(settings.provider)}"
+  end
+
+  defp generic_exit_message(settings, %ProcessExit{} = exit, context) do
+    base =
+      cond do
+        is_integer(exit.code) ->
+          "#{settings.display_name} exited with code #{exit.code}"
+
+        exit.status == :signal ->
+          "#{settings.display_name} terminated by signal #{inspect(exit.signal)}"
+
+        true ->
+          "#{settings.display_name} exited with #{inspect(exit.reason)}"
+      end
+
+    stderr = normalize_stderr(exit.stderr)
+
+    if is_binary(stderr) and stderr != "" do
+      "#{base}#{placement_suffix(context)}: #{stderr}"
+    else
+      "#{base}#{placement_suffix(context)}"
+    end
+  end
+
+  defp auth_hint(:claude), do: "Run `claude login` on the target and retry."
+  defp auth_hint(:codex), do: "Authenticate Codex on the target and retry."
+  defp auth_hint(:gemini), do: "Authenticate Gemini CLI on the target and retry."
+  defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
+  defp auth_hint(_provider), do: "Authenticate the CLI on the target and retry."
+
+  defp remote_path_hint do
+    " If the CLI is installed outside the remote non-login PATH, pass an explicit CLI path or PATH env override."
+  end
+
+  defp placement_suffix(%{remote?: true, destination: destination})
+       when is_binary(destination) and destination != "" do
+    " on remote target #{destination}"
+  end
+
+  defp placement_suffix(%{remote?: true}), do: " on the remote target"
+  defp placement_suffix(_context), do: ""
+
+  defp surface_destination(%ExecutionSurface{} = execution_surface) do
+    if ExecutionSurface.remote_surface?(execution_surface) do
+      Keyword.get(execution_surface.transport_options, :destination)
+    end
+  end
+
+  defp surface_destination(execution_surface) when is_list(execution_surface) do
+    case ExecutionSurface.new(execution_surface) do
+      {:ok, %ExecutionSurface{} = normalized} -> surface_destination(normalized)
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp surface_destination(%{} = execution_surface) do
+    execution_surface
+    |> Enum.into([])
+    |> surface_destination()
+  rescue
+    _error -> nil
+  end
+
+  defp surface_destination(_other), do: nil
+
+  defp normalize_stderr(stderr) when is_binary(stderr) do
+    stderr
+    |> String.trim()
+    |> case do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp normalize_stderr(_stderr), do: nil
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

@@ -309,7 +309,7 @@ defmodule CliSubprocessCore.Session do
         {@transport_event_tag, ref, {:exit, process_exit}},
         %{transport_ref: ref} = state
       ) do
-    {events, parser_state} = state.profile.handle_exit(process_exit.reason, state.parser_state)
+    {events, parser_state} = state.profile.handle_exit(process_exit, state.parser_state)
     state = %{state | parser_state: parser_state}
     state = normalize_and_dispatch(state, events)
     {:stop, :normal, state}

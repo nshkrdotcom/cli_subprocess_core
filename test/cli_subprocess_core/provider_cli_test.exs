@@ -2,8 +2,10 @@ defmodule CliSubprocessCore.ProviderCLITest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.CommandSpec
+  alias CliSubprocessCore.ProcessExit
   alias CliSubprocessCore.ProviderCLI
   alias CliSubprocessCore.ProviderCLI.Error
+  alias CliSubprocessCore.ProviderCLI.ErrorRuntimeFailure
   alias CliSubprocessCore.TestSupport
 
   defp isolated_env(overrides \\ %{}) do
@@ -345,6 +347,81 @@ defmodule CliSubprocessCore.ProviderCLITest do
                  transport_options: [destination: "ssh.example"]
                ]
              )
+  end
+
+  describe "runtime_failure/3" do
+    test "classifies remote command-not-found exits as cli_not_found" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 127},
+          stderr: "bash: line 1: exec: claude-code: not found\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :claude,
+                 exit,
+                 execution_surface: [
+                   surface_kind: :static_ssh,
+                   transport_options: [destination: "ssh.example"]
+                 ]
+               )
+
+      assert failure.kind == :cli_not_found
+      assert failure.exit_code == 127
+      assert failure.message =~ "Claude CLI not found"
+      assert failure.message =~ "remote target ssh.example"
+      assert failure.message =~ "remote non-login PATH"
+      assert ProviderCLI.runtime_failure_code(failure) == "cli_not_found"
+    end
+
+    test "classifies env-wrapper remote command misses as cli_not_found" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 127},
+          stderr: "env: ‘gemini’: No such file or directory\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :gemini,
+                 exit,
+                 execution_surface: [
+                   surface_kind: :static_ssh,
+                   transport_options: [destination: "gemini.example"]
+                 ]
+               )
+
+      assert failure.kind == :cli_not_found
+      assert failure.exit_code == 127
+      assert failure.message =~ "Gemini CLI not found"
+      assert failure.message =~ "remote target gemini.example"
+      assert failure.message =~ "remote non-login PATH"
+    end
+
+    test "classifies remote cwd misses as config_invalid runtime failures" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 1},
+          stderr: "bash: line 1: cd: /remote/worktree: No such file or directory\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :amp,
+                 exit,
+                 cwd: "/remote/worktree",
+                 execution_surface: [
+                   surface_kind: :static_ssh,
+                   transport_options: [destination: "amp.example"]
+                 ]
+               )
+
+      assert failure.kind == :cwd_not_found
+      assert failure.message =~ "/remote/worktree"
+      assert failure.message =~ "remote target amp.example"
+      assert ProviderCLI.runtime_failure_code(failure) == "config_invalid"
+    end
   end
 
   defp build_fake_asdf_codex do

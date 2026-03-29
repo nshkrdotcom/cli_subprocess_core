@@ -416,6 +416,32 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Stderr{content: "claude warning"} = stderr.payload
     end
 
+    test "Claude treats result frames with is_error=true as terminal auth errors" do
+      state = Claude.init_parser_state([])
+
+      raw =
+        Jason.encode!(%{
+          "type" => "result",
+          "subtype" => "success",
+          "session_id" => "claude-auth-session",
+          "result" =>
+            "Your organization does not have access to Claude. Please login again or contact your administrator.",
+          "is_error" => true
+        })
+
+      {[event], state} = Claude.decode_stdout(raw, state)
+
+      assert event.kind == :error
+      assert %Payload.Error{} = event.payload
+      assert event.payload.code == "auth_error"
+      assert event.payload.message =~ "organization does not have access"
+
+      {events_after_exit, _state} =
+        Claude.handle_exit(%CliSubprocessCore.ProcessExit{status: :success, code: 0}, state)
+
+      assert events_after_exit == []
+    end
+
     test "Codex decodes its JSONL fixture into normalized events" do
       events = decode_fixture(Codex, "codex")
 

@@ -10,6 +10,8 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
   - optional `CLI_SUBPROCESS_CORE_LIVE_SSH_PORT`
   - optional `CLI_SUBPROCESS_CORE_LIVE_SSH_IDENTITY_FILE`
   - optional `CLI_SUBPROCESS_CORE_LIVE_SSH_PATH`
+  - optional provider command overrides such as
+    `CLI_SUBPROCESS_CORE_LIVE_SSH_CLAUDE_COMMAND=/path/to/claude`
   """
 
   alias CliSubprocessCore.{Command, ExecutionSurface}
@@ -22,6 +24,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
   @port_env "CLI_SUBPROCESS_CORE_LIVE_SSH_PORT"
   @identity_file_env "CLI_SUBPROCESS_CORE_LIVE_SSH_IDENTITY_FILE"
   @ssh_path_env "CLI_SUBPROCESS_CORE_LIVE_SSH_PATH"
+  @provider_command_env_prefix "CLI_SUBPROCESS_CORE_LIVE_SSH_"
   @default_timeout_ms 30_000
 
   @spec enabled?() :: boolean()
@@ -35,7 +38,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
   @spec skip_reason() :: String.t()
   def skip_reason do
     "Live SSH tests are opt-in. Run with CLI_SUBPROCESS_CORE_LIVE_SSH=1 " <>
-      "CLI_SUBPROCESS_CORE_LIVE_SSH_DESTINATION=luhome mix test --only live_ssh --include live_ssh"
+      "CLI_SUBPROCESS_CORE_LIVE_SSH_DESTINATION=<ssh-host> mix test --only live_ssh --include live_ssh"
   end
 
   @spec destination() :: String.t() | nil
@@ -79,6 +82,19 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
     surface
     |> ExecutionSurface.surface_metadata()
     |> Keyword.put(:transport_options, surface.transport_options)
+  end
+
+  @spec provider_command(:amp | :claude | :codex | :gemini) :: String.t() | nil
+  def provider_command(provider) when provider in [:amp, :claude, :codex, :gemini] do
+    case System.get_env(provider_command_env(provider)) do
+      value when is_binary(value) and value != "" -> value
+      _other -> nil
+    end
+  end
+
+  @spec provider_command_env(:amp | :claude | :codex | :gemini) :: String.t()
+  def provider_command_env(provider) when provider in [:amp, :claude, :codex, :gemini] do
+    @provider_command_env_prefix <> String.upcase(Atom.to_string(provider)) <> "_COMMAND"
   end
 
   @spec run(String.t(), [String.t()], keyword()) ::

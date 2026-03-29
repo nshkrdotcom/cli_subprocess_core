@@ -16,7 +16,9 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @normalized_kinds %{
     "approval_denied" => :approval_denied,
     "auth_error" => :auth_error,
+    "authentication_failed" => :auth_error,
     "cancelled" => :user_cancelled,
+    "config_invalid" => :config_invalid,
     "parse_error" => :parse_error,
     "rate_limit" => :rate_limit,
     "timeout" => :timeout,
@@ -230,7 +232,11 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
 
   @spec handle_exit(term(), parser_state()) :: {[Event.t()], parser_state()}
   def handle_exit(reason, state) when is_map(state) do
-    exit = ProcessExit.from_reason(reason)
+    exit =
+      case reason do
+        %ProcessExit{} = exit -> exit
+        other -> ProcessExit.from_reason(other)
+      end
 
     cond do
       ProcessExit.successful?(exit) and state.result_emitted? ->
@@ -247,18 +253,36 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
         emit_single(:result, payload, %{exit: exit}, mark_result_emitted(state))
 
       true ->
+        failure =
+          ProviderCLI.runtime_failure(
+            Map.fetch!(state, :provider),
+            exit,
+            execution_surface: Map.get(state.options, :execution_surface),
+            cwd: Map.get(state.options, :cwd),
+            stderr: exit.stderr,
+            command: Map.get(state.options, :command)
+          )
+
         message =
-          cond do
-            is_integer(exit.code) -> "CLI exited with code #{exit.code}"
-            exit.status == :signal -> "CLI terminated by signal #{inspect(exit.signal)}"
-            true -> "CLI exited with #{inspect(exit.reason)}"
-          end
+          failure.message
 
         payload =
           Payload.Error.new(
             message: message,
-            code: normalize_code(exit.reason),
-            metadata: %{exit: Map.from_struct(exit)}
+            code: ProviderCLI.runtime_failure_code(failure),
+            metadata:
+              %{
+                exit: Map.from_struct(exit),
+                runtime_failure: %{
+                  kind: failure.kind,
+                  provider: failure.provider,
+                  exit_code: failure.exit_code,
+                  stderr: failure.stderr,
+                  context: failure.context
+                }
+              }
+              |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+              |> Map.new()
           )
 
         emit_single(:error, payload, %{exit: exit}, state)
@@ -436,9 +460,4 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
       _ -> default
     end
   end
-
-  defp normalize_code(reason) when is_atom(reason), do: Atom.to_string(reason)
-  defp normalize_code({:exit_status, code}) when is_integer(code), do: Integer.to_string(code)
-  defp normalize_code(reason) when is_integer(reason), do: Integer.to_string(reason)
-  defp normalize_code(_reason), do: "transport_exit"
 end

@@ -228,26 +228,42 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   end
 
   defp result(raw, state) do
-    usage = Shared.fetch_any(raw, [:usage, "usage"])
-    usage = if is_map(usage), do: usage, else: %{}
+    if result_error?(raw) do
+      payload =
+        Payload.Error.new(
+          message: result_error_message(raw),
+          code:
+            raw
+            |> result_error_code()
+            |> Atom.to_string(),
+          severity: :fatal,
+          metadata: Shared.normalize_map(raw)
+        )
 
-    Shared.emit_single(
-      :result,
-      Payload.Result.new(
-        status: :completed,
-        stop_reason:
-          Shared.fetch_any(raw, [:stop_reason, "stop_reason", :reason, "reason"]) || :unknown,
-        output: %{
-          duration_ms: Shared.fetch_any(raw, [:duration_ms, "duration_ms"]),
-          usage: %{
-            input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
-            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
+      {event, next_state} = Shared.emit_event(:error, payload, raw, state)
+      {[event], Shared.mark_result_emitted(next_state)}
+    else
+      usage = Shared.fetch_any(raw, [:usage, "usage"])
+      usage = if is_map(usage), do: usage, else: %{}
+
+      Shared.emit_single(
+        :result,
+        Payload.Result.new(
+          status: :completed,
+          stop_reason:
+            Shared.fetch_any(raw, [:stop_reason, "stop_reason", :reason, "reason"]) || :unknown,
+          output: %{
+            duration_ms: Shared.fetch_any(raw, [:duration_ms, "duration_ms"]),
+            usage: %{
+              input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
+              output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
+            }
           }
-        }
-      ),
-      raw,
-      state
-    )
+        ),
+        raw,
+        state
+      )
+    end
   end
 
   defp error_event(raw, state) do
@@ -265,4 +281,44 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
 
     Shared.emit_single(:error, payload, raw, state)
   end
+
+  defp result_error?(raw) do
+    Shared.truthy?(Shared.fetch_any(raw, [:is_error, "is_error"])) or
+      Shared.fetch_any(raw, [:subtype, "subtype"]) in [
+        "error_during_execution",
+        "error_max_turns"
+      ]
+  end
+
+  defp result_error_message(raw) do
+    Shared.fetch_any(raw, [:error, "error", :result, "result"]) ||
+      "Claude CLI reported an error result"
+  end
+
+  defp result_error_code(raw) do
+    code =
+      raw
+      |> Shared.fetch_any([:error, "error"])
+      |> Shared.normalize_kind()
+
+    cond do
+      code != :unknown ->
+        code
+
+      auth_error_text?(Shared.fetch_any(raw, [:result, "result"])) ->
+        :auth_error
+
+      true ->
+        :unknown
+    end
+  end
+
+  defp auth_error_text?(text) when is_binary(text) do
+    Regex.match?(
+      ~r/(does not have access|authentication failed|not authenticated|please log in|please login|login again|contact your administrator)/i,
+      text
+    )
+  end
+
+  defp auth_error_text?(_text), do: false
 end
