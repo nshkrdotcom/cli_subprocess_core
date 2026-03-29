@@ -603,14 +603,15 @@ defmodule CliSubprocessCore.ProviderCLI do
     expanded = Path.expand(path)
 
     cond do
-      String.contains?(expanded, "/.asdf/shims/") or file_contains?(expanded, "asdf exec") ->
+      String.contains?(expanded, "/.asdf/shims/") or shim_script_contains?(expanded, "asdf exec") ->
         :asdf
 
       String.contains?(expanded, "/.local/share/mise/shims/") or
-        String.contains?(expanded, "/.mise/shims/") or file_contains?(expanded, "mise exec") ->
+        String.contains?(expanded, "/.mise/shims/") or
+          shim_script_contains?(expanded, "mise exec") ->
         :mise
 
-      String.contains?(expanded, "/.rtx/shims/") or file_contains?(expanded, "rtx exec") ->
+      String.contains?(expanded, "/.rtx/shims/") or shim_script_contains?(expanded, "rtx exec") ->
         :rtx
 
       true ->
@@ -688,6 +689,35 @@ defmodule CliSubprocessCore.ProviderCLI do
       _ ->
         Path.join(System.user_home!(), ".asdf/bin/asdf")
     end
+  end
+
+  defp shim_script_contains?(path, marker) when is_binary(path) and is_binary(marker) do
+    if shims_directory?(path) and shell_script?(path) do
+      file_contains?(path, marker)
+    else
+      false
+    end
+  end
+
+  defp shims_directory?(path) when is_binary(path) do
+    Path.dirname(path) |> Path.basename() == "shims"
+  end
+
+  defp shell_script?(path) when is_binary(path) do
+    case read_first_line(path) do
+      {:ok, <<"#!", remainder::binary>>} ->
+        case parse_shebang(remainder) do
+          {:ok, {command, _command_prefix}} -> shell_command?(command)
+          _other -> false
+        end
+
+      _other ->
+        false
+    end
+  end
+
+  defp shell_command?(command) when is_binary(command) do
+    Path.basename(command) in ["ash", "bash", "dash", "fish", "ksh", "sh", "zsh"]
   end
 
   defp file_contains?(path, marker) when is_binary(path) and is_binary(marker) do

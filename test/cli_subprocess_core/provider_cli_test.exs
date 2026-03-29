@@ -198,6 +198,25 @@ defmodule CliSubprocessCore.ProviderCLITest do
       end
     end
 
+    test "Codex does not misclassify installed interpreters when their contents mention a manager command" do
+      {root, script_path, node_path} = build_fake_codex_with_non_shim_node_marker()
+      path = Path.dirname(node_path) <> ":/nonexistent_dir_only"
+
+      try do
+        TestSupport.with_env(%{"HOME" => root, "PATH" => path, "MISE_BIN" => nil}, fn ->
+          assert {:ok, %CommandSpec{} = spec} = ProviderCLI.resolve(:codex, command: script_path)
+          assert spec.program in [script_path, node_path]
+
+          case spec.program do
+            ^script_path -> assert spec.argv_prefix == []
+            ^node_path -> assert spec.argv_prefix == [script_path]
+          end
+        end)
+      after
+        File.rm_rf(root)
+      end
+    end
+
     test "Amp honors AMP_CLI_PATH" do
       dir = TestSupport.tmp_dir!("core_amp_cli")
       amp_path = TestSupport.write_executable!(dir, "amp", "#!/bin/bash\nexit 0\n")
@@ -410,5 +429,32 @@ defmodule CliSubprocessCore.ProviderCLITest do
     )
 
     {root, codex_shim_path, script_path, node_path}
+  end
+
+  defp build_fake_codex_with_non_shim_node_marker do
+    root = TestSupport.tmp_dir!("core_codex_non_shim_marker")
+    bin_dir = Path.join(root, ".asdf/installs/nodejs/25.1.0/bin")
+
+    File.mkdir_p!(bin_dir)
+
+    node_path =
+      TestSupport.write_executable!(
+        bin_dir,
+        "node",
+        """
+        #!/bin/sh
+        # accidental marker from unrelated contents: mise exec
+        exit 0
+        """
+      )
+
+    script_path =
+      TestSupport.write_executable!(
+        bin_dir,
+        "codex",
+        "#!/usr/bin/env node\nconsole.log('codex');\n"
+      )
+
+    {root, script_path, node_path}
   end
 end

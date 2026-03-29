@@ -703,11 +703,9 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   @spec safe_shutdown_task(Task.t()) :: {:ok, term()} | {:exit, term()} | nil
   defp safe_shutdown_task(%Task{} = task) do
-    try do
-      Task.shutdown(task, :brutal_kill)
-    catch
-      :exit, reason -> {:exit, reason}
-    end
+    Task.shutdown(task, :brutal_kill)
+  catch
+    :exit, reason -> {:exit, reason}
   end
 
   defp session_info(state) do
