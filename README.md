@@ -171,7 +171,9 @@ Higher-layer runtime workspace or approval policy belongs outside
 `execution_surface`. The core transport boundary remains generic and does not
 reintroduce public `transport_module` selection.
 
-For the full SSH surface contract, see `guides/raw-transport.md`.
+For the full SSH surface contract, see `guides/raw-transport.md`. For built-in
+transport-family implementation work, see
+`guides/developer-guide-adding-transports.md`.
 
 Use the raw session handle when you need long-lived exact-byte ownership:
 
@@ -304,6 +306,7 @@ Ad hoc external profiles can also be registered at runtime with
 - `guides/developer-guide-model-registry.md`
 - `guides/developer-guide-claude-backends.md`
 - `guides/developer-guide-codex-backends.md`
+- `guides/developer-guide-adding-transports.md`
 - `guides/developer-guide-provider-profiles.md`
 - `guides/developer-guide-runtime-layers.md`
 - `guides/command-api.md`

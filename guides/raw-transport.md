@@ -46,6 +46,9 @@ Its `:transport_options` contract is:
 `:guest_bridge` is also part of the generic contract and negotiates profile,
 protocol version, and effective capabilities when it attaches.
 
+If you need to add a new built-in transport family to the core itself, see
+`guides/developer-guide-adding-transports.md`.
+
 ```elixir
 command =
   CliSubprocessCore.Command.new("sh", ["-c", "cat"],
