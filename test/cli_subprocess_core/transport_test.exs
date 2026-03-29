@@ -13,16 +13,14 @@ defmodule CliSubprocessCore.TransportTest do
              Transport.start(
                command: script,
                subscriber: {self(), ref},
+               startup_mode: :lazy,
+               stdout_mode: :raw,
+               stdin_mode: :raw,
                target_id: "target-1",
                lease_ref: "lease-1",
                surface_ref: "surface-1",
                boundary_class: :local,
-               observability: %{suite: :phase_b},
-               transport_options: [
-                 startup_mode: :lazy,
-                 stdout_mode: :raw,
-                 stdin_mode: :raw
-               ]
+               observability: %{suite: :phase_b}
              )
 
     assert %Transport.Info{} = info = Transport.info(transport)
@@ -44,11 +42,26 @@ defmodule CliSubprocessCore.TransportTest do
                    2_000
   end
 
-  test "start rejects guest bridge until the deferred adapter lands" do
-    assert {:error, {:transport, %Error{} = error}} =
-             Transport.start(command: "cat", surface_kind: :guest_bridge)
+  test "start treats guest bridge as a real transport family" do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "cli_subprocess_core_guest_bridge_missing_#{System.unique_integer([:positive])}.sock"
+      )
 
-    assert error.reason == {:unsupported_surface_kind, :guest_bridge}
+    assert {:error, {:transport, %Error{} = error}} =
+             Transport.start(
+               command: "cat",
+               surface_kind: :guest_bridge,
+               transport_options: [
+                 endpoint: %{kind: :unix_socket, path: path},
+                 bridge_ref: "bridge-1",
+                 bridge_profile: "core_cli_transport",
+                 supported_protocol_versions: [1]
+               ]
+             )
+
+    assert {:startup_failed, {:bridge_connect_failed, _reason}} = error.reason
   end
 
   defp create_test_script(body) do

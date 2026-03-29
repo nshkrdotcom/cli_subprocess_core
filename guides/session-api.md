@@ -58,9 +58,8 @@ core merges those defaults with the public `:transport_options` lane and then
 resolves the concrete adapter internally from `:surface_kind`. If the selected
 transport is configured for lazy startup, the session still waits for that
 startup to finish before returning. The landed surfaces today are
-`:local_subprocess`, `:static_ssh`, and `:leased_ssh`; `:guest_bridge` remains
-deferred and is still rejected. Legacy backend-selection overrides are
-rejected.
+`:local_subprocess`, `:ssh_exec`, and `:guest_bridge`. Legacy
+backend-selection overrides are rejected.
 
 ## Lifecycle API
 

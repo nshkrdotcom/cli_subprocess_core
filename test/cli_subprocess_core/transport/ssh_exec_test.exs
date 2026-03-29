@@ -25,7 +25,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
                subscriber: {self(), ref},
                stdout_mode: :raw,
                stdin_mode: :raw,
-               surface_kind: :static_ssh,
+               surface_kind: :ssh_exec,
                target_id: "ssh-target-1",
                transport_options: [
                  ssh_path: fake_ssh.ssh_path,
@@ -36,7 +36,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
              )
 
     assert %Transport.Info{} = info = Transport.info(transport)
-    assert info.surface_kind == :static_ssh
+    assert info.surface_kind == :ssh_exec
     assert info.target_id == "ssh-target-1"
     assert info.adapter_metadata.destination == "ssh.test.example"
     assert info.adapter_metadata.port == 2222
@@ -76,7 +76,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
              Transport.start(
                command: script,
                subscriber: {self(), ref},
-               surface_kind: :leased_ssh,
+               surface_kind: :ssh_exec,
                lease_ref: "lease-1",
                surface_ref: "surface-1",
                transport_options: [
@@ -110,7 +110,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
              Transport.run(
                Command.new(script),
                stderr: :separate,
-               surface_kind: :static_ssh,
+               surface_kind: :ssh_exec,
                transport_options: [
                  ssh_path: fake_ssh.ssh_path,
                  destination: "run.test.example"
@@ -126,7 +126,7 @@ defmodule CliSubprocessCore.Transport.SSHExecTest do
 
   test "start/1 returns a structured error when SSH destination is missing" do
     assert {:error, {:transport, %Error{} = error}} =
-             Transport.start(command: "cat", surface_kind: :static_ssh)
+             Transport.start(command: "cat", surface_kind: :ssh_exec)
 
     assert error.reason == {:invalid_options, {:missing_ssh_destination, nil}}
   end

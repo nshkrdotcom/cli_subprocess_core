@@ -2,12 +2,39 @@ defmodule CliSubprocessCore.Transport.SSHExec do
   @moduledoc false
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.ExecutionSurface.Adapter
+  alias CliSubprocessCore.ExecutionSurface.Capabilities
   alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.{Error, RunResult, Subprocess}
 
+  @behaviour Adapter
   @behaviour Transport
 
-  @ssh_surface_kinds [:static_ssh, :leased_ssh]
+  @surface_kind :ssh_exec
+
+  @impl Adapter
+  def surface_kind, do: @surface_kind
+
+  @impl Adapter
+  def capabilities do
+    Capabilities.new!(
+      remote?: true,
+      startup_kind: :spawn,
+      path_semantics: :remote,
+      supports_run?: true,
+      supports_streaming_stdio?: true,
+      supports_pty?: true,
+      supports_user?: true,
+      supports_env?: true,
+      supports_cwd?: true,
+      interrupt_kind: :signal
+    )
+  end
+
+  @impl Adapter
+  def normalize_transport_options(options) do
+    do_normalize_transport_options(options)
+  end
 
   @impl Transport
   def start(opts) when is_list(opts) do
@@ -114,7 +141,7 @@ defmodule CliSubprocessCore.Transport.SSHExec do
   defp ssh_config(opts, %Command{} = command) when is_list(opts) do
     surface_kind = Keyword.get(opts, :surface_kind, :local_subprocess)
 
-    if surface_kind in @ssh_surface_kinds do
+    if surface_kind == @surface_kind do
       with {:ok, transport_options} <- ssh_transport_options(opts),
            {:ok, destination} <-
              normalize_destination(Keyword.get(transport_options, :destination)),
@@ -155,7 +182,7 @@ defmodule CliSubprocessCore.Transport.SSHExec do
   defp ssh_transport_options(opts) when is_list(opts) do
     case Keyword.fetch(opts, :transport_options) do
       {:ok, nested_options} ->
-        normalize_transport_options(nested_options)
+        do_normalize_transport_options(nested_options)
 
       :error ->
         {:ok,
@@ -243,9 +270,9 @@ defmodule CliSubprocessCore.Transport.SSHExec do
     |> Map.new()
   end
 
-  defp normalize_transport_options(nil), do: {:ok, []}
+  defp do_normalize_transport_options(nil), do: {:ok, []}
 
-  defp normalize_transport_options(options) when is_list(options) do
+  defp do_normalize_transport_options(options) when is_list(options) do
     if Keyword.keyword?(options) do
       {:ok, options}
     else
@@ -253,7 +280,7 @@ defmodule CliSubprocessCore.Transport.SSHExec do
     end
   end
 
-  defp normalize_transport_options(options) when is_map(options) do
+  defp do_normalize_transport_options(options) when is_map(options) do
     if Enum.all?(Map.keys(options), &is_atom/1) do
       {:ok, Enum.into(options, [])}
     else
@@ -261,7 +288,7 @@ defmodule CliSubprocessCore.Transport.SSHExec do
     end
   end
 
-  defp normalize_transport_options(options),
+  defp do_normalize_transport_options(options),
     do: transport_error(Error.invalid_options({:invalid_transport_options, options}))
 
   defp normalize_destination(nil),

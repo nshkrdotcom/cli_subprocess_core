@@ -33,18 +33,18 @@ one `:execution_surface` value:
 Landed surfaces today are:
 
 - `:local_subprocess`
-- `:static_ssh`
-- `:leased_ssh`
+- `:ssh_exec`
+- `:guest_bridge`
 
-The SSH-backed surfaces resolve internally to the hidden `SSHExec` adapter.
-Their `:transport_options` contract is:
+The SSH-backed surface resolves internally to the hidden `SSHExec` adapter.
+Its `:transport_options` contract is:
 
 - required `:destination`
 - optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
 - optional `:ssh_args` and `:ssh_options`
 
-`:guest_bridge` remains part of the generic contract but is still rejected
-until the deferred bridge phase lands.
+`:guest_bridge` is also part of the generic contract and negotiates profile,
+protocol version, and effective capabilities when it attaches.
 
 ```elixir
 command =

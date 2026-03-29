@@ -327,7 +327,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                    :codex,
                    [],
                    execution_surface: [
-                     surface_kind: :static_ssh,
+                     surface_kind: :ssh_exec,
                      transport_options: [destination: "ssh.example"]
                    ]
                  )
@@ -343,7 +343,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                :codex,
                [command: "/remote/bin/codex"],
                execution_surface: [
-                 surface_kind: :static_ssh,
+                 surface_kind: :ssh_exec,
                  transport_options: [destination: "ssh.example"]
                ]
              )
@@ -362,7 +362,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                  :claude,
                  exit,
                  execution_surface: [
-                   surface_kind: :static_ssh,
+                   surface_kind: :ssh_exec,
                    transport_options: [destination: "ssh.example"]
                  ]
                )
@@ -387,7 +387,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                  :gemini,
                  exit,
                  execution_surface: [
-                   surface_kind: :static_ssh,
+                   surface_kind: :ssh_exec,
                    transport_options: [destination: "gemini.example"]
                  ]
                )
@@ -412,7 +412,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                  exit,
                  cwd: "/remote/worktree",
                  execution_surface: [
-                   surface_kind: :static_ssh,
+                   surface_kind: :ssh_exec,
                    transport_options: [destination: "amp.example"]
                  ]
                )

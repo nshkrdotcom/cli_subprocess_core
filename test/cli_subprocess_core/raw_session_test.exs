@@ -156,12 +156,12 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert {:ok, session} =
              RawSession.start(script, [],
                surface_kind: :local_subprocess,
+               startup_mode: :lazy,
                target_id: "target-1",
                lease_ref: "lease-1",
                surface_ref: "surface-1",
                boundary_class: :local,
-               observability: %{suite: :phase_b},
-               transport_options: [startup_mode: :lazy]
+               observability: %{suite: :phase_b}
              )
 
     assert %{

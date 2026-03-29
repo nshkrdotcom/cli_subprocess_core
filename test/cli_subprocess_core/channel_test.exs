@@ -65,7 +65,7 @@ defmodule CliSubprocessCore.ChannelTest do
                subscriber: {self(), ref},
                stdout_mode: :raw,
                stdin_mode: :raw,
-               surface_kind: :static_ssh,
+               surface_kind: :ssh_exec,
                target_id: "ssh-target-1",
                transport_options:
                  FakeSSH.transport_options(fake_ssh,
@@ -74,7 +74,7 @@ defmodule CliSubprocessCore.ChannelTest do
                  )
              )
 
-    assert info.transport.surface_kind == :static_ssh
+    assert info.transport.surface_kind == :ssh_exec
     assert info.transport.target_id == "ssh-target-1"
     assert info.transport.adapter_metadata.destination == "channel.test.example"
     assert info.transport.adapter_metadata.port == 2222

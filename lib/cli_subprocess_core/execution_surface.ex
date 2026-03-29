@@ -13,10 +13,8 @@ defmodule CliSubprocessCore.ExecutionSurface do
   belong in `ExecutionSurface`.
   """
 
-  alias CliSubprocessCore.Transport.{LocalSubprocess, SSHExec}
+  alias CliSubprocessCore.ExecutionSurface.{Capabilities, Registry}
 
-  @surface_kinds [:local_subprocess, :static_ssh, :leased_ssh, :guest_bridge]
-  @remote_surface_kinds [:static_ssh, :leased_ssh]
   @default_surface_kind :local_subprocess
   @reserved_keys [
     :surface_kind,
@@ -37,7 +35,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
             boundary_class: nil,
             observability: %{}
 
-  @type surface_kind :: :local_subprocess | :static_ssh | :leased_ssh | :guest_bridge
+  @type surface_kind :: :local_subprocess | :ssh_exec | :guest_bridge
   @type reserved_key ::
           :surface_kind
           | :transport_options
@@ -77,6 +75,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
         }
 
   @type resolved :: %{
+          adapter_capabilities: Capabilities.t(),
           dispatch: dispatch(),
           adapter_options: keyword(),
           surface: t()
@@ -89,24 +88,28 @@ defmodule CliSubprocessCore.ExecutionSurface do
   def reserved_keys, do: @reserved_keys
 
   @spec supported_surface_kinds() :: [surface_kind(), ...]
-  def supported_surface_kinds, do: @surface_kinds
+  def supported_surface_kinds, do: Registry.supported_surface_kinds()
 
   @spec remote_surface_kind?(surface_kind()) :: boolean()
-  def remote_surface_kind?(surface_kind) when surface_kind in @remote_surface_kinds, do: true
-  def remote_surface_kind?(surface_kind) when surface_kind in @surface_kinds, do: false
+  def remote_surface_kind?(surface_kind) when is_atom(surface_kind) do
+    case adapter_capabilities(surface_kind) do
+      {:ok, %Capabilities{remote?: remote?}} -> remote?
+      {:error, _reason} -> false
+    end
+  end
 
   @spec remote_surface?(t() | surface_kind() | keyword() | map() | nil) :: boolean()
   def remote_surface?(%__MODULE__{surface_kind: surface_kind}),
     do: remote_surface_kind?(surface_kind)
 
-  def remote_surface?(surface_kind) when surface_kind in @surface_kinds,
+  def remote_surface?(surface_kind) when is_atom(surface_kind),
     do: remote_surface_kind?(surface_kind)
 
   def remote_surface?(opts) when is_list(opts) do
     case execution_surface_attrs(opts) do
       {:ok, attrs} ->
         case Keyword.get(attrs, :surface_kind) do
-          surface_kind when surface_kind in @surface_kinds -> remote_surface_kind?(surface_kind)
+          surface_kind when is_atom(surface_kind) -> remote_surface_kind?(surface_kind)
           _other -> false
         end
 
@@ -155,16 +158,17 @@ defmodule CliSubprocessCore.ExecutionSurface do
           {:ok, resolved()} | {:error, validation_error() | resolution_error()}
   def resolve(opts) when is_list(opts) do
     with {:ok, %__MODULE__{} = surface} <- new(opts),
-         {:ok, adapter} <- resolve_adapter(surface.surface_kind),
-         :ok <- ensure_adapter_loaded(adapter) do
+         {:ok, adapter} <- Registry.fetch(surface.surface_kind),
+         :ok <- ensure_adapter_loaded(adapter),
+         {:ok, %Capabilities{} = adapter_capabilities} <- normalize_adapter_capabilities(adapter),
+         {:ok, transport_options} <-
+           adapter.normalize_transport_options(surface.transport_options) do
       {:ok,
        %{
+         adapter_capabilities: adapter_capabilities,
          dispatch: adapter_dispatch(adapter),
          adapter_options:
-           opts
-           |> Keyword.drop(@reserved_keys)
-           |> Keyword.merge(surface.transport_options)
-           |> Keyword.merge(surface_metadata(surface)),
+           build_adapter_options(opts, surface, transport_options, adapter_capabilities),
          surface: surface
        }}
     else
@@ -177,8 +181,13 @@ defmodule CliSubprocessCore.ExecutionSurface do
           {:ok, surface_kind()} | {:error, {:invalid_surface_kind, term()}}
   def normalize_surface_kind(nil), do: {:ok, @default_surface_kind}
 
-  def normalize_surface_kind(surface_kind) when surface_kind in @surface_kinds,
-    do: {:ok, surface_kind}
+  def normalize_surface_kind(surface_kind) when is_atom(surface_kind) do
+    if Registry.registered?(surface_kind) do
+      {:ok, surface_kind}
+    else
+      {:error, {:invalid_surface_kind, surface_kind}}
+    end
+  end
 
   def normalize_surface_kind(surface_kind), do: {:error, {:invalid_surface_kind, surface_kind}}
 
@@ -218,11 +227,6 @@ defmodule CliSubprocessCore.ExecutionSurface do
     ]
   end
 
-  defp resolve_adapter(:local_subprocess), do: {:ok, LocalSubprocess}
-  defp resolve_adapter(:static_ssh), do: {:ok, SSHExec}
-  defp resolve_adapter(:leased_ssh), do: {:ok, SSHExec}
-  defp resolve_adapter(surface_kind), do: {:error, {:unsupported_surface_kind, surface_kind}}
-
   defp adapter_dispatch(adapter) when is_atom(adapter) do
     %{
       start: &adapter.start/1,
@@ -237,6 +241,44 @@ defmodule CliSubprocessCore.ExecutionSurface do
     else
       {:error, {:adapter_not_loaded, adapter}}
     end
+  end
+
+  defp normalize_adapter_capabilities(adapter) when is_atom(adapter) do
+    capabilities = adapter.capabilities()
+
+    case Capabilities.new(capabilities) do
+      {:ok, %Capabilities{} = normalized} ->
+        {:ok, normalized}
+
+      {:error, reason} ->
+        {:error, {:invalid_transport_options, {:invalid_adapter_capabilities, reason}}}
+    end
+  end
+
+  defp build_adapter_options(
+         opts,
+         %__MODULE__{} = surface,
+         transport_options,
+         adapter_capabilities
+       )
+       when is_list(opts) and is_list(transport_options) and
+              is_struct(adapter_capabilities, Capabilities) do
+    opts
+    |> Keyword.drop(@reserved_keys)
+    |> Keyword.put(:transport_options, transport_options)
+    |> Keyword.merge(surface_metadata(surface))
+    |> Keyword.put(:adapter_capabilities, adapter_capabilities)
+    |> maybe_put_effective_capabilities(surface.surface_kind, adapter_capabilities)
+  end
+
+  defp maybe_put_effective_capabilities(opts, :guest_bridge, _adapter_capabilities), do: opts
+
+  defp maybe_put_effective_capabilities(
+         opts,
+         _surface_kind,
+         %Capabilities{} = adapter_capabilities
+       ) do
+    Keyword.put(opts, :effective_capabilities, adapter_capabilities)
   end
 
   defp validate_optional_binary(nil, _field), do: :ok
@@ -312,4 +354,12 @@ defmodule CliSubprocessCore.ExecutionSurface do
   end
 
   defp normalize_execution_surface(attrs), do: {:error, {:invalid_execution_surface, attrs}}
+
+  defp adapter_capabilities(surface_kind) when is_atom(surface_kind) do
+    with {:ok, adapter} <- Registry.fetch(surface_kind),
+         :ok <- ensure_adapter_loaded(adapter),
+         {:ok, %Capabilities{} = capabilities} <- normalize_adapter_capabilities(adapter) do
+      {:ok, capabilities}
+    end
+  end
 end

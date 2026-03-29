@@ -87,9 +87,8 @@ Reserved command-lane options are:
 All remaining options are passed to `build_invocation/1` on the resolved
 provider profile. The core resolves the concrete transport adapter internally
 from `:surface_kind`, so callers should not choose transport modules directly.
-The landed surfaces today are `:local_subprocess`, `:static_ssh`, and
-`:leased_ssh`; `:guest_bridge` remains deferred and is still rejected. Legacy
-backend-selection overrides are rejected.
+The landed surfaces today are `:local_subprocess`, `:ssh_exec`, and
+`:guest_bridge`. Legacy backend-selection overrides are rejected.
 
 ## Transport Boundary
 

@@ -1,9 +1,11 @@
+# credo:disable-for-this-file Credo.Check.Warning.TooManyFields
 defmodule CliSubprocessCore.Transport.Options do
   @moduledoc """
   Normalized startup options for the raw transport layer.
   """
 
   alias CliSubprocessCore.{Command, ExecutionSurface, Transport}
+  alias CliSubprocessCore.ExecutionSurface.Capabilities
 
   @default_event_tag :cli_subprocess_core
   @default_headless_timeout_ms 30_000
@@ -17,49 +19,60 @@ defmodule CliSubprocessCore.Transport.Options do
   @default_close_stdin_on_start? false
 
   @enforce_keys [:command]
-  defstruct [
-    :command,
-    :surface_kind,
-    :target_id,
-    :lease_ref,
-    :surface_ref,
-    :boundary_class,
-    :observability,
-    adapter_metadata: %{},
-    invocation_override: nil,
-    args: [],
-    cwd: nil,
-    env: %{},
-    clear_env?: false,
-    user: nil,
-    stdout_mode: @default_stdout_mode,
-    stdin_mode: @default_stdin_mode,
-    pty?: false,
-    interrupt_mode: :signal,
-    subscriber: nil,
-    startup_mode: @default_startup_mode,
-    task_supervisor: @default_task_supervisor,
-    event_tag: @default_event_tag,
-    headless_timeout_ms: @default_headless_timeout_ms,
-    max_buffer_size: @default_max_buffer_size,
-    max_stderr_buffer_size: @default_max_stderr_buffer_size,
-    max_buffered_events: @default_max_buffered_events,
-    stderr_callback: nil,
-    close_stdin_on_start?: @default_close_stdin_on_start?,
-    replay_stderr_on_subscribe?: false,
-    buffer_events_until_subscribe?: false
-  ]
+  # credo:disable-for-next-line
+  defstruct command: nil,
+            surface_kind: nil,
+            transport_options: [],
+            target_id: nil,
+            lease_ref: nil,
+            surface_ref: nil,
+            boundary_class: nil,
+            observability: %{},
+            adapter_capabilities: nil,
+            effective_capabilities: nil,
+            bridge_profile: nil,
+            protocol_version: nil,
+            extensions: %{},
+            adapter_metadata: %{},
+            invocation_override: nil,
+            args: [],
+            cwd: nil,
+            env: %{},
+            clear_env?: false,
+            user: nil,
+            stdout_mode: @default_stdout_mode,
+            stdin_mode: @default_stdin_mode,
+            pty?: false,
+            interrupt_mode: :signal,
+            subscriber: nil,
+            startup_mode: @default_startup_mode,
+            task_supervisor: @default_task_supervisor,
+            event_tag: @default_event_tag,
+            headless_timeout_ms: @default_headless_timeout_ms,
+            max_buffer_size: @default_max_buffer_size,
+            max_stderr_buffer_size: @default_max_stderr_buffer_size,
+            max_buffered_events: @default_max_buffered_events,
+            stderr_callback: nil,
+            close_stdin_on_start?: @default_close_stdin_on_start?,
+            replay_stderr_on_subscribe?: false,
+            buffer_events_until_subscribe?: false
 
   @type subscriber :: pid() | {pid(), Transport.subscription_tag()} | nil
 
   @type t :: %__MODULE__{
           command: String.t(),
           surface_kind: Transport.surface_kind(),
+          transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,
           boundary_class: atom() | nil,
           observability: map(),
+          adapter_capabilities: Capabilities.t() | nil,
+          effective_capabilities: Capabilities.t() | nil,
+          bridge_profile: String.t() | nil,
+          protocol_version: pos_integer() | nil,
+          extensions: map(),
           adapter_metadata: map(),
           invocation_override: Command.t() | nil,
           args: [String.t()],
@@ -115,6 +128,10 @@ defmodule CliSubprocessCore.Transport.Options do
           | {:invalid_close_stdin_on_start, term()}
           | {:invalid_replay_stderr_on_subscribe, term()}
           | {:invalid_buffer_events_until_subscribe, term()}
+          | {:invalid_bridge_profile, term()}
+          | {:invalid_protocol_version, term()}
+          | {:invalid_extensions, term()}
+          | {:invalid_capabilities, term()}
 
   @doc """
   Builds a validated transport options struct.
@@ -123,7 +140,6 @@ defmodule CliSubprocessCore.Transport.Options do
   def new(opts) when is_list(opts) do
     with {:ok, normalized} <- normalize_invocation(opts),
          {:ok, surface} <- normalize_surface(opts),
-         :ok <- validate_surface_kind(surface.surface_kind),
          :ok <- validate_command(normalized.command),
          :ok <- validate_args(normalized.args),
          :ok <- validate_cwd(normalized.cwd),
@@ -145,13 +161,24 @@ defmodule CliSubprocessCore.Transport.Options do
          :ok <- validate_stderr_callback(normalized.stderr_callback),
          :ok <- validate_close_stdin_on_start(normalized.close_stdin_on_start?),
          :ok <- validate_replay_stderr_on_subscribe(normalized.replay_stderr_on_subscribe?),
-         :ok <-
-           validate_buffer_events_until_subscribe(normalized.buffer_events_until_subscribe?) do
+         :ok <- validate_buffer_events_until_subscribe(normalized.buffer_events_until_subscribe?),
+         {:ok, adapter_capabilities} <-
+           normalize_capabilities(Keyword.get(opts, :adapter_capabilities)),
+         {:ok, effective_capabilities} <-
+           normalize_capabilities(Keyword.get(opts, :effective_capabilities)),
+         :ok <- validate_bridge_profile(Keyword.get(opts, :bridge_profile)),
+         :ok <- validate_protocol_version(Keyword.get(opts, :protocol_version)),
+         :ok <- validate_extensions(Keyword.get(opts, :extensions, %{})) do
       {:ok,
        struct!(
          __MODULE__,
          normalized
          |> Map.merge(surface_metadata(surface))
+         |> Map.put(:adapter_capabilities, adapter_capabilities)
+         |> Map.put(:effective_capabilities, effective_capabilities)
+         |> Map.put(:bridge_profile, Keyword.get(opts, :bridge_profile))
+         |> Map.put(:protocol_version, Keyword.get(opts, :protocol_version))
+         |> Map.put(:extensions, normalize_extensions(Keyword.get(opts, :extensions, %{})))
          |> Map.put(
            :adapter_metadata,
            normalize_adapter_metadata(Keyword.get(opts, :adapter_metadata))
@@ -302,6 +329,7 @@ defmodule CliSubprocessCore.Transport.Options do
   defp surface_metadata(%ExecutionSurface{} = surface) do
     %{
       surface_kind: surface.surface_kind,
+      transport_options: surface.transport_options,
       target_id: surface.target_id,
       lease_ref: surface.lease_ref,
       surface_ref: surface.surface_ref,
@@ -318,12 +346,6 @@ defmodule CliSubprocessCore.Transport.Options do
 
   defp validate_command(command) when is_binary(command) and byte_size(command) > 0, do: :ok
   defp validate_command(command), do: {:error, {:invalid_command, command}}
-
-  defp validate_surface_kind(surface_kind)
-       when surface_kind in [:local_subprocess, :static_ssh, :leased_ssh],
-       do: :ok
-
-  defp validate_surface_kind(surface_kind), do: {:error, {:invalid_surface_kind, surface_kind}}
 
   defp validate_args(args) when is_list(args) do
     if Enum.all?(args, &is_binary/1) do
@@ -432,6 +454,30 @@ defmodule CliSubprocessCore.Transport.Options do
 
   defp validate_buffer_events_until_subscribe(value),
     do: {:error, {:invalid_buffer_events_until_subscribe, value}}
+
+  defp normalize_capabilities(nil), do: {:ok, nil}
+  defp normalize_capabilities(%Capabilities{} = capabilities), do: {:ok, capabilities}
+
+  defp normalize_capabilities(other) do
+    case Capabilities.new(other) do
+      {:ok, %Capabilities{} = capabilities} -> {:ok, capabilities}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_bridge_profile(nil), do: :ok
+  defp validate_bridge_profile(profile) when is_binary(profile) and profile != "", do: :ok
+  defp validate_bridge_profile(profile), do: {:error, {:invalid_bridge_profile, profile}}
+
+  defp validate_protocol_version(nil), do: :ok
+  defp validate_protocol_version(version) when is_integer(version) and version > 0, do: :ok
+  defp validate_protocol_version(version), do: {:error, {:invalid_protocol_version, version}}
+
+  defp normalize_extensions(extensions) when is_map(extensions), do: extensions
+  defp normalize_extensions(_other), do: %{}
+
+  defp validate_extensions(extensions) when is_map(extensions), do: :ok
+  defp validate_extensions(extensions), do: {:error, {:invalid_extensions, extensions}}
 
   defp default_interrupt_mode(true), do: {:stdin, <<3>>}
   defp default_interrupt_mode(_pty?), do: :signal

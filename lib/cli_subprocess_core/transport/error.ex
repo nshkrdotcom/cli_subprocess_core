@@ -9,6 +9,9 @@ defmodule CliSubprocessCore.Transport.Error do
           :not_connected
           | :timeout
           | :transport_stopped
+          | {:unsupported_capability, atom(), atom()}
+          | {:bridge_protocol_error, term()}
+          | {:bridge_remote_error, term(), term()}
           | {:buffer_overflow, pos_integer(), pos_integer()}
           | {:send_failed, term()}
           | {:call_exit, term()}
@@ -101,6 +104,31 @@ defmodule CliSubprocessCore.Transport.Error do
   @spec startup_failed(term()) :: t()
   def startup_failed(reason), do: transport_error({:startup_failed, reason})
 
+  @doc """
+  Builds an unsupported-capability error.
+  """
+  @spec unsupported_capability(atom(), atom()) :: t()
+  def unsupported_capability(capability, surface_kind)
+      when is_atom(capability) and is_atom(surface_kind) do
+    transport_error({:unsupported_capability, capability, surface_kind}, %{
+      capability: capability,
+      surface_kind: surface_kind
+    })
+  end
+
+  @doc """
+  Builds a bridge-protocol error.
+  """
+  @spec bridge_protocol_error(term()) :: t()
+  def bridge_protocol_error(reason), do: transport_error({:bridge_protocol_error, reason})
+
+  @doc """
+  Builds a bridge-remote error.
+  """
+  @spec bridge_remote_error(term(), term()) :: t()
+  def bridge_remote_error(code, details),
+    do: transport_error({:bridge_remote_error, code, details}, %{code: code, details: details})
+
   defp message_for(:not_connected), do: "Transport is not connected"
   defp message_for(:timeout), do: "Transport timeout"
   defp message_for(:transport_stopped), do: "Transport stopped before the operation completed"
@@ -122,5 +150,18 @@ defmodule CliSubprocessCore.Transport.Error do
     do: "Invalid transport options: #{inspect(reason)}"
 
   defp message_for({:startup_failed, reason}), do: "Transport startup failed: #{inspect(reason)}"
+
+  defp message_for({:unsupported_capability, capability, surface_kind}) do
+    "Transport capability #{inspect(capability)} is unsupported for #{inspect(surface_kind)}"
+  end
+
+  defp message_for({:bridge_protocol_error, reason}) do
+    "Guest bridge protocol error: #{inspect(reason)}"
+  end
+
+  defp message_for({:bridge_remote_error, code, details}) do
+    "Guest bridge remote error #{inspect(code)}: #{inspect(details)}"
+  end
+
   defp message_for(reason), do: "Transport error: #{inspect(reason)}"
 end

@@ -4,6 +4,7 @@ defmodule CliSubprocessCore.Transport.Info do
   """
 
   alias CliSubprocessCore.{Command, ExecutionSurface}
+  alias CliSubprocessCore.ExecutionSurface.Capabilities
   alias CliSubprocessCore.Transport
   alias CliSubprocessCore.Transport.Delivery
 
@@ -16,6 +17,11 @@ defmodule CliSubprocessCore.Transport.Info do
             surface_ref: nil,
             boundary_class: nil,
             observability: %{},
+            adapter_capabilities: nil,
+            effective_capabilities: nil,
+            bridge_profile: nil,
+            protocol_version: nil,
+            extensions: %{},
             adapter_metadata: %{},
             status: :disconnected,
             stdout_mode: :line,
@@ -35,6 +41,11 @@ defmodule CliSubprocessCore.Transport.Info do
           surface_ref: String.t() | nil,
           boundary_class: atom() | nil,
           observability: map(),
+          adapter_capabilities: Capabilities.t() | nil,
+          effective_capabilities: Capabilities.t() | nil,
+          bridge_profile: String.t() | nil,
+          protocol_version: pos_integer() | nil,
+          extensions: map(),
           adapter_metadata: map(),
           status: :connected | :disconnected | :error,
           stdout_mode: :line | :raw,
@@ -52,6 +63,7 @@ defmodule CliSubprocessCore.Transport.Info do
     %__MODULE__{
       delivery: Delivery.new(:cli_subprocess_core),
       observability: %{},
+      extensions: %{},
       adapter_metadata: %{}
     }
   end

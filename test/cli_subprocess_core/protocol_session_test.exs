@@ -52,7 +52,7 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
     {:ok, session} =
       start_protocol_session(
         fn request -> {:ok, %{"method" => request["method"]}} end,
-        surface_kind: :static_ssh,
+        surface_kind: :ssh_exec,
         transport_options:
           FakeSSH.transport_options(fake_ssh,
             destination: "protocol.test.example",

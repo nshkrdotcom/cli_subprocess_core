@@ -57,7 +57,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
 
     surface_opts =
       [
-        surface_kind: Keyword.get(opts, :surface_kind, :static_ssh),
+        surface_kind: Keyword.get(opts, :surface_kind, :ssh_exec),
         transport_options: transport_options,
         target_id: Keyword.get(opts, :target_id),
         lease_ref: Keyword.get(opts, :lease_ref),

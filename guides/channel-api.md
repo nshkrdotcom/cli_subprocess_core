@@ -90,7 +90,7 @@ tagged-delivery contract.
 ## SSH Surfaces
 
 Channels use the same generic execution-surface options as the transport layer.
-For a static SSH target:
+For an SSH execution surface:
 
 ```elixir
 {:ok, channel, _info} =
@@ -101,7 +101,7 @@ For a static SSH target:
     stdout_mode: :raw,
     stdin_mode: :raw,
     execution_surface: [
-      surface_kind: :static_ssh,
+      surface_kind: :ssh_exec,
       transport_options: [
         destination: "channel.test.example",
         ssh_user: "deploy",

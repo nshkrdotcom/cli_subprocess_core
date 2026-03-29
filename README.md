@@ -136,7 +136,7 @@ not choose transport modules directly.
   CliSubprocessCore.Transport.run(
     CliSubprocessCore.Command.new("hostname"),
     execution_surface: [
-      surface_kind: :static_ssh,
+      surface_kind: :ssh_exec,
       transport_options: [
         destination: "devbox.example",
         ssh_user: "deploy",
@@ -159,21 +159,17 @@ single `execution_surface` value whose fields are:
 - `boundary_class`
 - `observability`
 
-Landed surfaces today are `:local_subprocess`, `:static_ssh`, and
-`:leased_ssh`. The SSH surfaces accept:
+Landed surfaces today are `:local_subprocess`, `:ssh_exec`, and
+`:guest_bridge`. The SSH surface accepts:
 
 - required `:destination`
 - optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
 - optional `:ssh_args` and `:ssh_options`
 
-`:guest_bridge` remains reserved in the generic contract but is still
-rejected until the later deferred bridge phase lands.
-
-Higher layers in this stack may also carry `workspace_root`,
-`allowed_tools`, `approval_posture`, and `permission_mode` as generic
-execution-surface metadata before their own policy/runtime handling. The core
-transport boundary remains generic and does not reintroduce public
-`transport_module` selection.
+`:guest_bridge` negotiates its effective capabilities per attached session.
+Higher-layer runtime workspace or approval policy belongs outside
+`execution_surface`. The core transport boundary remains generic and does not
+reintroduce public `transport_module` selection.
 
 For the full SSH surface contract, see `guides/raw-transport.md`.
 

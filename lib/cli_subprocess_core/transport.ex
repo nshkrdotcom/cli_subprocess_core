@@ -30,6 +30,7 @@ defmodule CliSubprocessCore.Transport do
 
   alias CliSubprocessCore.{Command, ProcessExit, TaskSupport, Transport.Error}
   alias CliSubprocessCore.ExecutionSurface
+  alias CliSubprocessCore.ExecutionSurface.Capabilities
   alias CliSubprocessCore.Transport.Delivery
   alias CliSubprocessCore.Transport.Info
   alias CliSubprocessCore.Transport.RunResult
@@ -47,7 +48,7 @@ defmodule CliSubprocessCore.Transport do
   @type event_tag :: atom()
 
   @typedoc "Generic execution-surface placement kind."
-  @type surface_kind :: :local_subprocess | :static_ssh | :leased_ssh | :guest_bridge
+  @type surface_kind :: :local_subprocess | :ssh_exec | :guest_bridge
 
   @typedoc "Transport events delivered to subscribers."
   @type message ::
@@ -93,8 +94,10 @@ defmodule CliSubprocessCore.Transport do
   @spec start(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start(opts) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
-        dispatch.start.(adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options} = resolved} ->
+        with :ok <- validate_start_capabilities(resolved, opts) do
+          dispatch.start.(adapter_options)
+        end
 
       {:error, reason} ->
         transport_error(reason)
@@ -107,8 +110,10 @@ defmodule CliSubprocessCore.Transport do
   @spec start_link(keyword()) :: {:ok, t()} | {:error, {:transport, Error.t()}}
   def start_link(opts) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
-        dispatch.start_link.(adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options} = resolved} ->
+        with :ok <- validate_start_capabilities(resolved, opts) do
+          dispatch.start_link.(adapter_options)
+        end
 
       {:error, reason} ->
         transport_error(reason)
@@ -122,8 +127,10 @@ defmodule CliSubprocessCore.Transport do
   @spec run(Command.t(), keyword()) :: {:ok, RunResult.t()} | {:error, {:transport, Error.t()}}
   def run(%Command{} = command, opts \\ []) when is_list(opts) do
     case ExecutionSurface.resolve(opts) do
-      {:ok, %{dispatch: dispatch, adapter_options: adapter_options}} ->
-        dispatch.run.(command, adapter_options)
+      {:ok, %{dispatch: dispatch, adapter_options: adapter_options} = resolved} ->
+        with :ok <- validate_run_capabilities(resolved, command) do
+          dispatch.run.(command, adapter_options)
+        end
 
       {:error, reason} ->
         transport_error(reason)
@@ -256,6 +263,84 @@ defmodule CliSubprocessCore.Transport do
       _other -> Info.disconnected()
     end
   end
+
+  defp validate_start_capabilities(
+         %{adapter_capabilities: %Capabilities{} = capabilities, surface: surface},
+         opts
+       )
+       when is_list(opts) do
+    [
+      {capabilities.supports_streaming_stdio?, :streaming_stdio},
+      {not Keyword.get(opts, :pty?, false) or capabilities.supports_pty?, :pty},
+      {not has_user?(opts) or capabilities.supports_user?, :user},
+      {not has_env?(opts) or capabilities.supports_env?, :env},
+      {not has_cwd?(opts) or capabilities.supports_cwd?, :cwd}
+    ]
+    |> validate_family_capabilities(surface.surface_kind)
+  end
+
+  defp validate_run_capabilities(
+         %{adapter_capabilities: %Capabilities{} = capabilities, surface: surface},
+         %Command{} = command
+       ) do
+    [
+      {capabilities.supports_run?, :run},
+      {not has_user?(command) or capabilities.supports_user?, :user},
+      {not has_env?(command) or capabilities.supports_env?, :env},
+      {not has_cwd?(command) or capabilities.supports_cwd?, :cwd}
+    ]
+    |> validate_family_capabilities(surface.surface_kind)
+  end
+
+  defp validate_family_capabilities(checks, surface_kind) when is_list(checks) do
+    Enum.reduce_while(checks, :ok, fn {allowed?, capability}, :ok ->
+      case require_family_capability(allowed?, capability, surface_kind) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp require_family_capability(true, _capability, _surface_kind), do: :ok
+
+  defp require_family_capability(false, capability, surface_kind) do
+    transport_error(Error.unsupported_capability(capability, surface_kind))
+  end
+
+  defp has_user?(opts) when is_list(opts) do
+    case Keyword.get(opts, :user) do
+      user when is_binary(user) and user != "" -> true
+      _other -> false
+    end
+  end
+
+  defp has_user?(%Command{user: user}) when is_binary(user) and user != "", do: true
+  defp has_user?(%Command{}), do: false
+
+  defp has_env?(opts) when is_list(opts) do
+    clear_env? = Keyword.get(opts, :clear_env?, false)
+
+    case Keyword.get(opts, :env, %{}) do
+      env when is_map(env) -> map_size(env) > 0 or clear_env?
+      env when is_list(env) -> env != [] or clear_env?
+      _other -> clear_env?
+    end
+  end
+
+  defp has_env?(%Command{env: env, clear_env?: clear_env?}) when is_map(env),
+    do: map_size(env) > 0 or clear_env?
+
+  defp has_env?(%Command{}), do: false
+
+  defp has_cwd?(opts) when is_list(opts) do
+    case Keyword.get(opts, :cwd) do
+      cwd when is_binary(cwd) and cwd != "" -> true
+      _other -> false
+    end
+  end
+
+  defp has_cwd?(%Command{cwd: cwd}) when is_binary(cwd) and cwd != "", do: true
+  defp has_cwd?(%Command{}), do: false
 
   @doc """
   Extracts a normalized transport event from a legacy mailbox message.
