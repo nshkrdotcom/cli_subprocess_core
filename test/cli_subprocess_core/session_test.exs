@@ -108,7 +108,7 @@ defmodule CliSubprocessCore.SessionTest do
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
   end
 
-  test "session startup carries generic execution metadata and transport_options through the core" do
+  test "session startup carries generic execution metadata and transport tuning through the core" do
     script = create_test_script("sleep 60")
 
     assert {:ok, session, info} =
@@ -116,12 +116,15 @@ defmodule CliSubprocessCore.SessionTest do
                provider: :claude,
                prompt: "surface metadata",
                command: script,
-               target_id: "target-1",
-               lease_ref: "lease-1",
-               surface_ref: "surface-1",
-               boundary_class: :local,
-               observability: %{suite: :phase_b},
-               transport_options: [headless_timeout_ms: 321, startup_mode: :lazy]
+               execution_surface: [
+                 target_id: "target-1",
+                 lease_ref: "lease-1",
+                 surface_ref: "surface-1",
+                 boundary_class: :local,
+                 observability: %{suite: :phase_b}
+               ],
+               headless_timeout_ms: 321,
+               startup_mode: :lazy
              )
 
     assert %Transport.Info{} = info.transport.info
@@ -136,6 +139,38 @@ defmodule CliSubprocessCore.SessionTest do
     assert %{headless_timeout_ms: 321} = :sys.get_state(transport_pid)
 
     assert :ok = Session.close(session)
+  end
+
+  test "provider transport tuning stays top-level when the execution surface is canonical" do
+    test_pid = self()
+    stdin_path = temp_path!("amp_session_stdin")
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      cat > "#{stdin_path}"
+      printf 'ERR_LINE\\n' >&2
+      printf '{"type":"result","result":"ok"}\\n'
+      """)
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :amp,
+               prompt: "ship it",
+               command: script,
+               subscriber: {self(), ref},
+               stderr_callback: fn line -> send(test_pid, {:stderr_line, line}) end
+             )
+
+    assert_receive {:stderr_line, "ERR_LINE"}, 2_000
+    assert_receive {@session_event_tag, ^ref, {:event, run_started}}, 2_000
+    assert run_started.kind == :run_started
+    result_event = receive_session_event(ref, 2_000, &(&1.kind == :result))
+    assert result_event.kind == :result
+
+    monitor = Process.monitor(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
+    assert File.read!(stdin_path) == ""
   end
 
   test "interrupt requests propagate through the session and surface a terminal error" do
@@ -396,5 +431,26 @@ defmodule CliSubprocessCore.SessionTest do
     end)
 
     Path.join(dir, name)
+  end
+
+  defp receive_session_event(ref, timeout_ms, predicate) when is_reference(ref) do
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+    do_receive_session_event(ref, deadline_ms, predicate)
+  end
+
+  defp do_receive_session_event(ref, deadline_ms, predicate) when is_reference(ref) do
+    remaining_ms = max(deadline_ms - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {@session_event_tag, ^ref, {:event, event}} ->
+        if predicate.(event) do
+          event
+        else
+          do_receive_session_event(ref, deadline_ms, predicate)
+        end
+    after
+      remaining_ms ->
+        flunk("timed out waiting for matching session event")
+    end
   end
 end

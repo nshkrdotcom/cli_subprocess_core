@@ -203,7 +203,8 @@ defmodule CliSubprocessCore.Session do
   def init(opts) do
     with {:ok, options} <- Options.new(opts),
          {:ok, profile} <- resolve_profile(options),
-         {:ok, invocation} <- profile.build_invocation(options.provider_options),
+         provider_profile_options = Options.provider_profile_options(options),
+         {:ok, invocation} <- profile.build_invocation(provider_profile_options),
          :ok <- ProviderProfile.validate_invocation(invocation),
          {:ok, transport_pid, transport_ref} <- start_transport(options, profile, invocation) do
       state =
@@ -214,7 +215,7 @@ defmodule CliSubprocessCore.Session do
           options: options,
           runtime:
             Runtime.new(provider: options.provider, profile: profile, metadata: options.metadata),
-          parser_state: profile.init_parser_state(options.provider_options),
+          parser_state: profile.init_parser_state(provider_profile_options),
           subscribers: %{},
           transport_pid: transport_pid,
           transport_ref: transport_ref
@@ -381,26 +382,36 @@ defmodule CliSubprocessCore.Session do
 
   defp start_transport(options, profile, invocation) do
     transport_ref = make_ref()
+    execution_surface = Options.execution_surface(options)
+    provider_profile_options = Options.provider_profile_options(options)
 
-    transport_options =
-      options.provider_options
+    transport_runtime_opts =
+      provider_profile_options
       |> profile.transport_options()
-      |> Keyword.drop([:command, :args, :cwd, :env, :subscriber, :event_tag])
-      |> Keyword.merge(options.transport_options)
+      |> Keyword.drop([
+        :command,
+        :args,
+        :cwd,
+        :env,
+        :subscriber,
+        :event_tag,
+        :execution_surface,
+        :surface_kind,
+        :transport_options,
+        :target_id,
+        :lease_ref,
+        :surface_ref,
+        :boundary_class,
+        :observability
+      ])
 
     transport_opts =
       [
         command: invocation,
         subscriber: {self(), transport_ref},
         event_tag: @transport_event_tag,
-        surface_kind: options.surface_kind,
-        transport_options: transport_options,
-        target_id: options.target_id,
-        lease_ref: options.lease_ref,
-        surface_ref: options.surface_ref,
-        boundary_class: options.boundary_class,
-        observability: options.observability
-      ]
+        execution_surface: execution_surface
+      ] ++ transport_runtime_opts
 
     case CliSubprocessCore.Transport.start(transport_opts) do
       {:ok, transport_pid} ->

@@ -314,6 +314,39 @@ defmodule CliSubprocessCore.ProviderCLITest do
              ProviderCLI.resolve(:gemini, command: "custom-gemini")
   end
 
+  test "remote execution surfaces bypass local CODEX_PATH leakage and fall back to the provider command name" do
+    dir = TestSupport.tmp_dir!("core_codex_remote_resolution")
+    codex_path = TestSupport.write_executable!(dir, "codex", "#!/bin/bash\nexit 0\n")
+
+    try do
+      TestSupport.with_env(%{"CODEX_PATH" => codex_path}, fn ->
+        assert {:ok, %CommandSpec{program: "codex", argv_prefix: []}} =
+                 ProviderCLI.resolve(
+                   :codex,
+                   [],
+                   execution_surface: [
+                     surface_kind: :static_ssh,
+                     transport_options: [destination: "ssh.example"]
+                   ]
+                 )
+      end)
+    after
+      File.rm_rf(dir)
+    end
+  end
+
+  test "remote execution surfaces preserve explicit remote path overrides without local validation" do
+    assert {:ok, %CommandSpec{program: "/remote/bin/codex", argv_prefix: []}} =
+             ProviderCLI.resolve(
+               :codex,
+               [command: "/remote/bin/codex"],
+               execution_surface: [
+                 surface_kind: :static_ssh,
+                 transport_options: [destination: "ssh.example"]
+               ]
+             )
+  end
+
   defp build_fake_asdf_codex do
     root = TestSupport.tmp_dir!("core_codex_asdf")
     asdf_root = Path.join(root, ".asdf")

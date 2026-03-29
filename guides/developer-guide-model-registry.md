@@ -196,6 +196,11 @@ selection.resolved_model
 # => "llama3.2"
 ```
 
+That example still depends on a live Ollama-compatible endpoint at
+`anthropic_base_url` and on `llama3.2` actually being installed there. In a
+test environment without a running instance, expect the build call to fail
+instead of resolving to `"llama3.2"`.
+
 For Codex local OSS via Ollama, the caller should pass the backend intent into
 the core and let the registry validate that the local model exists:
 

@@ -28,18 +28,20 @@ defmodule CliSubprocessCore.Session.OptionsTest do
              Options.new(provider: :echo, subscriber: {:not_a_pid, :legacy})
   end
 
-  test "reserves execution-surface input off the provider lane" do
+  test "reserves canonical execution_surface input off the provider lane" do
     assert {:ok, %Options{} = options} =
              Options.new(
                provider: :echo,
                prompt: "hello",
-               surface_kind: :local_subprocess,
-               target_id: "target-1",
-               lease_ref: "lease-1",
-               surface_ref: "surface-1",
-               boundary_class: :local,
-               observability: %{suite: :phase_b},
-               transport_options: [startup_mode: :lazy]
+               execution_surface: [
+                 surface_kind: :local_subprocess,
+                 target_id: "target-1",
+                 lease_ref: "lease-1",
+                 surface_ref: "surface-1",
+                 boundary_class: :local,
+                 observability: %{suite: :phase_b},
+                 transport_options: [startup_mode: :lazy]
+               ]
              )
 
     assert options.provider_options == [prompt: "hello"]

@@ -6,7 +6,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   module instead of duplicating discovery logic in downstream adapters.
   """
 
-  alias CliSubprocessCore.CommandSpec
+  alias CliSubprocessCore.{CommandSpec, ExecutionSurface}
 
   defmodule Error do
     @moduledoc """
@@ -32,6 +32,7 @@ defmodule CliSubprocessCore.ProviderCLI do
           | {:default_command, String.t()}
           | {:display_name, String.t()}
           | {:env_var, String.t() | nil}
+          | {:execution_surface, ExecutionSurface.t() | map() | keyword() | nil}
           | {:extra_keys, [atom()]}
           | {:install_hint, String.t() | nil}
           | {:known_locations, [String.t()]}
@@ -106,6 +107,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   def resolve(provider, provider_opts \\ [], opts \\ [])
       when is_atom(provider) and is_list(provider_opts) and is_list(opts) do
     with {:ok, settings} <- build_settings(provider, opts),
+         settings = Map.put(settings, :resolution_mode, resolution_mode(provider_opts, settings)),
          {:ok, spec} <- resolve_spec(provider_opts, settings) do
       maybe_stabilize_command_spec(spec, settings)
     end
@@ -152,19 +154,25 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp resolve_spec(provider_opts, settings) do
-    path_steps =
-      if Map.get(settings, :known_locations_first?, false) do
-        [&known_location_lookup/1, &path_lookup/1]
-      else
-        [&path_lookup/1, &known_location_lookup/1]
+    if remote_resolution?(settings) do
+      with :miss <- explicit_override(provider_opts, settings) do
+        {:ok, CommandSpec.new(settings.default_command)}
       end
+    else
+      path_steps =
+        if Map.get(settings, :known_locations_first?, false) do
+          [&known_location_lookup/1, &path_lookup/1]
+        else
+          [&path_lookup/1, &known_location_lookup/1]
+        end
 
-    with :miss <- explicit_override(provider_opts, settings),
-         :miss <- env_override(settings),
-         :miss <- run_lookup_steps(path_steps, settings),
-         :miss <- npm_global_lookup(settings),
-         :miss <- npx_lookup(settings) do
-      {:error, cli_not_found(settings.provider, settings)}
+      with :miss <- explicit_override(provider_opts, settings),
+           :miss <- env_override(settings),
+           :miss <- run_lookup_steps(path_steps, settings),
+           :miss <- npm_global_lookup(settings),
+           :miss <- npx_lookup(settings) do
+        {:error, cli_not_found(settings.provider, settings)}
+      end
     end
   end
 
@@ -193,10 +201,14 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp explicit_string_override(value, settings) when is_binary(value) do
-    case explicit_path(value, settings) do
-      {:ok, %CommandSpec{} = spec} -> {:ok, spec}
-      :miss -> {:ok, CommandSpec.new(value)}
-      {:error, _reason} = error -> error
+    if remote_resolution?(settings) do
+      {:ok, CommandSpec.new(value)}
+    else
+      case explicit_path(value, settings) do
+        {:ok, %CommandSpec{} = spec} -> {:ok, spec}
+        :miss -> {:ok, CommandSpec.new(value)}
+        {:error, _reason} = error -> error
+      end
     end
   end
 
@@ -369,23 +381,67 @@ defmodule CliSubprocessCore.ProviderCLI do
          settings
        )
        when is_binary(program) do
-    if path_like?(program) and File.exists?(program) do
-      case stabilize_entrypoint(spec, settings) do
-        {:ok, %CommandSpec{} = stabilized_spec} ->
-          {:ok, stabilized_spec}
+    cond do
+      remote_resolution?(settings) ->
+        {:ok, spec}
 
-        {:error, {:program_shim_resolution_failed, path, reason}} ->
-          {:error, shim_resolution_error(settings, path, reason)}
+      path_like?(program) and File.exists?(program) ->
+        case stabilize_entrypoint(spec, settings) do
+          {:ok, %CommandSpec{} = stabilized_spec} ->
+            {:ok, stabilized_spec}
 
-        {:error, {:shebang_resolution_failed, script_path, reason}} ->
-          {:error, shebang_resolution_error(settings, script_path, reason)}
-      end
-    else
-      {:ok, spec}
+          {:error, {:program_shim_resolution_failed, path, reason}} ->
+            {:error, shim_resolution_error(settings, path, reason)}
+
+          {:error, {:shebang_resolution_failed, script_path, reason}} ->
+            {:error, shebang_resolution_error(settings, script_path, reason)}
+        end
+
+      true ->
+        {:ok, spec}
     end
   end
 
   defp maybe_stabilize_command_spec(%CommandSpec{} = spec, _settings), do: {:ok, spec}
+
+  defp resolution_mode(provider_opts, settings) do
+    cond do
+      Map.get(settings, :resolution_mode) in [:local, :remote] ->
+        Map.fetch!(settings, :resolution_mode)
+
+      ExecutionSurface.remote_surface?(Keyword.get(provider_opts, :execution_surface)) ->
+        :remote
+
+      ExecutionSurface.remote_surface?(Map.get(settings, :execution_surface)) ->
+        :remote
+
+      ExecutionSurface.remote_surface?(
+        surface_context(
+          Keyword.get(provider_opts, :surface_kind),
+          Keyword.get(provider_opts, :transport_options)
+        )
+      ) ->
+        :remote
+
+      ExecutionSurface.remote_surface?(
+        surface_context(Map.get(settings, :surface_kind), Map.get(settings, :transport_options))
+      ) ->
+        :remote
+
+      true ->
+        :local
+    end
+  end
+
+  defp surface_context(nil, _transport_options), do: nil
+
+  defp surface_context(surface_kind, transport_options) do
+    [surface_kind: surface_kind, transport_options: transport_options]
+  end
+
+  defp remote_resolution?(settings) do
+    Map.get(settings, :resolution_mode) == :remote
+  end
 
   defp stabilize_entrypoint(%CommandSpec{program: program} = spec, settings) do
     with {:ok, stabilized_program} <- stabilize_top_level_program(program, settings),

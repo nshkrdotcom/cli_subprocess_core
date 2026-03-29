@@ -20,8 +20,8 @@ multiple external CLI families.
 
 ## Schema Ownership Inside The Layers
 
-The common-lane schema boundary now sits beside the existing runtime layers,
-not above them as a second architecture.
+The shared schema boundary sits beside the existing runtime layers, not above
+them as a second architecture.
 
 - `CliSubprocessCore.Schema` owns the shared `Zoi` validation contract for
   core-owned dynamic boundaries.
@@ -30,6 +30,11 @@ not above them as a second architecture.
   `CliSubprocessCore.ModelRegistry.Selection`, and
   `CliSubprocessCore.ModelInput` use that schema layer at map ingress and then
   project back into the existing public structs.
+- Forward-compatible shared wire surfaces use
+  `Zoi.map(..., unrecognized_keys: :preserve)` plus projection so future fields
+  survive in `extra` where the boundary needs them.
+- Closed boundaries may still use direct struct validation, but evolving wire
+  surfaces should not depend on `Zoi.struct/3`.
 - Provider-native app-server, control-protocol, and orchestration schemas stay
   in the downstream repos that own those boundaries.
 

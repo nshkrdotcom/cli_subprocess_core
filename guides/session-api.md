@@ -13,21 +13,22 @@ Use `start_session/1` when you want the session pid and an initial info
 snapshot back together:
 
 ```elixir
+ref = make_ref()
+
 {:ok, session, info} =
   CliSubprocessCore.Session.start_session(
     provider: :claude,
     prompt: "Summarize the repo",
-    subscriber: {self(), make_ref()},
-    metadata: %{lane: :core},
-    session_event_tag: :sdk_runtime_session
+    subscriber: {self(), ref},
+    metadata: %{lane: :core}
   )
 ```
 
 `start_session/1` does not keep the caller linked to the session after startup.
 Use `start_link/1` when you want plain OTP linked-process semantics. Use
 `start_link_session/1` when you want the same initial info snapshot as
-`start_session/1` while keeping the session linked to the caller without
-depending on the internal startup handshake.
+`start_session/1` while also keeping the session linked to the caller. Both
+entrypoints still wait for the same startup handshake before returning.
 
 Required startup input is either:
 
@@ -92,8 +93,14 @@ Legacy subscribers receive:
 {:session_event, %CliSubprocessCore.Event{}}
 ```
 
-If an adapter sets `session_event_tag: :sdk_runtime_session`, tagged
-subscribers receive:
+Tagged subscribers receive this shape by default:
+
+```elixir
+{:cli_subprocess_core_session, ref, {:event, %CliSubprocessCore.Event{}}}
+```
+
+If an adapter overrides `:session_event_tag`, tagged subscribers receive the
+same payload with a different outer event atom:
 
 ```elixir
 {:sdk_runtime_session, ref, {:event, %CliSubprocessCore.Event{}}}
@@ -119,15 +126,14 @@ events in normalized runtime order.
 
 ## Info Snapshot
 
-For a session started with `session_event_tag: :sdk_runtime_session`,
-`info/1` returns a map shaped like:
+With the default tagged delivery, `info/1` returns a map shaped like:
 
 ```elixir
 %{
   capabilities: [:streaming, :interrupt],
   delivery: %CliSubprocessCore.Session.Delivery{
     legacy_message: :session_event,
-    tagged_event_tag: :sdk_runtime_session,
+    tagged_event_tag: :cli_subprocess_core_session,
     tagged_payload: :event
   },
   invocation: %CliSubprocessCore.Command{},
@@ -141,7 +147,7 @@ For a session started with `session_event_tag: :sdk_runtime_session`,
     provider_session_id: nil,
     sequence: 0
   },
-  session_event_tag: :sdk_runtime_session,
+  session_event_tag: :cli_subprocess_core_session,
   subscribers: 1,
   transport: %{
     module: CliSubprocessCore.Transport,
@@ -156,6 +162,20 @@ For a session started with `session_event_tag: :sdk_runtime_session`,
     pty?: false,
     interrupt_mode: :signal
   }
+}
+```
+
+If a direct adapter overrides `:session_event_tag`, the delivery fields change
+accordingly:
+
+```elixir
+%{
+  delivery: %CliSubprocessCore.Session.Delivery{
+    legacy_message: :session_event,
+    tagged_event_tag: :sdk_runtime_session,
+    tagged_payload: :event
+  },
+  session_event_tag: :sdk_runtime_session
 }
 ```
 

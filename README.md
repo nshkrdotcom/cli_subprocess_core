@@ -24,7 +24,7 @@ vocabulary. Within the runtime stack, it is the only repo that owns the
 underlying subprocess runtime startup, `:exec.*`, and raw subprocess lifecycle
 state.
 
-The library is designed for two consumers:
+Most callers fit one of four consumer shapes:
 
 - callers that only need process ownership and mailbox delivery through
   `CliSubprocessCore.Transport`
@@ -34,6 +34,10 @@ The library is designed for two consumers:
   `CliSubprocessCore.Command.run/1` or `run/2`
 - callers that want provider resolution, command construction, parsing, event
   sequencing, and normalized payloads through `CliSubprocessCore.Session`
+
+Advanced protocol callers can also build on `CliSubprocessCore.Channel`,
+`CliSubprocessCore.ProtocolSession`, or `CliSubprocessCore.JSONRPC` when they
+need long-lived framed IO or request/reply protocols above the raw transport.
 
 ## Menu
 
@@ -73,6 +77,9 @@ The library is designed for two consumers:
   stdin/stdout defaults, optional PTY startup, and normalized collection.
 - `CliSubprocessCore.Session` adds provider-aware parsing, sequencing, and
   subscriber fan-out on top of the raw transport.
+- `CliSubprocessCore.Channel`, `CliSubprocessCore.ProtocolSession`, and
+  `CliSubprocessCore.JSONRPC` add framed-IO and request/reply protocol helpers
+  above `CliSubprocessCore.RawSession` for advanced long-lived integrations.
 - `CliSubprocessCore.Transport` is the only public layer that exposes lazy
   startup directly. `CliSubprocessCore.RawSession` and
   `CliSubprocessCore.Session` wait for subprocess startup to either succeed or
@@ -81,27 +88,6 @@ The library is designed for two consumers:
 - `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
   `CliSubprocessCore.ProcessExit`, and `CliSubprocessCore.TaskSupport` support
   the transport and session layers.
-
-## Schema Contract
-
-`CliSubprocessCore` is also the shared schema-conventions anchor for the common
-CLI lane.
-
-- `CliSubprocessCore.Schema` defines the canonical `Zoi` validation and
-  normalization contract for new core-owned dynamic boundaries.
-- `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`,
-  `CliSubprocessCore.ModelRegistry.Model`,
-  `CliSubprocessCore.ModelRegistry.Selection`, and
-  `CliSubprocessCore.ModelInput` remain ergonomic caller-facing structs while
-  routing inbound dynamic maps through that schema layer.
-- Forward-compatible common-lane wire surfaces use
-  `Zoi.map(..., unrecognized_keys: :preserve)` plus projection so future fields
-  survive in `extra` where the boundary needs them.
-- Closed boundaries may still use direct struct validation, but evolving wire
-  surfaces should not depend on `Zoi.struct/3`.
-- Provider-native app-server, control-protocol, and orchestration-local schemas
-  stay in the repo that owns that boundary. They do not move into
-  `cli_subprocess_core`.
 
 ## Quick Start
 
@@ -141,8 +127,29 @@ receive do
 end
 ```
 
-Generic execution-surface input stays transport-neutral above the core. Public
-callers can pass:
+Use `execution_surface` when the process should run over SSH instead of
+locally. The core resolves the built-in SSH adapter internally; callers should
+not choose transport modules directly.
+
+```elixir
+{:ok, result} =
+  CliSubprocessCore.Transport.run(
+    CliSubprocessCore.Command.new("hostname"),
+    execution_surface: [
+      surface_kind: :static_ssh,
+      transport_options: [
+        destination: "devbox.example",
+        ssh_user: "deploy",
+        port: 22
+      ]
+    ]
+  )
+
+IO.puts(result.stdout)
+```
+
+Execution-surface input stays generic above the core. Public callers pass a
+single `execution_surface` value whose fields are:
 
 - `surface_kind`
 - `transport_options`
@@ -152,14 +159,8 @@ callers can pass:
 - `boundary_class`
 - `observability`
 
-Landed execution surfaces today are:
-
-- `:local_subprocess`
-- `:static_ssh`
-- `:leased_ssh`
-
-The built-in internal `SSHExec` adapter backs the two SSH surfaces. Its
-`transport_options` lane accepts:
+Landed surfaces today are `:local_subprocess`, `:static_ssh`, and
+`:leased_ssh`. The SSH surfaces accept:
 
 - required `:destination`
 - optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
@@ -168,14 +169,13 @@ The built-in internal `SSHExec` adapter backs the two SSH surfaces. Its
 `:guest_bridge` remains reserved in the generic contract but is still
 rejected until the later deferred bridge phase lands.
 
-`CliSubprocessCore.Transport` resolves the concrete built-in adapter
-internally. Callers should not choose transport modules directly.
-
 Higher layers in this stack may also carry `workspace_root`,
 `allowed_tools`, `approval_posture`, and `permission_mode` as generic
 execution-surface metadata before their own policy/runtime handling. The core
 transport boundary remains generic and does not reintroduce public
 `transport_module` selection.
+
+For the full SSH surface contract, see `guides/raw-transport.md`.
 
 Use the raw session handle when you need long-lived exact-byte ownership:
 
@@ -247,11 +247,11 @@ The `delivery` metadata returned by the core is the stable contract for direct
 adapter layers. Higher-level wrappers should prefer their own relay envelope or
 the extraction helpers over hard-coding the default core tag.
 Use `CliSubprocessCore.Session.start_link_session/1` when a direct adapter
-needs the initial info snapshot but must keep the session linked to the caller.
+needs the same startup snapshot while keeping the session linked to the caller.
 
 ## Built-In Profiles
 
-Phase 4 finalizes the publication story for the common provider-profile layer:
+The publication rule for provider profiles is:
 
 - the first-party common profiles for Claude, Codex, Gemini, and Amp stay
   built into `cli_subprocess_core`
@@ -313,6 +313,8 @@ Ad hoc external profiles can also be registered at runtime with
 - `guides/command-api.md`
 - `guides/raw-transport.md`
 - `guides/session-api.md`
+- `guides/channel-api.md`
+- `guides/json-rpc.md`
 - `guides/testing-and-conformance.md`
 - `guides/shutdown-and-timeouts.md`
 

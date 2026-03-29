@@ -88,13 +88,32 @@ Before treating a profile as first-party quality, confirm that it:
 - emits only normalized `CliSubprocessCore.Payload.*` structs
 - preserves provider-native data in `event.raw` when useful for debugging
 - sets `provider_session_id` when the CLI exposes a stable session identifier
-- emits a single terminal `:result` on success and `:error` on failure
+- follows the built-in terminal-exit pattern: one `:result` with
+  `status: :completed` on success and one `:error` on failure
 - behaves correctly under interrupt, stderr-only, and partial-line exit cases
 
 That checklist is intentionally stricter than "the parser seems to work." The
 goal is a stable shared runtime surface, not one-off provider adapters.
 
 ## Repo-Local Quality Gate
+
+During active development, use narrower loops before you rerun the full gate.
+
+Useful subsets:
+
+```bash
+mix test test/cli_subprocess_core/transport
+mix test test/cli_subprocess_core/transport_test.exs test/cli_subprocess_core/raw_session_test.exs test/cli_subprocess_core/channel_test.exs
+mix test test/cli_subprocess_core/provider_profile_test.exs test/cli_subprocess_core/provider_profiles_test.exs test/cli_subprocess_core/session_test.exs
+```
+
+When changing model resolution or provider backend selection, use the repo-local
+workflow helper as well:
+
+```bash
+./scripts/model_selection_ci.sh test --tag sdk
+./scripts/model_selection_ci.sh all --repo cli_subprocess_core
+```
 
 The full repo gate is:
 

@@ -174,13 +174,13 @@ defmodule CliSubprocessCore.Command do
 
   defp resolve_invocation(%Options{profile: profile} = options)
        when is_atom(profile) and not is_nil(profile) do
-    build_invocation(profile, options.provider_options, options.provider)
+    build_invocation(profile, Options.provider_profile_options(options), options.provider)
   end
 
   defp resolve_invocation(%Options{provider: provider, registry: registry} = options) do
     case ProviderRegistry.fetch(provider, registry) do
       {:ok, profile} ->
-        build_invocation(profile, options.provider_options, provider)
+        build_invocation(profile, Options.provider_profile_options(options), provider)
 
       :error ->
         {:error, Error.provider_not_found(provider)}
@@ -201,18 +201,20 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp do_run(invocation, %Options{} = options) do
+    execution_surface = Options.execution_surface(options)
+
     case CliSubprocessCore.Transport.run(invocation,
            stdin: options.stdin,
            timeout: options.timeout,
            stderr: options.stderr,
            close_stdin: options.close_stdin,
-           surface_kind: options.surface_kind,
+           execution_surface: execution_surface,
            transport_options: options.transport_options,
-           target_id: options.target_id,
-           lease_ref: options.lease_ref,
-           surface_ref: options.surface_ref,
-           boundary_class: options.boundary_class,
-           observability: options.observability
+           target_id: execution_surface.target_id,
+           lease_ref: execution_surface.lease_ref,
+           surface_ref: execution_surface.surface_ref,
+           boundary_class: execution_surface.boundary_class,
+           observability: execution_surface.observability
          ) do
       {:ok, %RunResult{} = result} ->
         {:ok, result}

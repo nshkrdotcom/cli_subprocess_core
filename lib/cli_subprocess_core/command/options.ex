@@ -22,6 +22,7 @@ defmodule CliSubprocessCore.Command.Options do
     :timeout,
     :stderr,
     :close_stdin,
+    :execution_surface,
     :surface_kind,
     :transport_options,
     :target_id,
@@ -156,6 +157,27 @@ defmodule CliSubprocessCore.Command.Options do
          provider_options: provider_options
        }}
     end
+  end
+
+  @spec execution_surface(t()) :: ExecutionSurface.t()
+  def execution_surface(%__MODULE__{} = options) do
+    {:ok, execution_surface} =
+      ExecutionSurface.new(
+        surface_kind: options.surface_kind,
+        transport_options: options.transport_options,
+        target_id: options.target_id,
+        lease_ref: options.lease_ref,
+        surface_ref: options.surface_ref,
+        boundary_class: options.boundary_class,
+        observability: options.observability
+      )
+
+    execution_surface
+  end
+
+  @spec provider_profile_options(t()) :: keyword()
+  def provider_profile_options(%__MODULE__{} = options) do
+    Keyword.put(options.provider_options, :execution_surface, execution_surface(options))
   end
 
   defp validate_invocation(%Command{} = invocation) do

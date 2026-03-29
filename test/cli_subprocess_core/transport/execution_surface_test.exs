@@ -51,6 +51,22 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
     assert leased_ssh.adapter_options[:destination] == "leased.example"
   end
 
+  test "resolve/1 accepts canonical execution_surface inputs" do
+    assert {:ok, resolved} =
+             ExecutionSurface.resolve(
+               command: "cat",
+               execution_surface: %{
+                 "surface_kind" => :static_ssh,
+                 "target_id" => "ssh-target-2",
+                 "transport_options" => %{"destination" => "ssh.canonical.example"}
+               }
+             )
+
+    assert resolved.surface.surface_kind == :static_ssh
+    assert resolved.surface.target_id == "ssh-target-2"
+    assert resolved.adapter_options[:destination] == "ssh.canonical.example"
+  end
+
   test "rejects guest bridge before adapter startup" do
     assert {:error, {:unsupported_surface_kind, :guest_bridge}} =
              ExecutionSurface.resolve(command: "cat", surface_kind: :guest_bridge)

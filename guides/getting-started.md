@@ -4,6 +4,14 @@ This guide walks through the core modules you need first, when to use the raw
 transport versus the session layer, and how to wire in a custom provider
 profile.
 
+## What "Common Lane" Means
+
+This repo uses "common lane" to mean the generic API shared by downstream SDKs
+and adapters. In that lane, callers describe a process with `surface_kind`,
+`transport_options`, `target_id`, and similar metadata without naming a
+transport module directly. Most application code should stay in that generic
+surface.
+
 ## What Exists In The Foundation
 
 The current foundation gives downstream repos a stable starting point for:
@@ -15,9 +23,11 @@ The current foundation gives downstream repos a stable starting point for:
 - provider profile validation with `CliSubprocessCore.ProviderProfile`
 - provider profile lookup with `CliSubprocessCore.ProviderRegistry`
 - built-in first-party provider profiles for Claude, Codex, Gemini, and Amp
-- runtime sequencing with `CliSubprocessCore.Runtime`
 - session-oriented provider runtime ownership with `CliSubprocessCore.Session`
+- provider-agnostic raw session ownership with `CliSubprocessCore.RawSession`
 - raw subprocess ownership with `CliSubprocessCore.Transport`
+- framed long-lived IO channels with `CliSubprocessCore.Channel`
+- JSON-RPC request/reply sessions with `CliSubprocessCore.JSONRPC`
 
 ## Define A Provider Profile
 
@@ -91,48 +101,6 @@ config :cli_subprocess_core,
 
 That preload hook affects the boot registry list only. It does not make the
 external profile a first-party built-in shipped by `cli_subprocess_core`.
-
-## Emit Sequenced Events
-
-`CliSubprocessCore.Runtime` centralizes provider id, provider session id, and
-event sequencing:
-
-```elixir
-runtime =
-  CliSubprocessCore.Runtime.new(
-    provider: :example,
-    profile: MyApp.ProviderProfiles.Example,
-    provider_session_id: "provider-session-1",
-    metadata: %{lane: :core}
-  )
-
-payload = CliSubprocessCore.Payload.AssistantDelta.new(content: "hello")
-
-{event, runtime} =
-  CliSubprocessCore.Runtime.next_event(runtime, :assistant_delta, payload)
-```
-
-The resulting `event` includes:
-
-- the normalized kind
-- the provider id
-- the next sequence number
-- the provider session id
-- the merged runtime metadata
-
-## Frame Incremental Output
-
-`CliSubprocessCore.LineFraming` lets transport code accumulate partial stdout
-and stderr chunks without losing line boundaries:
-
-```elixir
-state = CliSubprocessCore.LineFraming.new()
-{lines, state} = CliSubprocessCore.LineFraming.push(state, "alpha\nbeta")
-{tail, state} = CliSubprocessCore.LineFraming.flush(state)
-```
-
-`lines` contains complete lines and `tail` contains the final buffered fragment
-once the stream ends.
 
 ## Start A Raw Transport
 
@@ -216,3 +184,30 @@ See `guides/session-api.md` for the session contract,
 `guides/command-api.md` for the one-shot command lane,
 `guides/built-in-provider-profiles.md` for the first-party profile catalog, and
 `guides/custom-provider-profiles.md` for extension guidance.
+
+## Start A Channel
+
+Use `CliSubprocessCore.Channel` when you need a long-lived framed IO handle but
+do not want provider parsing. It wraps `RawSession` with stable mailbox
+delivery, stable `extract_event/2`, and `delivery_info/1` so adapters do not
+have to carry raw transport refs themselves. See `guides/channel-api.md`.
+
+## Start A JSON-RPC Session
+
+Use `CliSubprocessCore.JSONRPC` when the subprocess speaks newline-delimited
+JSON-RPC and you want request ids, notifications, peer-request replies, and
+readiness handling managed for you. It builds on
+`CliSubprocessCore.ProtocolSession` for the common request/reply lifecycle.
+See `guides/json-rpc.md`.
+
+## Lower-Level Helpers
+
+Most callers can ignore `CliSubprocessCore.Runtime` and
+`CliSubprocessCore.LineFraming` on day one.
+
+- Use `CliSubprocessCore.Runtime` directly only when you are emitting
+  normalized `CliSubprocessCore.Event` values yourself outside
+  `CliSubprocessCore.Session`.
+- Use `CliSubprocessCore.LineFraming` directly only when you are writing
+  transport or protocol code that receives partial chunks and must recover
+  newline-delimited records safely.

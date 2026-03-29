@@ -16,6 +16,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
   alias CliSubprocessCore.Transport.{LocalSubprocess, SSHExec}
 
   @surface_kinds [:local_subprocess, :static_ssh, :leased_ssh, :guest_bridge]
+  @remote_surface_kinds [:static_ssh, :leased_ssh]
   @default_surface_kind :local_subprocess
   @reserved_keys [
     :surface_kind,
@@ -59,6 +60,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
   @type validation_error ::
           {:invalid_surface_kind, term()}
           | {:invalid_transport_options, term()}
+          | {:invalid_execution_surface, term()}
           | {:invalid_target_id, term()}
           | {:invalid_lease_ref, term()}
           | {:invalid_surface_ref, term()}
@@ -89,25 +91,62 @@ defmodule CliSubprocessCore.ExecutionSurface do
   @spec supported_surface_kinds() :: [surface_kind(), ...]
   def supported_surface_kinds, do: @surface_kinds
 
+  @spec remote_surface_kind?(surface_kind()) :: boolean()
+  def remote_surface_kind?(surface_kind) when surface_kind in @remote_surface_kinds, do: true
+  def remote_surface_kind?(surface_kind) when surface_kind in @surface_kinds, do: false
+
+  @spec remote_surface?(t() | surface_kind() | keyword() | map() | nil) :: boolean()
+  def remote_surface?(%__MODULE__{surface_kind: surface_kind}),
+    do: remote_surface_kind?(surface_kind)
+
+  def remote_surface?(surface_kind) when surface_kind in @surface_kinds,
+    do: remote_surface_kind?(surface_kind)
+
+  def remote_surface?(opts) when is_list(opts) do
+    case execution_surface_attrs(opts) do
+      {:ok, attrs} ->
+        case Keyword.get(attrs, :surface_kind) do
+          surface_kind when surface_kind in @surface_kinds -> remote_surface_kind?(surface_kind)
+          _other -> false
+        end
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  def remote_surface?(%{} = surface) do
+    case Map.get(surface, :__struct__) do
+      __MODULE__ ->
+        remote_surface?(Map.get(surface, :surface_kind))
+
+      _other ->
+        remote_surface?(Map.get(surface, :surface_kind, Map.get(surface, "surface_kind")))
+    end
+  end
+
+  def remote_surface?(_other), do: false
+
   @spec new(keyword()) :: {:ok, t()} | {:error, validation_error()}
   def new(opts) when is_list(opts) do
-    with {:ok, surface_kind} <- normalize_surface_kind(Keyword.get(opts, :surface_kind)),
+    with {:ok, attrs} <- execution_surface_attrs(opts),
+         {:ok, surface_kind} <- normalize_surface_kind(Keyword.get(attrs, :surface_kind)),
          {:ok, transport_options} <-
-           normalize_transport_options(Keyword.get(opts, :transport_options)),
-         :ok <- validate_optional_binary(Keyword.get(opts, :target_id), :target_id),
-         :ok <- validate_optional_binary(Keyword.get(opts, :lease_ref), :lease_ref),
-         :ok <- validate_optional_binary(Keyword.get(opts, :surface_ref), :surface_ref),
-         :ok <- validate_boundary_class(Keyword.get(opts, :boundary_class)),
-         :ok <- validate_observability(Keyword.get(opts, :observability, %{})) do
+           normalize_transport_options(Keyword.get(attrs, :transport_options)),
+         :ok <- validate_optional_binary(Keyword.get(attrs, :target_id), :target_id),
+         :ok <- validate_optional_binary(Keyword.get(attrs, :lease_ref), :lease_ref),
+         :ok <- validate_optional_binary(Keyword.get(attrs, :surface_ref), :surface_ref),
+         :ok <- validate_boundary_class(Keyword.get(attrs, :boundary_class)),
+         :ok <- validate_observability(Keyword.get(attrs, :observability, %{})) do
       {:ok,
        %__MODULE__{
          surface_kind: surface_kind,
          transport_options: Keyword.drop(transport_options, @forbidden_transport_option_keys),
-         target_id: Keyword.get(opts, :target_id),
-         lease_ref: Keyword.get(opts, :lease_ref),
-         surface_ref: Keyword.get(opts, :surface_ref),
-         boundary_class: Keyword.get(opts, :boundary_class),
-         observability: Keyword.get(opts, :observability, %{})
+         target_id: Keyword.get(attrs, :target_id),
+         lease_ref: Keyword.get(attrs, :lease_ref),
+         surface_ref: Keyword.get(attrs, :surface_ref),
+         boundary_class: Keyword.get(attrs, :boundary_class),
+         observability: Keyword.get(attrs, :observability, %{})
        }}
     end
   end
@@ -156,10 +195,12 @@ defmodule CliSubprocessCore.ExecutionSurface do
   end
 
   def normalize_transport_options(options) when is_map(options) do
-    if Enum.all?(Map.keys(options), &is_atom/1) do
-      {:ok, Enum.into(options, [])}
-    else
-      {:error, {:invalid_transport_options, options}}
+    case Enum.reduce_while(options, [], &normalize_transport_option_pair/2) do
+      :error ->
+        {:error, {:invalid_transport_options, options}}
+
+      normalized ->
+        {:ok, Enum.reverse(normalized)}
     end
   end
 
@@ -212,4 +253,63 @@ defmodule CliSubprocessCore.ExecutionSurface do
 
   defp validate_observability(observability),
     do: {:error, {:invalid_observability, observability}}
+
+  defp normalize_transport_option_key(key) when is_binary(key) do
+    {:ok, String.to_existing_atom(key)}
+  rescue
+    ArgumentError -> :error
+  end
+
+  defp normalize_transport_option_pair({key, value}, acc) when is_atom(key) do
+    {:cont, [{key, value} | acc]}
+  end
+
+  defp normalize_transport_option_pair({key, value}, acc) when is_binary(key) do
+    case normalize_transport_option_key(key) do
+      {:ok, normalized_key} -> {:cont, [{normalized_key, value} | acc]}
+      :error -> {:halt, :error}
+    end
+  end
+
+  defp normalize_transport_option_pair(_other, _acc), do: {:halt, :error}
+
+  defp execution_surface_attrs(opts) when is_list(opts) do
+    case Keyword.get(opts, :execution_surface) do
+      nil ->
+        {:ok, Keyword.take(opts, @reserved_keys)}
+
+      execution_surface ->
+        normalize_execution_surface(execution_surface)
+    end
+  end
+
+  defp normalize_execution_surface(%__MODULE__{} = surface) do
+    {:ok,
+     [
+       transport_options: surface.transport_options
+     ] ++ surface_metadata(surface)}
+  end
+
+  defp normalize_execution_surface(attrs) when is_list(attrs) do
+    if Keyword.keyword?(attrs) do
+      {:ok, Keyword.take(attrs, @reserved_keys)}
+    else
+      {:error, {:invalid_execution_surface, attrs}}
+    end
+  end
+
+  defp normalize_execution_surface(attrs) when is_map(attrs) do
+    {:ok,
+     [
+       surface_kind: Map.get(attrs, :surface_kind, Map.get(attrs, "surface_kind")),
+       transport_options: Map.get(attrs, :transport_options, Map.get(attrs, "transport_options")),
+       target_id: Map.get(attrs, :target_id, Map.get(attrs, "target_id")),
+       lease_ref: Map.get(attrs, :lease_ref, Map.get(attrs, "lease_ref")),
+       surface_ref: Map.get(attrs, :surface_ref, Map.get(attrs, "surface_ref")),
+       boundary_class: Map.get(attrs, :boundary_class, Map.get(attrs, "boundary_class")),
+       observability: Map.get(attrs, :observability, Map.get(attrs, "observability", %{}))
+     ]}
+  end
+
+  defp normalize_execution_surface(attrs), do: {:error, {:invalid_execution_surface, attrs}}
 end

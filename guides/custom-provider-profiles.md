@@ -17,10 +17,9 @@ Add a custom profile when:
 If you only need raw subprocess ownership, use `CliSubprocessCore.Transport`
 directly and skip the profile layer.
 
-Phase 4 finalizes the packaging rule for this layer:
+The packaging rule for this layer is:
 
-- first-party common profiles stay built into `cli_subprocess_core` through the
-  initial published stack cut
+- first-party common profiles stay built into `cli_subprocess_core`
 - third-party/common custom profiles belong in external packages that implement
   `CliSubprocessCore.ProviderProfile`
 - those external packages register explicitly at runtime or preload
@@ -98,14 +97,22 @@ defmodule MyApp.ProviderProfiles.Example do
   def handle_exit(reason, state) do
     exit = ProcessExit.from_reason(reason)
 
-    payload =
+    {kind, payload} =
       if ProcessExit.successful?(exit) do
-        Payload.Result.new(status: :completed, stop_reason: exit.reason, output: %{code: exit.code})
+        {:result,
+         Payload.Result.new(
+           status: :completed,
+           stop_reason: normalize_stop_reason(exit.reason),
+           output: %{code: exit.code, signal: exit.signal}
+         )}
       else
-        Payload.Error.new(message: "CLI exited with code #{exit.code}", code: Integer.to_string(exit.code))
+        {:error,
+         Payload.Error.new(
+           message: "CLI exited with code #{exit.code}",
+           code: normalize_error_code(exit.reason)
+         )}
       end
 
-    kind = if ProcessExit.successful?(exit), do: :result, else: :error
     event = Event.new(kind, provider: id(), payload: payload)
 
     {[event], state}
@@ -113,6 +120,14 @@ defmodule MyApp.ProviderProfiles.Example do
 
   @impl true
   def transport_options(_opts), do: []
+
+  defp normalize_stop_reason(reason) when is_binary(reason), do: reason
+  defp normalize_stop_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp normalize_stop_reason(reason), do: inspect(reason)
+
+  defp normalize_error_code(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp normalize_error_code(reason) when is_binary(reason), do: reason
+  defp normalize_error_code(reason), do: inspect(reason)
 end
 ```
 
@@ -156,6 +171,14 @@ Common patterns:
 - map terminal success to `Payload.Result`
 - map non-zero exits and parse failures to `Payload.Error`
 - emit `provider_session_id` whenever the CLI exposes one
+
+The built-in profiles also normalize terminal exits in a specific way:
+
+- success emits exactly one `:result` with `status: :completed`
+- failure emits exactly one `:error`
+- `exit.reason` is normalized before it becomes a public `stop_reason` or
+  error `code`, because the runtime value may be an atom or tuple rather than
+  a display-friendly string
 
 The session layer will assign the final `id`, `sequence`, timestamp, provider,
 and merged metadata when it normalizes and dispatches each event.

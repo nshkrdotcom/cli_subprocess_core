@@ -20,7 +20,8 @@ directly.
 ## Start A Transport
 
 You can pass either a normalized `CliSubprocessCore.Command` or explicit
-transport keywords. Above the core, execution-surface input stays generic:
+transport keywords. Above the core, execution-surface input stays generic via
+one `:execution_surface` value:
 
 - `:surface_kind` selects the generic execution surface, default
   `:local_subprocess`
@@ -57,7 +58,7 @@ ref = make_ref()
   CliSubprocessCore.Transport.start(
     command: command,
     subscriber: {self(), ref},
-    transport_options: [startup_mode: :eager]
+    startup_mode: :eager
   )
 ```
 
@@ -66,24 +67,30 @@ Supported local-subprocess startup options are normalized by
 `CliSubprocessCore.Transport.start/1` when you are already inside the core:
 
 - `:command` – required executable path or binary name
-- `:args` – argv tail
-- `:cwd` – working directory
-- `:env` – environment map
-- `:clear_env?` – whether to clear inherited environment variables first
-- `:stdout_mode` – `:line` or `:raw`
-- `:stdin_mode` – `:line` or `:raw`
-- `:pty?` – whether to request PTY-backed subprocess startup
-- `:interrupt_mode` – `:signal` or `{:stdin, payload}`
-- `:subscriber` – `pid()` or `{pid(), :legacy | reference()}`
-- `:startup_mode` – `:eager` or `:lazy`
-- `:task_supervisor` – task supervisor used by safe transport calls
+- `:args` – argv tail, default `[]`
+- `:cwd` – working directory, default `nil` (inherit the caller's cwd)
+- `:env` – environment map, default `%{}`
+- `:clear_env?` – whether to clear inherited environment variables first,
+  default `false`
+- `:user` – subprocess user override, default `nil`
+- `:stdout_mode` – `:line` or `:raw`, default `:line`
+- `:stdin_mode` – `:line` or `:raw`, default `:line`
+- `:pty?` – whether to request PTY-backed subprocess startup, default `false`
+- `:interrupt_mode` – `:signal` or `{:stdin, payload}`, default `:signal` for
+  pipe-backed sessions and `{:stdin, <<3>>}` for PTY-backed sessions
+- `:subscriber` – `pid()` or `{pid(), :legacy | reference()}`, default `nil`
+- `:startup_mode` – `:eager` or `:lazy`, default `:eager`
+- `:task_supervisor` – task supervisor used by safe transport calls, default
+  `CliSubprocessCore.TaskSupervisor`
 - `:event_tag` – atom used for tagged subscriber events, default `:cli_subprocess_core`
 - `:headless_timeout_ms` – no-subscriber auto-stop timeout, default `30_000`
 - `:max_buffer_size` – stdout partial-line limit, default `1_048_576`
 - `:max_stderr_buffer_size` – stderr ring-buffer limit, default `262_144`
 - `:max_buffered_events` – early-event replay buffer size when
   `:buffer_events_until_subscribe?` is enabled, default `128`
-- `:stderr_callback` – optional per-line callback for stderr
+- `:stderr_callback` – optional per-line callback for stderr, default `nil`
+- `:close_stdin_on_start?` – whether stdin is closed immediately after spawn,
+  default `false`
 - `:replay_stderr_on_subscribe?` – replays the retained stderr tail to newly
   attached subscribers, default `false`
 - `:buffer_events_until_subscribe?` – buffers stdout/stderr/error events until
@@ -255,18 +262,7 @@ Use it when you need:
 - a stable raw-session handle instead of a bare transport pid
 - normalized output collection through `%CliSubprocessCore.Transport.RunResult{}`
 
-```elixir
-{:ok, session} =
-  CliSubprocessCore.RawSession.start("sh", ["-c", "cat"],
-    stdin?: true,
-    pty?: false
-  )
-
-:ok = CliSubprocessCore.RawSession.send_input(session, "alpha")
-:ok = CliSubprocessCore.RawSession.close_input(session)
-
-{:ok, result} = CliSubprocessCore.RawSession.collect(session, 5_000)
-```
+For the minimal start/send/collect flow, see `guides/getting-started.md`.
 
 `RawSession.collect/2` requires the configured receiver to be the calling
 process so the core can drain its own transport events deterministically.
@@ -274,7 +270,7 @@ process so the core can drain its own transport events deterministically.
 the underlying transport has either connected or returned a startup failure,
 even if the transport itself is configured with `startup_mode: :lazy`.
 `RawSession` starts through `CliSubprocessCore.Transport` by default, so
-common-lane callers should shape execution via `surface_kind` and
+generic-surface callers should shape execution via `surface_kind` and
 `transport_options`. Separate protocol families can still inject a generic
 `transport:` module when they need their own session contract.
 `RawSession.info/1` also returns `delivery` metadata with the effective

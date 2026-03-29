@@ -96,6 +96,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                    errors: []
                  },
                  output_schema: schema,
+                 skip_git_repo_check: true,
                  permission_mode: :yolo
                )
 
@@ -106,6 +107,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "--json",
                "--model",
                "gpt-5-codex",
+               "--skip-git-repo-check",
                "--output-schema",
                Jason.encode!(schema),
                "--config",

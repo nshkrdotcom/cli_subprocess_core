@@ -10,9 +10,8 @@ runtime lane:
 
 They are loaded into the default provider registry at application startup.
 
-Phase 4 keeps these as the runtime stack's first-party common profiles. They
-remain built into `cli_subprocess_core` rather than moving into separate
-profile packages.
+These remain the runtime stack's first-party common profiles. They ship inside
+`cli_subprocess_core` rather than moving into separate profile packages.
 
 ## Registry Ids
 

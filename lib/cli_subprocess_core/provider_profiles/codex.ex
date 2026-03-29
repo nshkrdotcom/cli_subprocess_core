@@ -67,6 +67,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     |> Shared.maybe_add_flag("--oss", oss_enabled?(opts))
     |> Shared.maybe_add_pair("--local-provider", local_provider_value(opts))
     |> Shared.maybe_add_pair("--model", model_value(opts))
+    |> Shared.maybe_add_flag("--skip-git-repo-check", Keyword.get(opts, :skip_git_repo_check))
     |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
     |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Kernel.++(permission_flags(opts))
