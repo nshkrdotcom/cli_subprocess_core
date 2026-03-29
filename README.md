@@ -171,6 +171,17 @@ Higher-layer runtime workspace or approval policy belongs outside
 `execution_surface`. The core transport boundary remains generic and does not
 reintroduce public `transport_module` selection.
 
+Runtime approval or sandbox posture is a separate concern from process
+placement. Flags such as provider-native "danger full access" modes belong to
+the downstream runtime layer that owns provider options, not to
+`CliSubprocessCore.ExecutionSurface`.
+
+That distinction matters for remote debugging. If a process launches over
+`:ssh_exec` and the remote CLI later fails when it tries to enter its own
+sandbox backend, the transport placement succeeded. At that point the failure
+is in the remote host or remote CLI runtime path, not in the core execution
+surface contract.
+
 For the full SSH surface contract, see `guides/raw-transport.md`. For built-in
 transport-family implementation work, see
 `guides/developer-guide-adding-transports.md`.

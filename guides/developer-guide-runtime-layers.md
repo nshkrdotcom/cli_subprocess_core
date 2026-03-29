@@ -87,6 +87,17 @@ captures process exit information.
 
 It should remain blind to provider policy.
 
+That includes provider-native approval and sandbox posture. The transport layer
+owns how the process is attached or started. It does not own whether a
+particular provider should run with a permissive mode such as "danger full
+access."
+
+If a remote CLI launched over `:ssh_exec` later fails inside its own sandbox
+backend, that is already above the transport-placement boundary. A common real
+example is a remote Linux host where the provider CLI tries to use `bwrap` and
+the host's AppArmor or userns policy blocks the loopback/userns setup. The
+core transport succeeded; the remote runtime or host policy did not.
+
 ## Layer 5: Event and Payload Emission
 
 Owned by:

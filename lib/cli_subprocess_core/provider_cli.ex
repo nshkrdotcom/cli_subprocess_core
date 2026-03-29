@@ -103,6 +103,7 @@ defmodule CliSubprocessCore.ProviderCLI do
     },
     claude: %{
       default_command: "claude-code",
+      remote_default_command: "claude",
       display_name: "Claude CLI",
       env_var: "CLAUDE_CLI_PATH",
       install_hint: "npm install -g @anthropic-ai/claude-code",
@@ -221,6 +222,9 @@ defmodule CliSubprocessCore.ProviderCLI do
       |> Map.put_new_lazy(:known_locations, fn -> default_known_locations(provider) end)
       |> Map.put_new(:known_locations_first?, false)
       |> Map.put_new(:allow_js_entrypoint, false)
+      |> Map.put_new_lazy(:remote_default_command, fn ->
+        Map.get(base_settings, :default_command)
+      end)
       |> Map.put_new(:node_command, "node")
       |> Map.put_new_lazy(:resolution_cwd, &File.cwd!/0)
       |> Map.put(:provider, provider)
@@ -254,7 +258,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp resolve_spec(provider_opts, settings) do
     if remote_resolution?(settings) do
       with :miss <- explicit_override(provider_opts, settings) do
-        {:ok, CommandSpec.new(settings.default_command)}
+        {:ok, CommandSpec.new(remote_default_command(settings))}
       end
     else
       path_steps =
@@ -539,6 +543,16 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp remote_resolution?(settings) do
     Map.get(settings, :resolution_mode) == :remote
+  end
+
+  defp remote_default_command(settings) when is_map(settings) do
+    case Map.get(settings, :remote_default_command) do
+      value when is_binary(value) and value != "" ->
+        value
+
+      _other ->
+        Map.get(settings, :default_command)
+    end
   end
 
   defp stabilize_entrypoint(%CommandSpec{program: program} = spec, settings) do

@@ -349,6 +349,18 @@ defmodule CliSubprocessCore.ProviderCLITest do
              )
   end
 
+  test "remote execution surfaces use the provider's remote default command when it differs from local discovery order" do
+    assert {:ok, %CommandSpec{program: "claude", argv_prefix: []}} =
+             ProviderCLI.resolve(
+               :claude,
+               [],
+               execution_surface: [
+                 surface_kind: :ssh_exec,
+                 transport_options: [destination: "ssh.example"]
+               ]
+             )
+  end
+
   describe "runtime_failure/3" do
     test "classifies remote command-not-found exits as cli_not_found" do
       exit =
