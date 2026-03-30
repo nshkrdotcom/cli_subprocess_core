@@ -167,6 +167,9 @@ Landed surfaces today are `:local_subprocess`, `:ssh_exec`, and
 - optional `:ssh_args` and `:ssh_options`
 
 `:guest_bridge` negotiates its effective capabilities per attached session.
+That surface is intentionally generic. Higher layers may source it from a
+boundary descriptor or another attach contract, but `cli_subprocess_core`
+still only consumes the normalized `execution_surface` payload.
 Higher-layer runtime workspace or approval policy belongs outside
 `execution_surface`. The core transport boundary remains generic and does not
 reintroduce public `transport_module` selection.
