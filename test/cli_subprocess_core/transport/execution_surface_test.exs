@@ -3,6 +3,26 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
 
   alias CliSubprocessCore.ExecutionSurface
 
+  test "helper lookups expose capabilities and path semantics without leaking adapter modules" do
+    assert {:ok, capabilities} = ExecutionSurface.capabilities(:local_subprocess)
+    assert capabilities.remote? == false
+    assert capabilities.path_semantics == :local
+
+    assert ExecutionSurface.path_semantics(:ssh_exec) == :remote
+    assert ExecutionSurface.path_semantics(surface_kind: :guest_bridge) == :guest
+    assert ExecutionSurface.nonlocal_path_surface?(:local_subprocess) == false
+    assert ExecutionSurface.nonlocal_path_surface?(:ssh_exec) == true
+    assert ExecutionSurface.nonlocal_path_surface?(surface_kind: :guest_bridge) == true
+  end
+
+  test "test-only guest-local helper proves path semantics are independent of remote topology" do
+    assert {:ok, capabilities} = ExecutionSurface.capabilities(:test_guest_local)
+    assert capabilities.remote? == false
+    assert capabilities.path_semantics == :guest
+    assert ExecutionSurface.remote_surface?(:test_guest_local) == false
+    assert ExecutionSurface.nonlocal_path_surface?(:test_guest_local) == true
+  end
+
   test "resolve/1 keeps adapter-module selection internal while normalizing the transport lane" do
     assert {:ok, resolved} =
              ExecutionSurface.resolve(

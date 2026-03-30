@@ -24,6 +24,20 @@ Use `:guest_bridge` when the new environment can expose the existing bridge
 contract and only needs a new bridge implementation or deployment fabric. That
 path does not require a new public transport family.
 
+If the new idea is really a control-plane concern rather than a transport
+family, stop before touching the registry.
+
+Examples that stay above the core:
+
+- lease allocation
+- pre-warmed pools
+- scheduler-driven target reuse
+- workspace fabric or sandbox provisioning
+
+Those concerns should reuse `target_id`, `lease_ref`, `surface_ref`, and
+`boundary_class` above the transport layer instead of minting a fake
+`surface_kind`.
+
 ## Public Contract Boundary
 
 The only public placement contract is `CliSubprocessCore.ExecutionSurface`.
@@ -63,6 +77,36 @@ That means:
 
 This is deliberate. The common CLI lane needs one authoritative owner for
 transport-family semantics, capability gating, and error normalization.
+
+## `remote?` Versus `path_semantics`
+
+These fields are related, but they are not interchangeable.
+
+- `remote?` answers whether the transport crosses a remote control boundary
+- `path_semantics` answers where command lookup, cwd handling, and PATH
+  expectations live
+
+Current built-in families happen to line up cleanly:
+
+- `:local_subprocess` -> `remote?: false`, `path_semantics: :local`
+- `:ssh_exec` -> `remote?: true`, `path_semantics: :remote`
+- `:guest_bridge` -> `remote?: true`, `path_semantics: :guest`
+
+Future families do not have to.
+
+A local container/daemon-driven surface may legitimately be:
+
+- `remote?: false`
+- `path_semantics: :guest`
+
+That is why command resolution and cwd-default logic must key off
+`path_semantics`, not `remote?`. In the public helper layer, use:
+
+- `ExecutionSurface.capabilities/1`
+- `ExecutionSurface.path_semantics/1`
+- `ExecutionSurface.nonlocal_path_surface?/1`
+
+Use `remote?` only when you truly mean transport topology.
 
 ## Implementation Checklist
 
@@ -105,6 +149,20 @@ Be explicit about:
 - `supports_env?`
 - `supports_cwd?`
 - `interrupt_kind`
+
+Do not rely on defaults for restrictive families.
+
+If the new family cannot support something, declare it explicitly in
+`Capabilities`. Facade-level validation only enforces what the adapter reports.
+
+Examples:
+
+- a family without `run/2` must set `supports_run?: false`
+- a family without PTY support must set `supports_pty?: false`
+- a family without cwd/env/user support must set those fields to `false`
+- a family without interrupt support must set `interrupt_kind` accordingly
+
+This is part of the transport contract, not an optional implementation detail.
 
 ### 3. Normalize only transport-owned options
 
@@ -220,6 +278,10 @@ Examples:
 - `run/2` on a non-run family
 - `cwd` on a family that does not support working directories
 
+Also add at least one conformance test that proves `path_semantics` can differ
+from `remote?`, so future local-but-guest families do not regress the command
+resolution layer.
+
 ### Adapter behavior tests
 
 Add family-specific tests for:
@@ -254,6 +316,42 @@ follow the `LocalSubprocess` pattern.
 Do not build a full bridge protocol for a transport that only needs command
 translation, and do not force a complex attach family into a spawn-wrapper just
 because subprocess support already exists.
+
+## Transport Auth For Future Credentialed Families
+
+Some future transport families may need transport-layer credentials even when
+the provider CLI does not.
+
+Examples:
+
+- `:aws_ssm`
+- future daemon-backed control channels
+
+The public transport contract must stay secret-free.
+
+Use:
+
+- `transport_options[:credential_binding_ref]`
+
+You may also carry non-secret selectors such as:
+
+- `:region`
+- `:profile`
+- `:role_arn`
+- target identifiers such as instance, pod, or daemon selectors
+
+Do not put any of the following into `ExecutionSurface` or public
+`transport_options`:
+
+- raw secret values
+- callback closures
+- Jido auth structs or lease structs
+
+Credentialed adapters should resolve secrets through a configured resolver
+owned outside the public core contract. If the binding ref is required, reject
+missing, `nil`, or empty `credential_binding_ref` inputs loudly during adapter
+normalization or startup. If metadata needs to expose auth lineage, expose only
+redacted binding identifiers or digests.
 
 ## Downstream Authoring Example
 

@@ -8,7 +8,7 @@ defmodule CliSubprocessCore.ExecutionSurface.Adapter do
 
   @type normalized_transport_options :: keyword()
 
-  @callback surface_kind() :: ExecutionSurface.surface_kind()
+  @callback surface_kind() :: ExecutionSurface.adapter_surface_kind()
   @callback capabilities() :: Capabilities.t()
   @callback normalize_transport_options(term()) ::
               {:ok, normalized_transport_options()}

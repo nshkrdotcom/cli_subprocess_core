@@ -256,7 +256,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp resolve_spec(provider_opts, settings) do
-    if remote_resolution?(settings) do
+    if nonlocal_path_resolution?(settings) do
       with :miss <- explicit_override(provider_opts, settings) do
         {:ok, CommandSpec.new(remote_default_command(settings))}
       end
@@ -303,7 +303,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp explicit_string_override(value, settings) when is_binary(value) do
-    if remote_resolution?(settings) do
+    if nonlocal_path_resolution?(settings) do
       {:ok, CommandSpec.new(value)}
     else
       case explicit_path(value, settings) do
@@ -484,7 +484,7 @@ defmodule CliSubprocessCore.ProviderCLI do
        )
        when is_binary(program) do
     cond do
-      remote_resolution?(settings) ->
+      nonlocal_path_resolution?(settings) ->
         {:ok, spec}
 
       path_like?(program) and File.exists?(program) ->
@@ -508,30 +508,33 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp resolution_mode(provider_opts, settings) do
     cond do
-      Map.get(settings, :resolution_mode) in [:local, :remote] ->
+      Map.get(settings, :resolution_mode) in [:local_path, :nonlocal_path] ->
         Map.fetch!(settings, :resolution_mode)
 
-      ExecutionSurface.remote_surface?(Keyword.get(provider_opts, :execution_surface)) ->
-        :remote
+      Map.get(settings, :resolution_mode) in [:local, :remote] ->
+        legacy_resolution_mode(Map.fetch!(settings, :resolution_mode))
 
-      ExecutionSurface.remote_surface?(Map.get(settings, :execution_surface)) ->
-        :remote
+      ExecutionSurface.nonlocal_path_surface?(Keyword.get(provider_opts, :execution_surface)) ->
+        :nonlocal_path
 
-      ExecutionSurface.remote_surface?(
+      ExecutionSurface.nonlocal_path_surface?(Map.get(settings, :execution_surface)) ->
+        :nonlocal_path
+
+      ExecutionSurface.nonlocal_path_surface?(
         surface_context(
           Keyword.get(provider_opts, :surface_kind),
           Keyword.get(provider_opts, :transport_options)
         )
       ) ->
-        :remote
+        :nonlocal_path
 
-      ExecutionSurface.remote_surface?(
+      ExecutionSurface.nonlocal_path_surface?(
         surface_context(Map.get(settings, :surface_kind), Map.get(settings, :transport_options))
       ) ->
-        :remote
+        :nonlocal_path
 
       true ->
-        :local
+        :local_path
     end
   end
 
@@ -541,8 +544,11 @@ defmodule CliSubprocessCore.ProviderCLI do
     [surface_kind: surface_kind, transport_options: transport_options]
   end
 
-  defp remote_resolution?(settings) do
-    Map.get(settings, :resolution_mode) == :remote
+  defp legacy_resolution_mode(:local), do: :local_path
+  defp legacy_resolution_mode(:remote), do: :nonlocal_path
+
+  defp nonlocal_path_resolution?(settings) do
+    Map.get(settings, :resolution_mode) == :nonlocal_path
   end
 
   defp remote_default_command(settings) when is_map(settings) do
@@ -1180,6 +1186,8 @@ defmodule CliSubprocessCore.ProviderCLI do
     cwd = Keyword.get(opts, :cwd)
     stderr = normalize_stderr(Keyword.get(opts, :stderr))
     remote? = ExecutionSurface.remote_surface?(execution_surface)
+    nonlocal_path? = ExecutionSurface.nonlocal_path_surface?(execution_surface)
+    path_semantics = ExecutionSurface.path_semantics(execution_surface)
     destination = surface_destination(execution_surface)
 
     %{
@@ -1188,6 +1196,8 @@ defmodule CliSubprocessCore.ProviderCLI do
       command: command,
       cwd: cwd,
       remote?: remote?,
+      nonlocal_path?: nonlocal_path?,
+      path_semantics: path_semantics,
       destination: destination,
       stderr: stderr
     }
@@ -1283,13 +1293,13 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp cli_not_found_message(settings, context) do
     base = cli_not_found(settings.provider, settings).message
 
-    if Map.get(context, :remote?) do
+    if Map.get(context, :nonlocal_path?) do
       base
       |> String.replace(
         " not found.",
         " not found#{placement_suffix(context)}."
       )
-      |> Kernel.<>(remote_path_hint())
+      |> Kernel.<>(path_hint(context))
     else
       base
     end
@@ -1332,8 +1342,21 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
   defp auth_hint(_provider), do: "Authenticate the CLI on the target and retry."
 
+  defp path_hint(%{remote?: true}), do: remote_path_hint()
+  defp path_hint(%{path_semantics: :guest}), do: guest_path_hint()
+  defp path_hint(%{nonlocal_path?: true}), do: nonlocal_path_hint()
+  defp path_hint(_context), do: ""
+
   defp remote_path_hint do
     " If the CLI is installed outside the remote non-login PATH, pass an explicit CLI path or PATH env override."
+  end
+
+  defp guest_path_hint do
+    " If the CLI is not on the guest PATH, pass an explicit CLI path or guest PATH env override."
+  end
+
+  defp nonlocal_path_hint do
+    " If the CLI is not on the target PATH, pass an explicit CLI path or PATH env override."
   end
 
   defp placement_suffix(%{remote?: true, destination: destination})
@@ -1342,6 +1365,8 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp placement_suffix(%{remote?: true}), do: " on the remote target"
+  defp placement_suffix(%{path_semantics: :guest}), do: " on the attached guest surface"
+  defp placement_suffix(%{nonlocal_path?: true}), do: " on the non-local execution surface"
   defp placement_suffix(_context), do: ""
 
   defp surface_destination(%ExecutionSurface{} = execution_surface) do

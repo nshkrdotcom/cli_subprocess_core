@@ -36,6 +36,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
             observability: %{}
 
   @type surface_kind :: :local_subprocess | :ssh_exec | :guest_bridge
+  @type adapter_surface_kind :: atom()
   @type reserved_key ::
           :surface_kind
           | :transport_options
@@ -87,48 +88,71 @@ defmodule CliSubprocessCore.ExecutionSurface do
   @spec reserved_keys() :: [reserved_key(), ...]
   def reserved_keys, do: @reserved_keys
 
-  @spec supported_surface_kinds() :: [surface_kind(), ...]
+  @spec supported_surface_kinds() :: [adapter_surface_kind(), ...]
   def supported_surface_kinds, do: Registry.supported_surface_kinds()
 
   @spec remote_surface_kind?(surface_kind()) :: boolean()
   def remote_surface_kind?(surface_kind) when is_atom(surface_kind) do
-    case adapter_capabilities(surface_kind) do
+    case capabilities(surface_kind) do
       {:ok, %Capabilities{remote?: remote?}} -> remote?
       {:error, _reason} -> false
     end
   end
 
+  @spec capabilities(t() | surface_kind() | keyword() | map() | nil) ::
+          {:ok, Capabilities.t()} | {:error, term()}
+  def capabilities(%__MODULE__{surface_kind: surface_kind}), do: capabilities(surface_kind)
+
+  def capabilities(surface_kind) when is_atom(surface_kind),
+    do: adapter_capabilities(surface_kind)
+
+  def capabilities(opts) when is_list(opts) do
+    with {:ok, attrs} <- execution_surface_attrs(opts),
+         surface_kind when is_atom(surface_kind) <- Keyword.get(attrs, :surface_kind) do
+      capabilities(surface_kind)
+    else
+      nil -> {:error, {:invalid_execution_surface, opts}}
+      {:error, _reason} = error -> error
+      _other -> {:error, {:invalid_execution_surface, opts}}
+    end
+  end
+
+  def capabilities(%{} = surface) do
+    case Map.get(surface, :__struct__) do
+      __MODULE__ ->
+        capabilities(Map.get(surface, :surface_kind))
+
+      _other ->
+        capabilities(Map.get(surface, :surface_kind, Map.get(surface, "surface_kind")))
+    end
+  end
+
+  def capabilities(_other), do: {:error, {:invalid_execution_surface, nil}}
+
+  @spec path_semantics(t() | surface_kind() | keyword() | map() | nil) ::
+          Capabilities.path_semantics() | nil
+  def path_semantics(surface) do
+    case capabilities(surface) do
+      {:ok, %Capabilities{path_semantics: path_semantics}} -> path_semantics
+      {:error, _reason} -> nil
+    end
+  end
+
+  @spec nonlocal_path_surface?(t() | surface_kind() | keyword() | map() | nil) :: boolean()
+  def nonlocal_path_surface?(surface) do
+    path_semantics(surface) in [:remote, :guest]
+  end
+
   @spec remote_surface?(t() | surface_kind() | keyword() | map() | nil) :: boolean()
-  def remote_surface?(%__MODULE__{surface_kind: surface_kind}),
-    do: remote_surface_kind?(surface_kind)
-
-  def remote_surface?(surface_kind) when is_atom(surface_kind),
-    do: remote_surface_kind?(surface_kind)
-
-  def remote_surface?(opts) when is_list(opts) do
-    case execution_surface_attrs(opts) do
-      {:ok, attrs} ->
-        case Keyword.get(attrs, :surface_kind) do
-          surface_kind when is_atom(surface_kind) -> remote_surface_kind?(surface_kind)
-          _other -> false
-        end
+  def remote_surface?(surface) do
+    case capabilities(surface) do
+      {:ok, %Capabilities{remote?: remote?}} ->
+        remote?
 
       {:error, _reason} ->
         false
     end
   end
-
-  def remote_surface?(%{} = surface) do
-    case Map.get(surface, :__struct__) do
-      __MODULE__ ->
-        remote_surface?(Map.get(surface, :surface_kind))
-
-      _other ->
-        remote_surface?(Map.get(surface, :surface_kind, Map.get(surface, "surface_kind")))
-    end
-  end
-
-  def remote_surface?(_other), do: false
 
   @spec new(keyword()) :: {:ok, t()} | {:error, validation_error()}
   def new(opts) when is_list(opts) do

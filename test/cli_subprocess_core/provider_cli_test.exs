@@ -361,6 +361,33 @@ defmodule CliSubprocessCore.ProviderCLITest do
              )
   end
 
+  test "guest path semantics bypass local resolution even when the surface is not remote" do
+    dir = TestSupport.tmp_dir!("core_codex_guest_path_resolution")
+    codex_path = TestSupport.write_executable!(dir, "codex", "#!/bin/bash\nexit 0\n")
+
+    try do
+      TestSupport.with_env(%{"CODEX_PATH" => codex_path}, fn ->
+        assert {:ok, %CommandSpec{program: "codex", argv_prefix: []}} =
+                 ProviderCLI.resolve(
+                   :codex,
+                   [],
+                   execution_surface: [surface_kind: :test_guest_local]
+                 )
+      end)
+    after
+      File.rm_rf(dir)
+    end
+  end
+
+  test "guest path semantics preserve explicit guest command overrides without local validation" do
+    assert {:ok, %CommandSpec{program: "/guest/bin/codex", argv_prefix: []}} =
+             ProviderCLI.resolve(
+               :codex,
+               [command: "/guest/bin/codex"],
+               execution_surface: [surface_kind: :test_guest_local]
+             )
+  end
+
   describe "runtime_failure/3" do
     test "classifies remote command-not-found exits as cli_not_found" do
       exit =
@@ -433,6 +460,26 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert failure.message =~ "/remote/worktree"
       assert failure.message =~ "remote target amp.example"
       assert ProviderCLI.runtime_failure_code(failure) == "config_invalid"
+    end
+
+    test "classifies guest-path command misses without pretending they are remote targets" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 127},
+          stderr: "env: codex: No such file or directory\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :codex,
+                 exit,
+                 execution_surface: [surface_kind: :test_guest_local]
+               )
+
+      assert failure.kind == :cli_not_found
+      assert failure.message =~ "Codex CLI not found on the attached guest surface"
+      assert failure.message =~ "guest PATH env override"
+      refute failure.message =~ "remote target"
     end
   end
 
