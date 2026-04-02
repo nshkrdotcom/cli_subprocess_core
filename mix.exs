@@ -40,6 +40,7 @@ defmodule CliSubprocessCore.MixProject do
         LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],
         "guides/external-runtime-transport.md": [title: "External Runtime Transport"],
+        "guides/execution-surface-compatibility.md": [title: "Execution Surface Compatibility"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
@@ -84,6 +85,7 @@ defmodule CliSubprocessCore.MixProject do
         "Runtime & APIs": [
           "guides/getting-started.md",
           "guides/external-runtime-transport.md",
+          "guides/execution-surface-compatibility.md",
           "guides/raw-transport.md",
           "guides/event-and-payload-model.md",
           "guides/command-api.md",

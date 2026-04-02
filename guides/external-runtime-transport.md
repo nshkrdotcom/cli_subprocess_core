@@ -23,6 +23,10 @@ The core accepts one public placement value:
 The core passes that contract to `ExternalRuntimeTransport.ExecutionSurface`
 without leaking adapter module names into its own public API.
 
+For downstream compatibility, `CliSubprocessCore.ExecutionSurface` remains as a
+thin facade over the same transport-owned contract. It preserves the legacy
+struct/module identity without moving transport ownership back into the core.
+
 ## What The Core Gets Back
 
 The transport substrate returns transport-owned types such as:

@@ -25,6 +25,10 @@ The raw execution substrate now lives in `external_runtime_transport`.
 `cli_subprocess_core` consumes that package through one public placement seam:
 `execution_surface`.
 
+For downstream packages that still type against the historical module name,
+`CliSubprocessCore.ExecutionSurface` remains available as a compatibility
+facade over `ExternalRuntimeTransport.ExecutionSurface`.
+
 ## What This Package Owns
 
 - `CliSubprocessCore.Command` for provider-aware one-shot CLI execution.
@@ -53,6 +57,10 @@ following are owned by `external_runtime_transport`:
 
 That separation keeps provider/runtime behavior in the core while leaving raw
 process placement reusable by non-CLI stacks.
+
+The compatibility facade does not change that ownership boundary. Transport
+validation, capabilities, and dispatch still live in
+`ExternalRuntimeTransport.ExecutionSurface`.
 
 ## Installation
 
@@ -142,10 +150,21 @@ That contract carries:
 It does not expose adapter module names. Public callers do not choose
 `LocalSubprocess`, `SSHExec`, or `GuestBridge` directly.
 
+Callers may supply that value either as:
+
+- `execution_surface: [...]`
+- `execution_surface: %{...}`
+- `execution_surface: %CliSubprocessCore.ExecutionSurface{}`
+
+The first two are the preferred long-term shapes. The struct form remains for
+downstream compatibility.
+
 ## Documentation
 
 - `guides/getting-started.md` for the main public entrypoints.
 - `guides/external-runtime-transport.md` for the shared placement seam.
+- `guides/execution-surface-compatibility.md` for the compatibility facade
+  exported for downstream packages.
 - `guides/command-api.md`, `guides/channel-api.md`, and `guides/session-api.md`
   for the primary runtime APIs.
 - `guides/raw-transport.md` and `guides/shutdown-and-timeouts.md` for the
