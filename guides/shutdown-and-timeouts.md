@@ -1,100 +1,86 @@
 # Shutdown And Timeouts
 
-`CliSubprocessCore.Transport` separates normal shutdown, escalated shutdown,
-and timeout behavior so callers can choose the right level of force.
+`cli_subprocess_core` surfaces transport lifecycle behavior through
+`CliSubprocessCore.RawSession`, `CliSubprocessCore.Channel`, and
+`CliSubprocessCore.Session`.
+
+The lower shutdown, interrupt, timeout, and buffering mechanics are owned by
+`ExternalRuntimeTransport.Transport`. The core keeps those semantics visible
+without re-owning the substrate internals.
 
 ## Normal Close
 
-`close/1` stops the transport `GenServer` with reason `:normal`. During
-`terminate/2`, the transport:
+Use `RawSession.stop/1`, `Channel.close/1`, or `Session.close/1` when the
+caller still owns the handle and wants an orderly shutdown.
 
-1. cancels finalize and headless timers
-2. demonitors subscribers
-3. replies to pending callers with `transport_stopped`
-4. stops the subprocess
-
-Use `close/1` when the caller still owns the transport and wants an orderly
-shutdown.
+Those entrypoints delegate to the extracted transport and preserve its
+transport-owned result/error contract.
 
 ## Force Close
 
-`force_close/1` is the escalation path. The call itself is wrapped in a task so
-the caller does not hang forever on an unresponsive transport.
+`RawSession.force_close/1` and `Channel.force_close/1` expose the escalation
+path when the subprocess is unresponsive.
 
-Once the server handles the call, it:
-
-1. invokes `:exec.stop/1`
-2. escalates with `:exec.kill(pid, 9)`
-3. stops the `GenServer`
-
-If the `GenServer` is wedged or suspended, the caller sees:
+If the underlying transport cannot complete the call within the bounded wait
+window, callers see:
 
 ```elixir
-{:error, {:transport, %CliSubprocessCore.Transport.Error{reason: :timeout}}}
+{:error, {:transport, %ExternalRuntimeTransport.Transport.Error{reason: :timeout}}}
 ```
 
-The underlying call may still complete later once the server resumes. That is
-intentional: caller safety takes priority over synchronous certainty.
+That timeout protects the caller from hanging forever while still leaving the
+underlying transport free to complete later if it can recover.
 
 ## Interrupt
 
-`interrupt/1` sends SIGINT via `:exec.kill(pid, 2)`.
+`RawSession.interrupt/1`, `Channel.interrupt/1`, and `Session.interrupt/1`
+forward an interrupt request to the substrate according to the configured
+transport contract.
 
-Use it when the subprocess is still healthy but should be asked to abort the
-current turn or command without a full force-close.
-
-The resulting exit is surfaced to subscribers as a normalized
-`CliSubprocessCore.ProcessExit` struct.
+The resulting subprocess exit is surfaced as an
+`ExternalRuntimeTransport.ProcessExit`.
 
 ## EOF
 
-`end_input/1` uses the active stdin contract and is the correct way to finish a
-half-duplex or EOF-driven subprocess conversation.
+`RawSession.close_input/1`, `Channel.close_input/1`, and `Session.end_input/1`
+use the active stdin contract and are the correct way to finish EOF-driven
+conversations.
 
-- non-PTY transports send `:eof`
-- PTY transports send the terminal EOF byte (`Ctrl-D`)
+- pipe-backed transports send EOF
+- PTY-backed transports send the terminal EOF byte
 
-This is separate from `close/1`:
+This is separate from closing the handle itself:
 
-- `end_input/1` tells the child no more stdin is coming
-- `close/1` tears down the transport itself
-
-Interrupt and forced shutdown signal the subprocess process group directly from
-the core runtime. Startup does not depend on the internal runtime's
-`:kill_group` flag.
+- closing input tells the child no more stdin is coming
+- closing the handle tears down the owning session/channel/transport
 
 ## Headless Timeout
 
-When a transport has no subscribers, it starts a headless timer. If no
-subscriber attaches before `headless_timeout_ms`, the transport stops itself.
+When the underlying transport has no subscribers, it starts a headless timer.
+If nobody attaches before `headless_timeout_ms`, the transport stops itself.
 
-This applies both to:
+This applies to:
 
 - transports started without a bootstrap subscriber
-- transports where the last subscriber unsubscribed or died
+- transports whose final subscriber unsubscribed or died
 
-Set `headless_timeout_ms: :infinity` to disable this behavior.
+Set `headless_timeout_ms: :infinity` to disable the behavior.
 
 ## Exit Finalization
 
-Child exits are finalized after a short delay so the transport can:
+The substrate finalizes exits after draining any queued stdout/stderr work so
+late fragments are not lost at process shutdown boundaries.
 
-1. drain any queued stdout lines
-2. flush a trailing stdout fragment
-3. flush a trailing stderr callback fragment
-4. dispatch the exit event
-
-That finalize step avoids losing late stdout/stderr chunks that arrive around
-process exit.
+That is why raw-session and channel consumers may still receive final buffered
+output immediately before the normalized exit.
 
 ## Safe Calls
 
-Public APIs such as `send/2`, `end_input/1`, `interrupt/1`, and `force_close/1`
-use `TaskSupport.async_nolink/2` plus the `Task.yield || Task.shutdown`
-pattern. This gives the caller bounded wait behavior even if the transport is
-blocked, dead, or mid-shutdown.
+Transport-facing lifecycle APIs use bounded waits so callers do not hang
+forever when the underlying transport is blocked, dead, or mid-shutdown.
 
-Normalized call-time failures include:
+Normalized call-time failures still surface as
+`ExternalRuntimeTransport.Transport.Error` reasons such as:
 
 - `:not_connected`
 - `:timeout`
@@ -102,4 +88,4 @@ Normalized call-time failures include:
 - `{:call_exit, reason}`
 - `{:send_failed, reason}`
 
-All of them are wrapped in `CliSubprocessCore.Transport.Error`.
+Those are transport-owned errors carried upward through the core handles.

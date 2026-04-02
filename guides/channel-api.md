@@ -13,7 +13,7 @@ Use `Channel` when you need:
 - the same local-versus-SSH execution surface used by the lower transport APIs
 
 If you only need one-shot execution, use `CliSubprocessCore.Command.run/1,2` or
-`CliSubprocessCore.Transport.run/2`. If you want provider parsing and
+`ExternalRuntimeTransport.Transport.run/2`. If you want provider parsing and
 normalized `CliSubprocessCore.Event` values, use `CliSubprocessCore.Session`.
 
 ## Start A Channel
@@ -57,7 +57,7 @@ Legacy subscribers receive:
 {:channel_message, line}
 {:channel_data, chunk}
 {:channel_stderr, chunk}
-{:channel_exit, %CliSubprocessCore.ProcessExit{}}
+{:channel_exit, %ExternalRuntimeTransport.ProcessExit{}}
 {:channel_error, reason}
 ```
 
@@ -67,7 +67,7 @@ Tagged subscribers receive:
 {:cli_subprocess_core_channel, ref, {:message, line}}
 {:cli_subprocess_core_channel, ref, {:data, chunk}}
 {:cli_subprocess_core_channel, ref, {:stderr, chunk}}
-{:cli_subprocess_core_channel, ref, {:exit, %CliSubprocessCore.ProcessExit{}}}
+{:cli_subprocess_core_channel, ref, {:exit, %ExternalRuntimeTransport.ProcessExit{}}}
 {:cli_subprocess_core_channel, ref, {:error, reason}}
 ```
 

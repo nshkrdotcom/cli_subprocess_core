@@ -146,7 +146,10 @@ It does not expose adapter module names. Public callers do not choose
 
 - `guides/getting-started.md` for the main public entrypoints.
 - `guides/external-runtime-transport.md` for the shared placement seam.
-- `guides/command-api.md` and `guides/session-api.md` for the primary APIs.
+- `guides/command-api.md`, `guides/channel-api.md`, and `guides/session-api.md`
+  for the primary runtime APIs.
+- `guides/raw-transport.md` and `guides/shutdown-and-timeouts.md` for the
+  transport boundary surfaced through `RawSession`.
 - `guides/developer-guide-adding-transports.md` for the ownership rule after
   extraction.
 - `examples/README.md` for runnable examples.

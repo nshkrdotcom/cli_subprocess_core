@@ -29,13 +29,13 @@ defmodule CliSubprocessCore.MixProject do
 
   defp docs do
     [
-      main: "readme",
+      main: "overview",
       source_ref: "v#{@version}",
       homepage_url: @homepage_url,
       assets: %{"assets" => "assets"},
       logo: "assets/cli_subprocess_core.svg",
       extras: [
-        "README.md": [title: "Overview"],
+        "README.md": [title: "Overview", filename: "overview"],
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],
@@ -46,6 +46,7 @@ defmodule CliSubprocessCore.MixProject do
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
         "guides/provider-feature-manifests.md": [title: "Provider Feature Manifests"],
         "guides/developer-guide-model-registry.md": [title: "Developer Guide: Model Registry"],
+        "guides/developer-guide-runtime-layers.md": [title: "Developer Guide: Runtime Layers"],
         "guides/developer-guide-claude-backends.md": [title: "Developer Guide: Claude Backends"],
         "guides/developer-guide-codex-backends.md": [title: "Developer Guide: Codex Backends"],
         "guides/developer-guide-adding-transports.md": [
@@ -55,11 +56,17 @@ defmodule CliSubprocessCore.MixProject do
           title: "Developer Guide: Provider Profiles"
         ],
         "guides/command-api.md": [title: "Command API"],
+        "guides/raw-transport.md": [title: "Raw Sessions And Transport"],
+        "guides/channel-api.md": [title: "Channel API"],
+        "guides/json-rpc.md": [title: "JSON-RPC"],
         "guides/session-api.md": [title: "Session API"],
+        "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"],
+        "examples/README.md": [title: "Examples", filename: "examples"],
         "guides/testing-and-conformance.md": [title: "Testing And Conformance"]
       ],
       groups_for_extras: [
         "Project Overview": ["README.md"],
+        Examples: ["examples/README.md"],
         "Provider Profiles": [
           "guides/provider-profile-contract.md",
           "guides/custom-provider-profiles.md",
@@ -68,6 +75,7 @@ defmodule CliSubprocessCore.MixProject do
         ],
         "Developer Guides": [
           "guides/developer-guide-model-registry.md",
+          "guides/developer-guide-runtime-layers.md",
           "guides/developer-guide-claude-backends.md",
           "guides/developer-guide-codex-backends.md",
           "guides/developer-guide-adding-transports.md",
@@ -76,11 +84,17 @@ defmodule CliSubprocessCore.MixProject do
         "Runtime & APIs": [
           "guides/getting-started.md",
           "guides/external-runtime-transport.md",
+          "guides/raw-transport.md",
           "guides/event-and-payload-model.md",
           "guides/command-api.md",
+          "guides/channel-api.md",
+          "guides/json-rpc.md",
           "guides/session-api.md"
         ],
-        "Operations & Conformance": ["guides/testing-and-conformance.md"],
+        "Operations & Conformance": [
+          "guides/shutdown-and-timeouts.md",
+          "guides/testing-and-conformance.md"
+        ],
         "Project Reference": ["CHANGELOG.md", "LICENSE"]
       ],
       formatters: ["html", "epub", "markdown"],

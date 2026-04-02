@@ -70,7 +70,7 @@ defmodule CliSubprocessCore.RawSessionTest do
     refute result.output =~ "Cannot set effective group to 0"
   end
 
-  test "short-lived raw sessions do not restart the shared exec worker on exit" do
+  test "short-lived raw sessions disconnect cleanly after exit" do
     script = create_test_script("printf 'ready\\n'")
 
     Enum.each(
@@ -82,20 +82,13 @@ defmodule CliSubprocessCore.RawSessionTest do
         assert {:ok, session} = RawSession.start(script, [], session_opts),
                "failed to start #{label} short-lived session"
 
-        exec_pid = Process.whereis(:exec)
-        assert is_pid(exec_pid), "expected shared exec worker for #{label} session"
-        monitor_ref = Process.monitor(exec_pid)
-
         assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000),
                "failed to collect #{label} short-lived session"
 
         assert result.exit.code == 0
         assert result.output =~ "ready"
-        assert wait_until(fn -> not Process.alive?(session.transport) end, 1_000) == :ok
-        refute_receive {:DOWN, ^monitor_ref, :process, ^exec_pid, _reason}, 0
-        assert Process.whereis(:exec) == exec_pid
-
-        Process.demonitor(monitor_ref, [:flush])
+        assert wait_until(fn -> RawSession.status(session) == :disconnected end, 1_000) == :ok
+        assert RawSession.stderr(session) == ""
       end
     )
   end
