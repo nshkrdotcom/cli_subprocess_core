@@ -3,15 +3,10 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{
-    Command,
-    ExecutionSurface,
-    ProviderProfile,
-    ProviderRegistry,
-    Transport
-  }
-
-  alias CliSubprocessCore.Transport.RunOptions
+  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry}
+  alias ExternalRuntimeTransport.ExecutionSurface
+  alias ExternalRuntimeTransport.Transport
+  alias ExternalRuntimeTransport.Transport.RunOptions
 
   @default_registry ProviderRegistry
   @reserved_keys [
@@ -100,7 +95,7 @@ defmodule CliSubprocessCore.Command.Options do
     with :ok <- validate_invocation(invocation),
          :ok <- reject_transport_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
-         {:ok, run_options} <- RunOptions.new(invocation, opts) do
+         {:ok, run_options} <- RunOptions.new(Command.to_transport_command(invocation), opts) do
       {:ok,
        %__MODULE__{
          invocation: invocation,

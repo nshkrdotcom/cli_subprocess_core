@@ -12,7 +12,7 @@ or trying to understand where a change should land.
 1. model policy
 2. provider profile adaptation
 3. command/session normalization
-4. raw transport execution
+4. execution-surface and raw transport execution
 5. normalized event and payload emission
 
 These layers exist so the runtime can stay consistent while still supporting
@@ -80,10 +80,10 @@ longer-lived sessions.
 
 Owned by:
 
-- `CliSubprocessCore.Transport`
+- `ExternalRuntimeTransport.Transport`
 
 This layer starts the external process, manages stdin/stdout/stderr, and
-captures process exit information.
+captures process exit information through the shared substrate.
 
 It should remain blind to provider policy.
 

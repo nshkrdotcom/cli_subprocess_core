@@ -6,8 +6,10 @@ defmodule CliSubprocessCore.ProviderCLI do
   module instead of duplicating discovery logic in downstream adapters.
   """
 
-  alias CliSubprocessCore.{CommandSpec, ExecutionSurface, ProcessExit}
-  alias CliSubprocessCore.Transport.Error, as: TransportError
+  alias CliSubprocessCore.CommandSpec
+  alias ExternalRuntimeTransport.ExecutionSurface
+  alias ExternalRuntimeTransport.ProcessExit
+  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
 
   defmodule Error do
     @moduledoc """
@@ -1342,8 +1344,8 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
   defp auth_hint(_provider), do: "Authenticate the CLI on the target and retry."
 
-  defp path_hint(%{remote?: true}), do: remote_path_hint()
   defp path_hint(%{path_semantics: :guest}), do: guest_path_hint()
+  defp path_hint(%{remote?: true}), do: remote_path_hint()
   defp path_hint(%{nonlocal_path?: true}), do: nonlocal_path_hint()
   defp path_hint(_context), do: ""
 
@@ -1359,13 +1361,14 @@ defmodule CliSubprocessCore.ProviderCLI do
     " If the CLI is not on the target PATH, pass an explicit CLI path or PATH env override."
   end
 
+  defp placement_suffix(%{path_semantics: :guest}), do: " on the attached guest surface"
+
   defp placement_suffix(%{remote?: true, destination: destination})
        when is_binary(destination) and destination != "" do
     " on remote target #{destination}"
   end
 
   defp placement_suffix(%{remote?: true}), do: " on the remote target"
-  defp placement_suffix(%{path_semantics: :guest}), do: " on the attached guest surface"
   defp placement_suffix(%{nonlocal_path?: true}), do: " on the non-local execution surface"
   defp placement_suffix(_context), do: ""
 

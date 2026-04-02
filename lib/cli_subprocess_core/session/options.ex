@@ -3,7 +3,9 @@ defmodule CliSubprocessCore.Session.Options do
   Validated startup options for the common session engine.
   """
 
-  alias CliSubprocessCore.{ExecutionSurface, ProviderProfile, ProviderRegistry, Transport}
+  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
+  alias ExternalRuntimeTransport.ExecutionSurface
+  alias ExternalRuntimeTransport.Transport
 
   @default_registry ProviderRegistry
   @default_session_event_tag :cli_subprocess_core_session

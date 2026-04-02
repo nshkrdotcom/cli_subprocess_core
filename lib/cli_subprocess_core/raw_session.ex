@@ -2,17 +2,20 @@ defmodule CliSubprocessCore.RawSession do
   @moduledoc """
   Provider-agnostic handle for long-lived raw subprocess sessions.
 
-  `CliSubprocessCore.Transport` owns the subprocess lifecycle itself. This
+  `ExternalRuntimeTransport.Transport` owns the subprocess lifecycle itself. This
   module provides a higher-level contract for consumers that need a stable raw
   session handle, exact-byte stdin/stdout defaults, optional PTY startup, and
   normalized result collection without re-implementing lifecycle rules in
   provider repos.
   """
 
-  alias CliSubprocessCore.{Command, ProcessExit, Transport}
+  alias CliSubprocessCore.Command
   alias CliSubprocessCore.RawSession.Delivery
-  alias CliSubprocessCore.Transport.Delivery, as: TransportDelivery
-  alias CliSubprocessCore.Transport.{Info, RunResult}
+  alias ExternalRuntimeTransport.ProcessExit
+  alias ExternalRuntimeTransport.Transport
+  alias ExternalRuntimeTransport.Transport.Delivery, as: TransportDelivery
+  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
+  alias ExternalRuntimeTransport.Transport.{Info, RunResult}
 
   @default_event_tag :cli_subprocess_core_raw_session
   @transport_start_timeout_ms 5_000
@@ -292,7 +295,7 @@ defmodule CliSubprocessCore.RawSession do
       transport_opts =
         opts
         |> Keyword.drop(@reserved_keys)
-        |> Keyword.put(:command, invocation)
+        |> Keyword.put(:command, Command.to_transport_command(invocation))
         |> Keyword.put(:subscriber, {receiver, transport_ref})
         |> Keyword.put(:event_tag, event_tag)
         |> Keyword.put_new(:stdout_mode, stdout_mode)
@@ -371,7 +374,7 @@ defmodule CliSubprocessCore.RawSession do
   defp do_collect(session, timeout, stdout, stderr) do
     receive do
       message ->
-        case Transport.extract_event(message, session.transport_ref) do
+        case session.transport_api.extract_event(message, session.transport_ref) do
           {:ok, {:data, chunk}} ->
             do_collect(session, timeout, [chunk | stdout], stderr)
 
@@ -451,13 +454,13 @@ defmodule CliSubprocessCore.RawSession do
     end
   end
 
-  defp normalize_transport_start_exit({:transport, %CliSubprocessCore.Transport.Error{} = error}),
+  defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
-  defp normalize_transport_start_exit(%CliSubprocessCore.Transport.Error{} = error),
+  defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
 
-  defp normalize_transport_start_exit({:shutdown, %CliSubprocessCore.Transport.Error{} = error}),
+  defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(:normal), do: :ok

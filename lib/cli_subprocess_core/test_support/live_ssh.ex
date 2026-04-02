@@ -14,9 +14,10 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
     `CLI_SUBPROCESS_CORE_LIVE_SSH_CLAUDE_COMMAND=/path/to/claude`
   """
 
-  alias CliSubprocessCore.{Command, ExecutionSurface}
-  alias CliSubprocessCore.ProcessExit
-  alias CliSubprocessCore.Transport.RunResult
+  alias CliSubprocessCore.Command
+  alias ExternalRuntimeTransport.ExecutionSurface
+  alias ExternalRuntimeTransport.ProcessExit
+  alias ExternalRuntimeTransport.Transport.RunResult
 
   @enabled_env "CLI_SUBPROCESS_CORE_LIVE_SSH"
   @destination_env "CLI_SUBPROCESS_CORE_LIVE_SSH_DESTINATION"
@@ -118,6 +119,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
     )
   end
 
+  @dialyzer {:nowarn_function, runnable?: 3}
   @spec runnable?(String.t(), [String.t()], keyword()) :: boolean()
   def runnable?(command, args \\ ["--version"], opts \\ [])
       when is_binary(command) and is_list(args) and is_list(opts) do

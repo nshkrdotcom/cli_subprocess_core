@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.LiveSSHTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.TestSupport.LiveSSH
-  alias CliSubprocessCore.Transport.RunResult
+  alias ExternalRuntimeTransport.Transport.RunResult
 
   @moduletag :live_ssh
   @moduletag timeout: 60_000

@@ -3,7 +3,8 @@ defmodule CliSubprocessCore.TestSupport.ProviderProfiles.Echo do
 
   @behaviour CliSubprocessCore.ProviderProfile
 
-  alias CliSubprocessCore.{Command, Event, Payload, ProcessExit}
+  alias CliSubprocessCore.{Command, Event, Payload}
+  alias ExternalRuntimeTransport.ProcessExit
 
   @impl true
   def id, do: :echo

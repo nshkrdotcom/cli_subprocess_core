@@ -8,15 +8,19 @@ defmodule CliSubprocessCore.Session do
   import Kernel, except: [send: 2]
 
   alias CliSubprocessCore.{
+    Command,
     Event,
     Payload,
     ProviderProfile,
     ProviderRegistry,
     Runtime,
     Session.Delivery,
-    Session.Options,
-    Transport.Info
+    Session.Options
   }
+
+  alias ExternalRuntimeTransport.Transport
+  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
+  alias ExternalRuntimeTransport.Transport.Info
 
   @session_start_timeout_ms 5_000
   @transport_event_tag :cli_subprocess_core_session_transport
@@ -252,15 +256,15 @@ defmodule CliSubprocessCore.Session do
 
   @impl GenServer
   def handle_call({:send, input}, _from, state) do
-    {:reply, CliSubprocessCore.Transport.send(state.transport_pid, input), state}
+    {:reply, ExternalRuntimeTransport.Transport.send(state.transport_pid, input), state}
   end
 
   def handle_call(:end_input, _from, state) do
-    {:reply, CliSubprocessCore.Transport.end_input(state.transport_pid), state}
+    {:reply, ExternalRuntimeTransport.Transport.end_input(state.transport_pid), state}
   end
 
   def handle_call(:interrupt, _from, state) do
-    {:reply, CliSubprocessCore.Transport.interrupt(state.transport_pid), state}
+    {:reply, ExternalRuntimeTransport.Transport.interrupt(state.transport_pid), state}
   end
 
   def handle_call({:subscribe, pid, tag}, _from, state) do
@@ -324,7 +328,7 @@ defmodule CliSubprocessCore.Session do
   @impl GenServer
   def terminate(_reason, state) do
     if is_pid(state.transport_pid) do
-      _ = CliSubprocessCore.Transport.close(state.transport_pid)
+      _ = ExternalRuntimeTransport.Transport.close(state.transport_pid)
     end
 
     :ok
@@ -413,14 +417,16 @@ defmodule CliSubprocessCore.Session do
         execution_surface: execution_surface
       ] ++ transport_runtime_opts
 
-    case CliSubprocessCore.Transport.start(transport_opts) do
+    case Transport.start(
+           Keyword.put(transport_opts, :command, Command.to_transport_command(invocation))
+         ) do
       {:ok, transport_pid} ->
-        case await_transport_started(CliSubprocessCore.Transport, transport_pid) do
+        case await_transport_started(Transport, transport_pid) do
           :ok ->
             {:ok, transport_pid, transport_ref}
 
           {:error, reason} ->
-            safe_close_transport(CliSubprocessCore.Transport, transport_pid)
+            safe_close_transport(Transport, transport_pid)
             {:error, reason}
         end
 
@@ -453,13 +459,13 @@ defmodule CliSubprocessCore.Session do
   end
 
   defp session_info(state) do
-    transport_info = maybe_transport_info(CliSubprocessCore.Transport, state.transport_pid)
+    transport_info = maybe_transport_info(Transport, state.transport_pid)
 
     transport_status =
-      transport_status(CliSubprocessCore.Transport, state.transport_pid, transport_info)
+      transport_status(Transport, state.transport_pid, transport_info)
 
     transport_stderr =
-      transport_stderr(CliSubprocessCore.Transport, state.transport_pid, transport_info)
+      transport_stderr(Transport, state.transport_pid, transport_info)
 
     %{
       capabilities: state.profile.capabilities(),
@@ -473,7 +479,7 @@ defmodule CliSubprocessCore.Session do
       subscribers: map_size(state.subscribers),
       transport:
         build_transport_snapshot(
-          CliSubprocessCore.Transport,
+          Transport,
           state.transport_pid,
           transport_status,
           transport_stderr,
@@ -575,13 +581,13 @@ defmodule CliSubprocessCore.Session do
     end
   end
 
-  defp normalize_transport_start_exit({:transport, %CliSubprocessCore.Transport.Error{} = error}),
+  defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
-  defp normalize_transport_start_exit(%CliSubprocessCore.Transport.Error{} = error),
+  defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
 
-  defp normalize_transport_start_exit({:shutdown, %CliSubprocessCore.Transport.Error{} = error}),
+  defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(:normal), do: :ok

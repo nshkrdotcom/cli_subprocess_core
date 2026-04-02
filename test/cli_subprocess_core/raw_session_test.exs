@@ -4,7 +4,7 @@ defmodule CliSubprocessCore.RawSessionTest do
   import ExUnit.CaptureLog
 
   alias CliSubprocessCore.RawSession
-  alias CliSubprocessCore.Transport.RunResult
+  alias ExternalRuntimeTransport.Transport.RunResult
 
   test "raw sessions preserve exact stdin bytes and collect a normalized result" do
     script = create_test_script("cat")
@@ -183,7 +183,7 @@ defmodule CliSubprocessCore.RawSessionTest do
 
     assert {:ok, session} =
              RawSession.start(script, [],
-               transport: CliSubprocessCore.Transport,
+               transport: ExternalRuntimeTransport.Transport,
                stdin?: false
              )
 
@@ -193,7 +193,7 @@ defmodule CliSubprocessCore.RawSessionTest do
 
   test "raw sessions reject the legacy module-selector option name" do
     assert {:error, {:unsupported_option, :transport_selector}} =
-             RawSession.start("ignored", [], transport_module: CliSubprocessCore.Transport)
+             RawSession.start("ignored", [], transport_module: ExternalRuntimeTransport.Transport)
   end
 
   test "lazy startup surfaces subprocess spawn failures before returning a raw session" do
@@ -208,7 +208,9 @@ defmodule CliSubprocessCore.RawSessionTest do
     assert capture_log(fn ->
              assert {:error,
                      {:transport,
-                      %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+                      %ExternalRuntimeTransport.Transport.Error{
+                        reason: {:cwd_not_found, ^missing_cwd}
+                      }}} =
                       RawSession.start(script, [], startup_mode: :lazy, cwd: missing_cwd)
            end) == ""
   end

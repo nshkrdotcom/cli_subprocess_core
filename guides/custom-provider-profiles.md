@@ -14,8 +14,8 @@ Add a custom profile when:
   payloads
 - downstream code should not duplicate command-building or JSONL parsing logic
 
-If you only need raw subprocess ownership, use `CliSubprocessCore.Transport`
-directly and skip the profile layer.
+If you only need raw subprocess ownership, use `CliSubprocessCore.RawSession`
+or `ExternalRuntimeTransport.Transport` directly and skip the profile layer.
 
 The packaging rule for this layer is:
 
@@ -53,7 +53,8 @@ The contract is documented in more detail in
 defmodule MyApp.ProviderProfiles.Example do
   @behaviour CliSubprocessCore.ProviderProfile
 
-  alias CliSubprocessCore.{Command, Event, Payload, ProcessExit}
+  alias CliSubprocessCore.{Command, Event, Payload}
+  alias ExternalRuntimeTransport.ProcessExit
 
   @impl true
   def id, do: :example

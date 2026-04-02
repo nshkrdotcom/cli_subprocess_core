@@ -16,82 +16,45 @@
   </a>
 </p>
 
-`CliSubprocessCore` is the shared runtime foundation for first-party CLI
-providers. It owns the raw subprocess transport, the normalized session/event
-model above that transport, the shared non-PTY command lane, and the built-in
-provider profiles that turn provider-specific JSONL streams into a stable core
-vocabulary. Within the runtime stack, it is the only repo that owns the
-underlying subprocess runtime startup, `:exec.*`, and raw subprocess lifecycle
-state.
+`cli_subprocess_core` is the shared runtime for provider-facing CLIs. It owns
+provider profile resolution, normalized command/session APIs, event and payload
+shaping, model policy helpers, and the built-in first-party profiles for
+Claude, Codex, Gemini, and Amp.
 
-Most callers fit one of four consumer shapes:
+The raw execution substrate now lives in `external_runtime_transport`.
+`cli_subprocess_core` consumes that package through one public placement seam:
+`execution_surface`.
 
-- callers that only need process ownership and mailbox delivery through
-  `CliSubprocessCore.Transport`
-- callers that need a provider-agnostic long-lived raw session handle through
-  `CliSubprocessCore.RawSession`
-- callers that need provider-aware one-shot command execution through
-  `CliSubprocessCore.Command.run/1` or `run/2`
-- callers that want provider resolution, command construction, parsing, event
-  sequencing, and normalized payloads through `CliSubprocessCore.Session`
+## What This Package Owns
 
-Advanced protocol callers can also build on `CliSubprocessCore.Channel`,
-`CliSubprocessCore.ProtocolSession`, or `CliSubprocessCore.JSONRPC` when they
-need long-lived framed IO or request/reply protocols above the raw transport.
-
-## Menu
-
-- [Overview](#clisubprocesscore)
-- [What The Package Owns](#what-the-package-owns)
-- [Quick Start](#quick-start)
-- [Built-In Profiles](#built-in-profiles)
-- [Guides](#guides)
-- [Project Links](#project-links)
-- [Development](#development)
-
-## What The Package Owns
-
-- `CliSubprocessCore.Event` and `CliSubprocessCore.Payload.*` define the shared
-  runtime event vocabulary.
-- `CliSubprocessCore.Command` owns normalized invocations and the provider-aware
-  one-shot command boundary for common non-PTY CLI flows.
-- `CliSubprocessCore.ProviderProfile` and `CliSubprocessCore.ProviderRegistry`
-  define and manage provider profile modules.
-- `CliSubprocessCore.ProviderFeatures` owns canonical built-in provider feature
-  metadata such as provider-native permission terminology and partial common
-  features like Ollama-backed model routing.
-- `CliSubprocessCore.ProviderProfiles.*` ships first-party profiles for Claude,
-  Codex, Gemini, and Amp.
-- `CliSubprocessCore.ModelRegistry` and `CliSubprocessCore.Ollama` own
-  centralized model resolution, backend-aware validation, and the authoritative
-  payload passed downstream to provider renderers.
-- `CliSubprocessCore.ModelInput` owns mixed raw-versus-payload normalization so
-  downstream SDKs and ASM can consume one canonical payload instead of
-  re-resolving provider model policy locally.
-- `CliSubprocessCore.Transport` owns subprocess lifecycle, stdout/stderr
-  dispatch, PTY startup, raw-byte versus line-oriented IO contracts,
-  synchronous `run/2`, interrupt, close, force-close behavior, and transport
-  metadata through `CliSubprocessCore.Transport.Info`.
-- `CliSubprocessCore.RawSession` owns the provider-agnostic raw-session handle
-  above the transport for long-lived subprocess families that need exact-byte
-  stdin/stdout defaults, optional PTY startup, and normalized collection.
-- `CliSubprocessCore.Session` adds provider-aware parsing, sequencing, and
-  subscriber fan-out on top of the raw transport.
+- `CliSubprocessCore.Command` for provider-aware one-shot CLI execution.
+- `CliSubprocessCore.RawSession` for provider-agnostic long-lived raw sessions.
+- `CliSubprocessCore.Session` for normalized provider sessions and event fanout.
 - `CliSubprocessCore.Channel`, `CliSubprocessCore.ProtocolSession`, and
-  `CliSubprocessCore.JSONRPC` add framed-IO and request/reply protocol helpers
-  above `CliSubprocessCore.RawSession` for advanced long-lived integrations.
-- `CliSubprocessCore.Transport` is the only public layer that exposes lazy
-  startup directly. `CliSubprocessCore.RawSession` and
-  `CliSubprocessCore.Session` wait for subprocess startup to either succeed or
-  fail before returning. Deterministic startup validation still happens before
-  a lazy transport pid is returned.
-- `CliSubprocessCore.Runtime`, `CliSubprocessCore.LineFraming`,
-  `CliSubprocessCore.ProcessExit`, and `CliSubprocessCore.TaskSupport` support
-  the transport and session layers.
+  `CliSubprocessCore.JSONRPC` for framed or protocol-driven CLI interactions.
+- `CliSubprocessCore.ProviderProfile`, `CliSubprocessCore.ProviderRegistry`,
+  and `CliSubprocessCore.ProviderProfiles.*` for provider-specific command
+  planning and parsing.
+- `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`, and
+  `CliSubprocessCore.Runtime` for the shared runtime vocabulary.
+- `CliSubprocessCore.ModelRegistry`, `CliSubprocessCore.ModelInput`, and
+  related catalog helpers for centralized model policy.
 
-## Quick Start
+## What This Package Does Not Own
 
-Add the dependency and start the application normally:
+`cli_subprocess_core` no longer owns the raw execution substrate modules. The
+following are owned by `external_runtime_transport`:
+
+- `ExternalRuntimeTransport.ExecutionSurface`
+- `ExternalRuntimeTransport.Transport`
+- adapter registry and transport contracts
+- built-in `:local_subprocess`, `:ssh_exec`, and `:guest_bridge` families
+- shared `ProcessExit`, `LineFraming`, and transport result types
+
+That separation keeps provider/runtime behavior in the core while leaving raw
+process placement reusable by non-CLI stacks.
+
+## Installation
 
 ```elixir
 def deps do
@@ -101,95 +64,38 @@ def deps do
 end
 ```
 
-For local workspace development, replace the published requirement with a
-sibling `path:` override.
+## Quick Start
 
-Use the raw transport when you only need subprocess IO:
-
-```elixir
-ref = make_ref()
-
-{:ok, transport} =
-  CliSubprocessCore.Transport.start(
-    command: CliSubprocessCore.Command.new("sh", ["-c", "cat"]),
-    subscriber: {self(), ref}
-  )
-
-:ok = CliSubprocessCore.Transport.send(transport, "hello")
-:ok = CliSubprocessCore.Transport.end_input(transport)
-
-receive do
-  message ->
-    case CliSubprocessCore.Transport.extract_event(message, ref) do
-      {:ok, {:message, "hello"}} -> :ok
-      _other -> :ignore
-    end
-end
-```
-
-Use `execution_surface` when the process should run over SSH instead of
-locally. The core resolves the built-in SSH adapter internally; callers should
-not choose transport modules directly.
+Run a provider-aware one-shot command:
 
 ```elixir
 {:ok, result} =
-  CliSubprocessCore.Transport.run(
-    CliSubprocessCore.Command.new("hostname"),
+  CliSubprocessCore.Command.run(
+    provider: :claude,
+    prompt: "Summarize this repository"
+  )
+
+IO.inspect(result.output)
+```
+
+Move that command onto SSH through the generic placement seam:
+
+```elixir
+{:ok, result} =
+  CliSubprocessCore.Command.run(
+    provider: :codex,
+    prompt: "Review the latest diff",
     execution_surface: [
       surface_kind: :ssh_exec,
       transport_options: [
-        destination: "devbox.example",
-        ssh_user: "deploy",
-        port: 22
+        destination: "buildbox.example",
+        ssh_user: "deploy"
       ]
     ]
   )
-
-IO.puts(result.stdout)
 ```
 
-Execution-surface input stays generic above the core. Public callers pass a
-single `execution_surface` value whose fields are:
-
-- `surface_kind`
-- `transport_options`
-- `target_id`
-- `lease_ref`
-- `surface_ref`
-- `boundary_class`
-- `observability`
-
-Landed surfaces today are `:local_subprocess`, `:ssh_exec`, and
-`:guest_bridge`. The SSH surface accepts:
-
-- required `:destination`
-- optional `:ssh_path`, `:port`, `:ssh_user`, `:identity_file`
-- optional `:ssh_args` and `:ssh_options`
-
-`:guest_bridge` negotiates its effective capabilities per attached session.
-That surface is intentionally generic. Higher layers may source it from a
-boundary descriptor or another attach contract, but `cli_subprocess_core`
-still only consumes the normalized `execution_surface` payload.
-Higher-layer runtime workspace or approval policy belongs outside
-`execution_surface`. The core transport boundary remains generic and does not
-reintroduce public `transport_module` selection.
-
-Runtime approval or sandbox posture is a separate concern from process
-placement. Flags such as provider-native "danger full access" modes belong to
-the downstream runtime layer that owns provider options, not to
-`CliSubprocessCore.ExecutionSurface`.
-
-That distinction matters for remote debugging. If a process launches over
-`:ssh_exec` and the remote CLI later fails when it tries to enter its own
-sandbox backend, the transport placement succeeded. At that point the failure
-is in the remote host or remote CLI runtime path, not in the core execution
-surface contract.
-
-For the full SSH surface contract, see `guides/raw-transport.md`. For built-in
-transport-family implementation work, see
-`guides/developer-guide-adding-transports.md`.
-
-Use the raw session handle when you need long-lived exact-byte ownership:
+Use `RawSession` when you need exact-byte ownership and normalized collection:
 
 ```elixir
 {:ok, session} =
@@ -202,153 +108,45 @@ Use the raw session handle when you need long-lived exact-byte ownership:
 IO.inspect({result.stdout, result.exit.code})
 ```
 
-`CliSubprocessCore.RawSession` always starts through the public
-`CliSubprocessCore.Transport` facade by default. Common-lane callers can shape
-generic execution surfaces with `surface_kind` and `transport_options`;
-separate protocol families can still inject a generic `transport:` module when
-they need their own session contract.
-
-`end_input/1` and `close_input/1` use the correct EOF mechanism for the active
-transport contract:
-
-- pipe-backed stdin sends `:eof`
-- PTY-backed stdin sends the terminal EOF byte (`Ctrl-D`)
-
-Use the command lane when you need one-shot non-PTY execution:
-
-```elixir
-invocation =
-  CliSubprocessCore.Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
-
-{:ok, result} =
-  CliSubprocessCore.Command.run(invocation,
-    stderr: :stdout,
-    timeout: 5_000
-  )
-
-IO.inspect({result.output, result.exit.code})
-```
-
-Use the session layer when you want provider command building and normalized
-events:
+Use `Session` when you want normalized provider events:
 
 ```elixir
 ref = make_ref()
 
 {:ok, _session, info} =
   CliSubprocessCore.Session.start_session(
-    provider: :claude,
-    prompt: "Summarize this repository",
-    subscriber: {self(), ref},
-    metadata: %{lane: :core}
+    provider: :gemini,
+    prompt: "Hello from the shared runtime",
+    subscriber: {self(), ref}
   )
 
-IO.inspect(info.capabilities)
 IO.inspect(info.delivery)
-
-receive do
-  message ->
-    case CliSubprocessCore.Session.extract_event(message, ref) do
-      {:ok, event} -> IO.inspect({event.sequence, event.kind})
-      :error -> :ignore
-    end
-end
 ```
 
-The `delivery` metadata returned by the core is the stable contract for direct
-adapter layers. Higher-level wrappers should prefer their own relay envelope or
-the extraction helpers over hard-coding the default core tag.
-Use `CliSubprocessCore.Session.start_link_session/1` when a direct adapter
-needs the same startup snapshot while keeping the session linked to the caller.
+## Execution Surface
 
-## Built-In Profiles
+`cli_subprocess_core` keeps the public placement seam intentionally narrow. The
+only public way to choose where a command runs is one `execution_surface`
+value.
 
-The publication rule for provider profiles is:
+That contract carries:
 
-- the first-party common profiles for Claude, Codex, Gemini, and Amp stay
-  built into `cli_subprocess_core`
-- third-party common profiles belong in external packages that implement
-  `CliSubprocessCore.ProviderProfile`
-- external profiles register explicitly at runtime or are preloaded through app
-  config; that preload does not make them first-party built-ins
+- `surface_kind`
+- `transport_options`
+- `target_id`
+- `lease_ref`
+- `surface_ref`
+- `boundary_class`
+- `observability`
 
-The shipped first-party modules are available through
-`CliSubprocessCore.first_party_profile_modules/0`.
+It does not expose adapter module names. Public callers do not choose
+`LocalSubprocess`, `SSHExec`, or `GuestBridge` directly.
 
-`CliSubprocessCore.ModelRegistry` is the single authority for model selection
-across the stack. That includes the explicit Claude `:ollama` backend path,
-where the core validates the external model and carries the required
-Anthropic-compatible env in the resolved payload. It also includes the Codex
-local OSS path, where the core validates the Ollama runtime, validates the
-requested local model id, and carries the backend metadata used to render
-`--oss --local-provider ollama`.
+## Documentation
 
-When a caller accepts either raw model knobs or an explicit `model_payload`,
-`CliSubprocessCore.ModelInput.normalize/3` is the single normalized handoff.
-Provider SDK repos should feed repo-local env defaults into that normalizer only
-when a payload was not supplied explicitly. Once a payload exists, it is the
-authoritative model-selection object for the rest of the call path.
-
-The default registry starts with these ids:
-
-- `:claude`
-- `:codex`
-- `:gemini`
-- `:amp`
-
-You can preload additional external profile modules through application config:
-
-```elixir
-config :cli_subprocess_core,
-  built_in_profile_modules: [MyApp.ProviderProfiles.Example]
-```
-
-That config only controls what the default registry boots with. It does not
-change first-party package ownership.
-
-Ad hoc external profiles can also be registered at runtime with
-`CliSubprocessCore.ProviderRegistry.register/2`.
-
-## Guides
-
-- `guides/getting-started.md`
-- `guides/event-and-payload-model.md`
-- `guides/provider-profile-contract.md`
-- `guides/custom-provider-profiles.md`
-- `guides/built-in-provider-profiles.md`
-- `guides/provider-feature-manifests.md`
-- `guides/developer-guide-model-registry.md`
-- `guides/developer-guide-claude-backends.md`
-- `guides/developer-guide-codex-backends.md`
-- `guides/developer-guide-adding-transports.md`
-- `guides/developer-guide-provider-profiles.md`
-- `guides/developer-guide-runtime-layers.md`
-- `guides/command-api.md`
-- `guides/raw-transport.md`
-- `guides/session-api.md`
-- `guides/channel-api.md`
-- `guides/json-rpc.md`
-- `guides/testing-and-conformance.md`
-- `guides/shutdown-and-timeouts.md`
-
-## Project Links
-
-- Hex: `https://hex.pm/packages/cli_subprocess_core`
-- HexDocs: `https://hexdocs.pm/cli_subprocess_core`
-- GitHub: `https://github.com/nshkrdotcom/cli_subprocess_core`
-- Changelog: `CHANGELOG.md`
-- License: `LICENSE`
-
-## Development
-
-The repo-local quality gate is:
-
-```bash
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix test
-mix credo --strict
-mix dialyzer
-mix docs
-mix hex.build
-```
+- `guides/getting-started.md` for the main public entrypoints.
+- `guides/external-runtime-transport.md` for the shared placement seam.
+- `guides/command-api.md` and `guides/session-api.md` for the primary APIs.
+- `guides/developer-guide-adding-transports.md` for the ownership rule after
+  extraction.
+- `examples/README.md` for runnable examples.

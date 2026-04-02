@@ -161,7 +161,7 @@ defmodule CliSubprocessCore.CommandTest do
     invocation = Command.new("sh", ["-c", "printf ready"])
 
     assert {:error, %Error{} = error} =
-             Command.run(invocation, transport_module: CliSubprocessCore.Transport)
+             Command.run(invocation, transport_module: ExternalRuntimeTransport.Transport)
 
     assert error.reason == {:invalid_options, {:unsupported_option, :transport_selector}}
     assert error.context == %{invocation: invocation}

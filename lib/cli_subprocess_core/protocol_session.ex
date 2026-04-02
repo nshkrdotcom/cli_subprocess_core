@@ -16,7 +16,8 @@ defmodule CliSubprocessCore.ProtocolSession do
 
   use GenServer
 
-  alias CliSubprocessCore.{Channel, ProcessExit, TaskSupport}
+  alias CliSubprocessCore.{Channel, TaskSupport}
+  alias ExternalRuntimeTransport.ProcessExit
 
   @default_request_timeout_ms 30_000
   @default_peer_request_timeout_ms 30_000

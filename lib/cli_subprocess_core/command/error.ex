@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.Command.Error do
   Structured failures for the provider-aware non-PTY command lane.
   """
 
-  alias CliSubprocessCore.Transport.Error, as: TransportError
+  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
 
   defexception [:reason, :message, context: %{}]
 

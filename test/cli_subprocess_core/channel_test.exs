@@ -2,9 +2,9 @@ defmodule CliSubprocessCore.ChannelTest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Channel
-  alias CliSubprocessCore.ProcessExit
   alias CliSubprocessCore.TestSupport
   alias CliSubprocessCore.TestSupport.FakeSSH
+  alias ExternalRuntimeTransport.ProcessExit
 
   test "channel streams local framed IO and exposes stable delivery metadata" do
     ref = make_ref()

@@ -8,7 +8,9 @@ defmodule CliSubprocessCore.Command do
 
   alias CliSubprocessCore.Command.{Error, Options}
   alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
-  alias CliSubprocessCore.Transport.RunResult
+  alias ExternalRuntimeTransport.Command, as: TransportCommand
+  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
+  alias ExternalRuntimeTransport.Transport.RunResult
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
@@ -69,6 +71,19 @@ defmodule CliSubprocessCore.Command do
   @spec argv(t()) :: [String.t()]
   def argv(%__MODULE__{} = command) do
     [command.command | command.args]
+  end
+
+  @doc """
+  Projects a CLI-domain invocation onto the generic transport substrate.
+  """
+  @spec to_transport_command(t()) :: TransportCommand.t()
+  def to_transport_command(%__MODULE__{} = command) do
+    TransportCommand.new(command.command, command.args,
+      cwd: command.cwd,
+      env: command.env,
+      clear_env?: command.clear_env?,
+      user: command.user
+    )
   end
 
   @doc """
@@ -202,8 +217,9 @@ defmodule CliSubprocessCore.Command do
 
   defp do_run(invocation, %Options{} = options) do
     execution_surface = Options.execution_surface(options)
+    transport_invocation = to_transport_command(invocation)
 
-    case CliSubprocessCore.Transport.run(invocation,
+    case ExternalRuntimeTransport.Transport.run(transport_invocation,
            stdin: options.stdin,
            timeout: options.timeout,
            stderr: options.stderr,
@@ -217,9 +233,9 @@ defmodule CliSubprocessCore.Command do
            observability: execution_surface.observability
          ) do
       {:ok, %RunResult{} = result} ->
-        {:ok, result}
+        {:ok, %RunResult{result | invocation: invocation}}
 
-      {:error, {:transport, %CliSubprocessCore.Transport.Error{} = error}} ->
+      {:error, {:transport, %TransportError{} = error}} ->
         {:error, Error.transport_error(error, %{invocation: invocation})}
     end
   end

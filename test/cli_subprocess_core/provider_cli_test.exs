@@ -2,11 +2,11 @@ defmodule CliSubprocessCore.ProviderCLITest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.CommandSpec
-  alias CliSubprocessCore.ProcessExit
   alias CliSubprocessCore.ProviderCLI
   alias CliSubprocessCore.ProviderCLI.Error
   alias CliSubprocessCore.ProviderCLI.ErrorRuntimeFailure
   alias CliSubprocessCore.TestSupport
+  alias ExternalRuntimeTransport.ProcessExit
 
   defp isolated_env(overrides \\ %{}) do
     Map.merge(
@@ -371,7 +371,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                  ProviderCLI.resolve(
                    :codex,
                    [],
-                   execution_surface: [surface_kind: :test_guest_local]
+                   execution_surface: [surface_kind: :guest_bridge]
                  )
       end)
     after
@@ -384,7 +384,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
              ProviderCLI.resolve(
                :codex,
                [command: "/guest/bin/codex"],
-               execution_surface: [surface_kind: :test_guest_local]
+               execution_surface: [surface_kind: :guest_bridge]
              )
   end
 
@@ -473,7 +473,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
                ProviderCLI.runtime_failure(
                  :codex,
                  exit,
-                 execution_surface: [surface_kind: :test_guest_local]
+                 execution_surface: [surface_kind: :guest_bridge]
                )
 
       assert failure.kind == :cli_not_found

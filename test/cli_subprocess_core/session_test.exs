@@ -6,7 +6,7 @@ defmodule CliSubprocessCore.SessionTest do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
   alias CliSubprocessCore.Session
-  alias CliSubprocessCore.Transport
+  alias ExternalRuntimeTransport.Transport
 
   @session_event_tag :cli_subprocess_core_session
 
@@ -287,7 +287,9 @@ defmodule CliSubprocessCore.SessionTest do
     assert capture_log(fn ->
              assert {:error,
                      {:transport,
-                      %CliSubprocessCore.Transport.Error{reason: {:cwd_not_found, ^missing_cwd}}}} =
+                      %ExternalRuntimeTransport.Transport.Error{
+                        reason: {:cwd_not_found, ^missing_cwd}
+                      }}} =
                       Session.start_session(
                         provider: :claude,
                         prompt: "missing cwd",

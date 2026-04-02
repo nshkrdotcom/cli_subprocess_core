@@ -39,6 +39,7 @@ defmodule CliSubprocessCore.MixProject do
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],
+        "guides/external-runtime-transport.md": [title: "External Runtime Transport"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
@@ -53,12 +54,9 @@ defmodule CliSubprocessCore.MixProject do
         "guides/developer-guide-provider-profiles.md": [
           title: "Developer Guide: Provider Profiles"
         ],
-        "guides/developer-guide-runtime-layers.md": [title: "Developer Guide: Runtime Layers"],
         "guides/command-api.md": [title: "Command API"],
-        "guides/raw-transport.md": [title: "Raw Transport"],
         "guides/session-api.md": [title: "Session API"],
-        "guides/testing-and-conformance.md": [title: "Testing And Conformance"],
-        "guides/shutdown-and-timeouts.md": [title: "Shutdown And Timeouts"]
+        "guides/testing-and-conformance.md": [title: "Testing And Conformance"]
       ],
       groups_for_extras: [
         "Project Overview": ["README.md"],
@@ -73,20 +71,16 @@ defmodule CliSubprocessCore.MixProject do
           "guides/developer-guide-claude-backends.md",
           "guides/developer-guide-codex-backends.md",
           "guides/developer-guide-adding-transports.md",
-          "guides/developer-guide-provider-profiles.md",
-          "guides/developer-guide-runtime-layers.md"
+          "guides/developer-guide-provider-profiles.md"
         ],
         "Runtime & APIs": [
           "guides/getting-started.md",
+          "guides/external-runtime-transport.md",
           "guides/event-and-payload-model.md",
           "guides/command-api.md",
-          "guides/raw-transport.md",
           "guides/session-api.md"
         ],
-        "Operations & Conformance": [
-          "guides/testing-and-conformance.md",
-          "guides/shutdown-and-timeouts.md"
-        ],
+        "Operations & Conformance": ["guides/testing-and-conformance.md"],
         "Project Reference": ["CHANGELOG.md", "LICENSE"]
       ],
       formatters: ["html", "epub", "markdown"],
@@ -99,7 +93,7 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       description: description(),
       files:
-        ~w(lib priv guides scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
+        ~w(lib priv guides examples scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -126,7 +120,7 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
-      {:erlexec, "~> 2.2"},
+      {:external_runtime_transport, path: "../external_runtime_transport"},
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},

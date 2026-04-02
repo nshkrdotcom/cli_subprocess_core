@@ -1,213 +1,97 @@
 # Getting Started
 
-This guide walks through the core modules you need first, when to use the raw
-transport versus the session layer, and how to wire in a custom provider
-profile.
+`cli_subprocess_core` is the provider-facing runtime layer above
+`external_runtime_transport`.
 
-## What "Common Lane" Means
+Use it when you want normalized provider commands, sessions, payloads, and
+events instead of working directly with the raw transport substrate.
 
-This repo uses "common lane" to mean the generic API shared by downstream SDKs
-and adapters. In that lane, callers describe a process with `surface_kind`,
-`transport_options`, `target_id`, and similar metadata without naming a
-transport module directly. Most application code should stay in that generic
-surface.
-
-## What Exists In The Foundation
-
-The current foundation gives downstream repos a stable starting point for:
-
-- normalized subprocess command data with `CliSubprocessCore.Command`
-- provider-aware one-shot execution with `CliSubprocessCore.Command.run/1,2`
-- normalized runtime events with `CliSubprocessCore.Event`
-- normalized payload structs with `CliSubprocessCore.Payload.*`
-- provider profile validation with `CliSubprocessCore.ProviderProfile`
-- provider profile lookup with `CliSubprocessCore.ProviderRegistry`
-- built-in first-party provider profiles for Claude, Codex, Gemini, and Amp
-- session-oriented provider runtime ownership with `CliSubprocessCore.Session`
-- provider-agnostic raw session ownership with `CliSubprocessCore.RawSession`
-- raw subprocess ownership with `CliSubprocessCore.Transport`
-- framed long-lived IO channels with `CliSubprocessCore.Channel`
-- JSON-RPC request/reply sessions with `CliSubprocessCore.JSONRPC`
-
-## Define A Provider Profile
-
-Start with a module that implements `CliSubprocessCore.ProviderProfile`:
+## Install
 
 ```elixir
-defmodule MyApp.ProviderProfiles.Example do
-  @behaviour CliSubprocessCore.ProviderProfile
-
-  alias CliSubprocessCore.{Command, Event, Payload, ProcessExit}
-
-  @impl true
-  def id, do: :example
-
-  @impl true
-  def capabilities, do: [:streaming, :interrupt]
-
-  @impl true
-  def build_invocation(_opts) do
-    {:ok, Command.new("example-cli", ["run"])}
-  end
-
-  @impl true
-  def init_parser_state(_opts), do: %{}
-
-  @impl true
-  def decode_stdout(data, state) do
-    payload = Payload.AssistantDelta.new(content: data)
-    event = Event.new(:assistant_delta, provider: id(), payload: payload)
-    {[event], state}
-  end
-
-  @impl true
-  def decode_stderr(data, state) do
-    payload = Payload.Stderr.new(content: data)
-    event = Event.new(:stderr, provider: id(), payload: payload)
-    {[event], state}
-  end
-
-  @impl true
-  def handle_exit(reason, state) do
-    exit = ProcessExit.from_reason(reason)
-    payload = Payload.Result.new(status: exit.status, stop_reason: exit.reason)
-    event = Event.new(:result, provider: id(), payload: payload)
-    {[event], state}
-  end
-
-  @impl true
-  def transport_options(_opts), do: []
-end
-```
-
-## Register The Profile
-
-Register a profile module in the default registry:
-
-```elixir
-:ok = CliSubprocessCore.ProviderRegistry.register(MyApp.ProviderProfiles.Example)
-{:ok, MyApp.ProviderProfiles.Example} =
-  CliSubprocessCore.ProviderRegistry.fetch(:example)
-```
-
-Or preload the external profile into the default registry at boot:
-
-```elixir
-config :cli_subprocess_core,
-  built_in_profile_modules: [
-    MyApp.ProviderProfiles.Example
+def deps do
+  [
+    {:cli_subprocess_core, "~> 0.1.1"}
   ]
-```
-
-That preload hook affects the boot registry list only. It does not make the
-external profile a first-party built-in shipped by `cli_subprocess_core`.
-
-## Start A Raw Transport
-
-Use `CliSubprocessCore.Transport` when you need raw process ownership without
-provider-specific parsing:
-
-```elixir
-ref = make_ref()
-
-{:ok, transport} =
-  CliSubprocessCore.Transport.start(
-    command: CliSubprocessCore.Command.new("sh", ["-c", "cat"]),
-    subscriber: {self(), ref}
-  )
-
-:ok = CliSubprocessCore.Transport.send(transport, "hello")
-:ok = CliSubprocessCore.Transport.end_input(transport)
-
-receive do
-  {:cli_subprocess_core, ^ref, {:message, "hello"}} -> :ok
 end
 ```
 
-See `guides/raw-transport.md` for the transport contract and
-`guides/shutdown-and-timeouts.md` for shutdown and timeout behavior.
+## Choose The Right API
 
-## Run A One-Shot Command
+Use:
 
-Use the command lane when you need exact stdin/stdout/stderr capture without a
-long-lived session:
+- `CliSubprocessCore.Command` for provider-aware one-shot execution
+- `CliSubprocessCore.RawSession` for long-lived raw subprocess ownership
+- `CliSubprocessCore.Session` for normalized provider events
+- `CliSubprocessCore.Channel` or `CliSubprocessCore.ProtocolSession` for framed
+  or protocol-driven sessions
 
-```elixir
-invocation =
-  CliSubprocessCore.Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
-
-{:ok, result} =
-  CliSubprocessCore.Command.run(invocation,
-    stderr: :stdout,
-    timeout: 5_000
-  )
-```
-
-Or let the core resolve a provider profile and build the invocation:
+## One-Shot Commands
 
 ```elixir
 {:ok, result} =
   CliSubprocessCore.Command.run(
     provider: :claude,
-    prompt: "Summarize the repo"
+    prompt: "Summarize the latest changes"
   )
 ```
 
-See `guides/command-api.md` for the provider-aware boundary and
-`guides/raw-transport.md` for the lower transport-owned execution contract.
+The result type is
+`ExternalRuntimeTransport.Transport.RunResult`. The core keeps provider-facing
+planning and error wrapping around that transport-owned result.
 
-## Start A Session
+## Raw Sessions
 
-Use the session layer when you want provider command construction, parsing, and
-normalized event emission handled by the core:
+```elixir
+{:ok, session} =
+  CliSubprocessCore.RawSession.start("sh", ["-c", "cat"], stdin?: true)
+
+:ok = CliSubprocessCore.RawSession.send_input(session, "alpha")
+:ok = CliSubprocessCore.RawSession.close_input(session)
+
+{:ok, result} = CliSubprocessCore.RawSession.collect(session, 5_000)
+```
+
+`RawSession` is the lowest public CLI-owned layer. It uses
+`ExternalRuntimeTransport.Transport` underneath but keeps the public placement
+seam generic.
+
+## Normalized Sessions
 
 ```elixir
 ref = make_ref()
 
-{:ok, _session, _info} =
+{:ok, session, info} =
   CliSubprocessCore.Session.start_session(
-    provider: :claude,
-    prompt: "Summarize the repo",
+    provider: :codex,
+    prompt: "Review this change",
     subscriber: {self(), ref}
   )
 
-receive do
-  message ->
-    case CliSubprocessCore.Session.extract_event(message, ref) do
-      {:ok, event} -> IO.inspect({event.sequence, event.kind})
-      :error -> :ignore
-    end
-end
+IO.inspect(info.transport.info.surface_kind)
 ```
 
-See `guides/session-api.md` for the session contract,
-`guides/command-api.md` for the one-shot command lane,
-`guides/built-in-provider-profiles.md` for the first-party profile catalog, and
-`guides/custom-provider-profiles.md` for extension guidance.
+## Execution Surface
 
-## Start A Channel
+Placement stays on one `execution_surface` contract:
 
-Use `CliSubprocessCore.Channel` when you need a long-lived framed IO handle but
-do not want provider parsing. It wraps `RawSession` with stable mailbox
-delivery, stable `extract_event/2`, and `delivery_info/1` so adapters do not
-have to carry raw transport refs themselves. See `guides/channel-api.md`.
+```elixir
+execution_surface = [
+  surface_kind: :ssh_exec,
+  transport_options: [
+    destination: "buildbox.example",
+    ssh_user: "deploy"
+  ],
+  target_id: "buildbox-1",
+  boundary_class: :remote
+]
+```
 
-## Start A JSON-RPC Session
+Pass that value through `Command.run/1`, `Command.run/2`,
+`RawSession.start/2`, or `Session.start_session/1`.
 
-Use `CliSubprocessCore.JSONRPC` when the subprocess speaks newline-delimited
-JSON-RPC and you want request ids, notifications, peer-request replies, and
-readiness handling managed for you. It builds on
-`CliSubprocessCore.ProtocolSession` for the common request/reply lifecycle.
-See `guides/json-rpc.md`.
+Supported landed surface kinds are:
 
-## Lower-Level Helpers
-
-Most callers can ignore `CliSubprocessCore.Runtime` and
-`CliSubprocessCore.LineFraming` on day one.
-
-- Use `CliSubprocessCore.Runtime` directly only when you are emitting
-  normalized `CliSubprocessCore.Event` values yourself outside
-  `CliSubprocessCore.Session`.
-- Use `CliSubprocessCore.LineFraming` directly only when you are writing
-  transport or protocol code that receives partial chunks and must recover
-  newline-delimited records safely.
+- `:local_subprocess`
+- `:ssh_exec`
+- `:guest_bridge`

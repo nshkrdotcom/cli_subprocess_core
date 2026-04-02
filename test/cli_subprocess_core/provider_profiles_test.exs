@@ -437,7 +437,10 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert event.payload.message =~ "organization does not have access"
 
       {events_after_exit, _state} =
-        Claude.handle_exit(%CliSubprocessCore.ProcessExit{status: :success, code: 0}, state)
+        Claude.handle_exit(
+          %ExternalRuntimeTransport.ProcessExit{status: :success, code: 0},
+          state
+        )
 
       assert events_after_exit == []
     end
