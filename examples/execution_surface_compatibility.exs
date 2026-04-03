@@ -14,6 +14,7 @@ surface =
   )
 
 IO.inspect(surface, label: "compatibility surface")
+IO.inspect(CliSubprocessCore.ExecutionSurface.to_map(surface), label: "compatibility surface map")
 
 IO.inspect(
   %{

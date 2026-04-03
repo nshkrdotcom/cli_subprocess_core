@@ -12,6 +12,7 @@ That means:
 
 The core accepts one public placement value:
 
+- `contract_version`
 - `surface_kind`
 - `transport_options`
 - `target_id`
@@ -26,6 +27,9 @@ without leaking adapter module names into its own public API.
 For downstream compatibility, `CliSubprocessCore.ExecutionSurface` remains as a
 thin facade over the same transport-owned contract. It preserves the legacy
 struct/module identity without moving transport ownership back into the core.
+
+Use `CliSubprocessCore.ExecutionSurface.to_map/1` when a caller needs the
+versioned map projection for a boundary or fixture.
 
 ## What The Core Gets Back
 

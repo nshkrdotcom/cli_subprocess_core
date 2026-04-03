@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
   alias CliSubprocessCore.ExecutionSurface
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.{CommandRunner, Echo}
+  alias ExternalRuntimeTransport.ExecutionSurface, as: TransportExecutionSurface
 
   test "builds a compatibility struct from keyword input" do
     assert {:ok, %ExecutionSurface{} = surface} =
@@ -88,5 +89,24 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
 
     assert options.target_id == "target-session"
     assert options.observability == %{suite: :compat}
+  end
+
+  test "compatibility facade preserves the contract version and string boundary classes" do
+    assert {:ok, %ExecutionSurface{} = surface} =
+             ExecutionSurface.new(%{
+               "contract_version" => "execution_surface.v1",
+               "surface_kind" => :ssh_exec,
+               "boundary_class" => "remote_cli",
+               "observability" => %{"suite" => "compat"}
+             })
+
+    assert surface.contract_version == "execution_surface.v1"
+    assert surface.boundary_class == "remote_cli"
+
+    assert %TransportExecutionSurface{} =
+             transport_surface = ExecutionSurface.to_external(surface)
+
+    assert transport_surface.contract_version == "execution_surface.v1"
+    assert transport_surface.boundary_class == "remote_cli"
   end
 end

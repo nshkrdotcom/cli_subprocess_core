@@ -108,7 +108,8 @@ mix test test/cli_subprocess_core/provider_profile_test.exs test/cli_subprocess_
 ```
 
 When changing model resolution or provider backend selection, use the repo-local
-workflow helper as well:
+workflow helper as well. It refreshes the extracted transport substrate before
+recompiling dependent workspace repos:
 
 ```bash
 ./scripts/model_selection_ci.sh test --tag sdk

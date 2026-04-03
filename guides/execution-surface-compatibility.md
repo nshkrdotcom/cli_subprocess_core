@@ -18,6 +18,7 @@ facade.
 
 The compatibility module preserves the historical struct shape:
 
+- `contract_version`
 - `surface_kind`
 - `transport_options`
 - `target_id`
@@ -28,6 +29,8 @@ The compatibility module preserves the historical struct shape:
 
 It delegates validation and capability lookup to
 `ExternalRuntimeTransport.ExecutionSurface`.
+It also delegates map projection through
+`CliSubprocessCore.ExecutionSurface.to_map/1`.
 
 ## What The Facade Does Not Do
 

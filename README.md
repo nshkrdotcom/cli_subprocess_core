@@ -139,6 +139,7 @@ value.
 
 That contract carries:
 
+- `contract_version`
 - `surface_kind`
 - `transport_options`
 - `target_id`
@@ -158,6 +159,11 @@ Callers may supply that value either as:
 
 The first two are the preferred long-term shapes. The struct form remains for
 downstream compatibility.
+
+When that surface needs to cross a boundary, use
+`CliSubprocessCore.ExecutionSurface.to_map/1` or
+`ExternalRuntimeTransport.ExecutionSurface.to_map/1` to project the versioned
+map form.
 
 ## Documentation
 

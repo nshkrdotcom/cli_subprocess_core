@@ -3,6 +3,7 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Command.Options, as: CommandOptions
+  alias CliSubprocessCore.Command.RunResult, as: CommandRunResult
   alias CliSubprocessCore.RawSession
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
@@ -65,10 +66,10 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
     assert result.output =~ "ready"
   end
 
-  test "command run returns the extracted transport result type" do
+  test "command run returns the core command result type" do
     script = create_test_script("printf 'runner-ok'")
 
-    assert {:ok, %RunResult{} = result} =
+    assert {:ok, %CommandRunResult{} = result} =
              Command.run(
                profile: CommandRunner,
                command: script,

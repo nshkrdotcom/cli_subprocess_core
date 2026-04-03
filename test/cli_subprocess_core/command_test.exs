@@ -3,6 +3,7 @@ defmodule CliSubprocessCore.CommandTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Command.Error
+  alias CliSubprocessCore.Command.RunResult
   alias CliSubprocessCore.CommandSpec
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
 
@@ -112,7 +113,7 @@ defmodule CliSubprocessCore.CommandTest do
       printf 'runner-ok'
       """)
 
-    assert {:ok, result} =
+    assert {:ok, %RunResult{} = result} =
              Command.run(
                profile: CommandRunner,
                command: script,

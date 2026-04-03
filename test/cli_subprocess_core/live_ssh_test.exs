@@ -2,8 +2,8 @@ defmodule CliSubprocessCore.LiveSSHTest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.Command.RunResult
   alias CliSubprocessCore.TestSupport.LiveSSH
-  alias ExternalRuntimeTransport.Transport.RunResult
 
   @moduletag :live_ssh
   @moduletag timeout: 60_000

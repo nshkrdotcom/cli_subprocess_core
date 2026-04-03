@@ -11,7 +11,8 @@ defmodule CliSubprocessCore.ExecutionSurface do
   alias ExternalRuntimeTransport.ExecutionSurface, as: TransportExecutionSurface
   alias ExternalRuntimeTransport.ExecutionSurface.Capabilities
 
-  defstruct surface_kind: TransportExecutionSurface.default_surface_kind(),
+  defstruct contract_version: TransportExecutionSurface.contract_version(),
+            surface_kind: TransportExecutionSurface.default_surface_kind(),
             transport_options: [],
             target_id: nil,
             lease_ref: nil,
@@ -20,13 +21,25 @@ defmodule CliSubprocessCore.ExecutionSurface do
             observability: %{}
 
   @type t :: %__MODULE__{
+          contract_version: TransportExecutionSurface.contract_version(),
           surface_kind: TransportExecutionSurface.surface_kind(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,
-          boundary_class: atom() | nil,
+          boundary_class: TransportExecutionSurface.boundary_class(),
           observability: map()
+        }
+
+  @type projected_t :: %{
+          required(:contract_version) => String.t(),
+          required(:surface_kind) => TransportExecutionSurface.surface_kind(),
+          required(:transport_options) => map(),
+          required(:target_id) => String.t() | nil,
+          required(:lease_ref) => String.t() | nil,
+          required(:surface_ref) => String.t() | nil,
+          required(:boundary_class) => TransportExecutionSurface.boundary_class(),
+          required(:observability) => map()
         }
 
   @type validation_error :: TransportExecutionSurface.validation_error()
@@ -35,6 +48,9 @@ defmodule CliSubprocessCore.ExecutionSurface do
 
   @spec default_surface_kind() :: TransportExecutionSurface.surface_kind()
   defdelegate default_surface_kind(), to: TransportExecutionSurface
+
+  @spec contract_version() :: String.t()
+  defdelegate contract_version(), to: TransportExecutionSurface
 
   @spec reserved_keys() :: [TransportExecutionSurface.reserved_key(), ...]
   defdelegate reserved_keys(), to: TransportExecutionSurface
@@ -135,11 +151,15 @@ defmodule CliSubprocessCore.ExecutionSurface do
   def surface_metadata(%TransportExecutionSurface{} = surface),
     do: TransportExecutionSurface.surface_metadata(surface)
 
+  @spec to_map(t() | TransportExecutionSurface.t()) :: projected_t()
+  def to_map(surface), do: surface |> to_external() |> TransportExecutionSurface.to_map()
+
   @spec to_external(t() | TransportExecutionSurface.t()) :: TransportExecutionSurface.t()
   def to_external(%TransportExecutionSurface{} = surface), do: surface
 
   def to_external(%__MODULE__{} = surface) do
     %TransportExecutionSurface{
+      contract_version: surface.contract_version,
       surface_kind: surface.surface_kind,
       transport_options: surface.transport_options,
       target_id: surface.target_id,
@@ -153,6 +173,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
   @spec from_external(TransportExecutionSurface.t()) :: t()
   def from_external(%TransportExecutionSurface{} = surface) do
     %__MODULE__{
+      contract_version: surface.contract_version,
       surface_kind: surface.surface_kind,
       transport_options: surface.transport_options,
       target_id: surface.target_id,
@@ -168,6 +189,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
 
   defp execution_surface_attrs(attrs) do
     [
+      contract_version: Map.get(attrs, :contract_version, Map.get(attrs, "contract_version")),
       surface_kind: Map.get(attrs, :surface_kind, Map.get(attrs, "surface_kind")),
       transport_options: Map.get(attrs, :transport_options, Map.get(attrs, "transport_options")),
       target_id: Map.get(attrs, :target_id, Map.get(attrs, "target_id")),

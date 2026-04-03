@@ -1387,13 +1387,24 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp surface_destination(%{} = execution_surface) do
     execution_surface
-    |> Enum.into([])
+    |> execution_surface_surface_opts()
     |> surface_destination()
-  rescue
-    _error -> nil
   end
 
   defp surface_destination(_other), do: nil
+
+  defp execution_surface_surface_opts(execution_surface) when is_map(execution_surface) do
+    [
+      surface_kind:
+        Map.get(execution_surface, :surface_kind, Map.get(execution_surface, "surface_kind")),
+      transport_options:
+        Map.get(
+          execution_surface,
+          :transport_options,
+          Map.get(execution_surface, "transport_options")
+        )
+    ]
+  end
 
   defp normalize_stderr(stderr) when is_binary(stderr) do
     stderr

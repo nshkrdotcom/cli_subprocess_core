@@ -45,7 +45,7 @@ defmodule CliSubprocessCore.TestSupport.FakeSSH do
   def wait_until_written(%__MODULE__{manifest_path: manifest_path}, timeout_ms)
       when is_integer(timeout_ms) and timeout_ms >= 0 do
     deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
-    wait_until(fn -> File.exists?(manifest_path) end, deadline_ms)
+    wait_until(fn -> manifest_written?(manifest_path) end, deadline_ms)
   end
 
   @spec read_manifest!(t()) :: binary()
@@ -117,6 +117,13 @@ defmodule CliSubprocessCore.TestSupport.FakeSSH do
     dir = Path.join(System.tmp_dir!(), "#{prefix}_#{suffix}")
     File.mkdir_p!(dir)
     dir
+  end
+
+  defp manifest_written?(manifest_path) when is_binary(manifest_path) do
+    case File.stat(manifest_path) do
+      {:ok, %File.Stat{size: size}} when size > 0 -> true
+      _other -> false
+    end
   end
 
   defp wait_until(fun, deadline_ms) when is_function(fun, 0) and is_integer(deadline_ms) do

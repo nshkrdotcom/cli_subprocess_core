@@ -6,11 +6,11 @@ defmodule CliSubprocessCore.Command do
   through `run/1` and `run/2`.
   """
 
-  alias CliSubprocessCore.Command.{Error, Options}
+  alias CliSubprocessCore.Command.{Error, Options, RunResult}
   alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
   alias ExternalRuntimeTransport.Command, as: TransportCommand
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
-  alias ExternalRuntimeTransport.Transport.RunResult
+  alias ExternalRuntimeTransport.Transport.RunResult, as: TransportRunResult
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
@@ -232,8 +232,8 @@ defmodule CliSubprocessCore.Command do
            boundary_class: execution_surface.boundary_class,
            observability: execution_surface.observability
          ) do
-      {:ok, %RunResult{} = result} ->
-        {:ok, %RunResult{result | invocation: invocation}}
+      {:ok, %TransportRunResult{} = result} ->
+        {:ok, RunResult.from_transport(result, invocation)}
 
       {:error, {:transport, %TransportError{} = error}} ->
         {:error, Error.transport_error(error, %{invocation: invocation})}

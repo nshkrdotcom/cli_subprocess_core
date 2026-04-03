@@ -15,9 +15,9 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
   """
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.Command.RunResult
   alias ExternalRuntimeTransport.ExecutionSurface
   alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport.RunResult
 
   @enabled_env "CLI_SUBPROCESS_CORE_LIVE_SSH"
   @destination_env "CLI_SUBPROCESS_CORE_LIVE_SSH_DESTINATION"

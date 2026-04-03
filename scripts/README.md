@@ -22,6 +22,8 @@ Use this script to run model-selection-related quality gates from `/home/home/p/
 - Fails hard on first failure.
 - Prints repo-by-repo pass/fail status and final summary.
 - Supports focused execution with `--repo` and `--tag`.
+- Refreshes local workspace deps in dependency order, including
+  `external_runtime_transport` before `cli_subprocess_core` where needed.
 
 ## Usage examples
 

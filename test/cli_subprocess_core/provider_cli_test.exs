@@ -438,6 +438,30 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert failure.message =~ "remote non-login PATH"
     end
 
+    test "preserves remote destination context from the core execution-surface struct" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 127},
+          stderr: "bash: line 1: exec: amp: not found\n"
+        )
+
+      execution_surface =
+        CliSubprocessCore.ExecutionSurface.new!(
+          surface_kind: :ssh_exec,
+          transport_options: [destination: "amp.command.missing.example"]
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :amp,
+                 exit,
+                 execution_surface: execution_surface
+               )
+
+      assert failure.kind == :cli_not_found
+      assert failure.message =~ "remote target amp.command.missing.example"
+    end
+
     test "classifies remote cwd misses as config_invalid runtime failures" do
       exit =
         ProcessExit.from_reason({:exit_status, 1},
