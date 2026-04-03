@@ -9,6 +9,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :task_supervisor,
     :headless_timeout_ms,
     :max_buffer_size,
+    :oversize_line_chunk_bytes,
+    :max_recoverable_line_bytes,
+    :oversize_line_mode,
+    :buffer_overflow_mode,
     :max_stderr_buffer_size,
     :stderr_callback,
     :close_stdin_on_start?

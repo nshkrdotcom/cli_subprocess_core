@@ -11,3 +11,12 @@ These examples show the current public placement seam honestly: callers use
   `CliSubprocessCore.ExecutionSurface` struct flowing through the public
   command options API without taking transport ownership back from
   `external_runtime_transport`.
+## Hardening Notes
+
+The emergency hardening work in this repo is primarily profile and contract work, so the strongest
+example surface is the provider-profile test lane:
+
+- `test/cli_subprocess_core/provider_profiles_test.exs`
+
+That suite now proves that the shared transport options preserve chunk-first overflow controls
+instead of dropping them at the profile boundary.

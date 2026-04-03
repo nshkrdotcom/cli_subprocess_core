@@ -229,3 +229,18 @@ substrate internals.
 
 See `guides/shutdown-and-timeouts.md` for the surfaced lifecycle contract and
 `guides/external-runtime-transport.md` for the package split.
+## Chunk-First Overflow Controls
+
+When a provider profile opts into line-based stdout framing, the raw transport now exposes the full
+oversize-line control set:
+
+- `:max_buffer_size`
+- `:oversize_line_chunk_bytes`
+- `:max_recoverable_line_bytes`
+- `:oversize_line_mode`
+- `:buffer_overflow_mode`
+
+The intended default is `:chunk_then_fail` plus `:fatal`: try to reconstruct the complete line
+within a bounded window, then raise a structured overflow error once the recoverable ceiling is
+exceeded. Provider profiles should pass those values through transparently rather than silently
+reverting to optimistic drop-and-continue behavior.

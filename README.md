@@ -178,3 +178,18 @@ map form.
 - `guides/developer-guide-adding-transports.md` for the ownership rule after
   extraction.
 - `examples/README.md` for runnable examples.
+## Emergency Hardening Surfaces
+
+`cli_subprocess_core` now preserves the transport hardening controls that matter to upper layers
+instead of flattening them away inside provider defaults.
+
+- shared provider-profile transport options retain `max_buffer_size`,
+  `oversize_line_chunk_bytes`, `max_recoverable_line_bytes`, `oversize_line_mode`, and
+  `buffer_overflow_mode`
+- the common capability vocabulary now has a stable place for session-history, resume, pause, and
+  intervention support
+- higher layers can reason about fatal data-loss boundaries without re-inventing transport-specific
+  heuristics
+
+This repo is still not a retry engine. It is the boundary that keeps subprocess and provider
+profiles honest about what can be recovered and what must fail.

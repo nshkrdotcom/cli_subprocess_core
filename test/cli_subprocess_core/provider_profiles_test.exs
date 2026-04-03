@@ -355,6 +355,25 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert Codex.transport_options([])[:close_stdin_on_start?] == true
       assert Codex.transport_options(startup_mode: :eager)[:startup_mode] == :eager
     end
+
+    test "shared transport options preserve chunk-first line recovery controls" do
+      opts =
+        Shared.transport_options(
+          max_buffer_size: 1_024,
+          oversize_line_chunk_bytes: 128,
+          max_recoverable_line_bytes: 16_384,
+          oversize_line_mode: :chunk_then_fail,
+          buffer_overflow_mode: :fatal,
+          ignored: true
+        )
+
+      assert opts[:max_buffer_size] == 1_024
+      assert opts[:oversize_line_chunk_bytes] == 128
+      assert opts[:max_recoverable_line_bytes] == 16_384
+      assert opts[:oversize_line_mode] == :chunk_then_fail
+      assert opts[:buffer_overflow_mode] == :fatal
+      refute Keyword.has_key?(opts, :ignored)
+    end
   end
 
   describe "parser fixtures" do

@@ -106,3 +106,16 @@ profile behavior that the core itself owns.
 It should not become a generic SDK catalog or an adapter-specific policy layer.
 Higher-level packages such as ASM may wrap this metadata to describe their own
 common surfaces, but the source of truth for built-in CLI behavior stays here.
+## Session-Control Capability Vocabulary
+
+Provider manifests may now advertise the following session-control capabilities when the runtime
+really supports them:
+
+- `:session_history`
+- `:session_resume`
+- `:session_pause`
+- `:session_intervene`
+
+These names are intentionally shared with the upper orchestration layers. A profile should only
+publish them when the runtime can surface a truthful provider-native history/resume/pause path; the
+manifest is not the place for speculative compatibility claims.
