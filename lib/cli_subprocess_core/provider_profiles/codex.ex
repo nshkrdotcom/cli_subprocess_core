@@ -60,23 +60,29 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   def handle_exit(reason, state), do: Shared.handle_exit(reason, state)
 
   @impl true
-  def transport_options(opts), do: Shared.transport_options(opts)
+  def transport_options(opts) do
+    opts
+    |> Shared.transport_options()
+    |> Keyword.put(:close_stdin_on_start?, true)
+  end
 
   defp option_flags(opts) do
     []
-    |> Shared.maybe_add_flag("--oss", oss_enabled?(opts))
-    |> Shared.maybe_add_pair("--local-provider", local_provider_value(opts))
     |> Shared.maybe_add_pair("--model", model_value(opts))
+    |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Shared.maybe_add_flag("--skip-git-repo-check", Keyword.get(opts, :skip_git_repo_check))
     |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
-    |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Kernel.++(permission_flags(opts))
   end
 
   defp model_value(opts) do
-    opts
-    |> Keyword.get(:model_payload, %{})
-    |> model_payload_value(:resolved_model)
+    if oss_enabled?(opts) do
+      nil
+    else
+      opts
+      |> Keyword.get(:model_payload, %{})
+      |> model_payload_value(:resolved_model)
+    end
   end
 
   defp reasoning_config_values(opts) do
@@ -127,8 +133,24 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       |> List.wrap()
       |> Enum.filter(&(is_binary(&1) and &1 != ""))
 
-    (reasoning_config_values(opts) ++ Keyword.get(opts, :config_values, []) ++ payload_values)
+    (local_model_provider_config_values(opts) ++
+       reasoning_config_values(opts) ++ Keyword.get(opts, :config_values, []) ++ payload_values)
     |> Enum.uniq()
+  end
+
+  defp local_model_provider_config_values(opts) do
+    model =
+      Keyword.get(opts, :model) ||
+        model_payload_value(Keyword.get(opts, :model_payload, %{}), :resolved_model)
+
+    case {local_provider_value(opts), model} do
+      {provider, model}
+      when is_binary(provider) and provider != "" and is_binary(model) and model != "" ->
+        [~s(model_provider="#{provider}"), ~s(model="#{model}")]
+
+      _other ->
+        []
+    end
   end
 
   defp permission_flags(opts) do

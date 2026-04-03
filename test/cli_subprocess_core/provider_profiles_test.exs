@@ -107,11 +107,11 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "--json",
                "--model",
                "gpt-5-codex",
+               "--config",
+               ~s(model_reasoning_effort="high"),
                "--skip-git-repo-check",
                "--output-schema",
                Jason.encode!(schema),
-               "--config",
-               ~s(model_reasoning_effort="high"),
                "--dangerously-bypass-approvals-and-sandbox",
                "review this diff"
              ]
@@ -153,11 +153,10 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.args == [
                "exec",
                "--json",
-               "--oss",
-               "--local-provider",
-               "ollama",
-               "--model",
-               "gpt-oss:20b",
+               "--config",
+               ~s(model_provider="ollama"),
+               "--config",
+               ~s(model="gpt-oss:20b"),
                "--config",
                ~s(model_reasoning_effort="high"),
                "review this diff"
@@ -350,6 +349,11 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert Shared.maybe_add_pair([], "--threads", 3) == ["--threads", "3"]
       assert Shared.maybe_add_pair([], "--timeout", 3.5) == ["--timeout", "3.5"]
       assert Shared.maybe_add_pair([], "--auto", true) == ["--auto", "true"]
+    end
+
+    test "Codex closes stdin on start for one-shot exec runs" do
+      assert Codex.transport_options([])[:close_stdin_on_start?] == true
+      assert Codex.transport_options(startup_mode: :eager)[:startup_mode] == :eager
     end
   end
 

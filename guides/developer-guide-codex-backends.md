@@ -41,7 +41,9 @@ implementation landed:
 Direct CLI check:
 
 ```bash
-codex exec --oss --local-provider ollama -m gpt-oss:20b \
+codex exec --json \
+  --config 'model_provider="ollama"' \
+  --config 'model="gpt-oss:20b"' \
   "Respond with exactly: OK"
 ```
 
@@ -49,7 +51,9 @@ The more general local route also runs with arbitrary installed models such as
 `llama3.2`:
 
 ```bash
-codex exec --oss --local-provider ollama -m llama3.2 \
+codex exec --json \
+  --config 'model_provider="ollama"' \
+  --config 'model="llama3.2"' \
   "Respond with exactly: OK"
 ```
 
@@ -113,8 +117,10 @@ Downstream repos do not make a second backend decision.
 
 In this stack:
 
-- `CliSubprocessCore.ProviderProfiles.Codex` renders `--oss`,
-  `--local-provider`, and `--model` from the payload
+- `CliSubprocessCore.ProviderProfiles.Codex` renders payload-owned `--config`
+  overrides for `model_provider` and `model` on the local Ollama path, and
+  closes stdin on start for one-shot exec runs so upstream Codex does not wait
+  for EOF after argv prompts
 - `/home/home/p/g/n/codex_sdk` reads the same payload in
   `Codex.Options`, `Codex.Runtime.Exec`, and app-server startup
 - `/home/home/p/g/n/agent_session_manager` forwards Codex backend intent into
@@ -147,4 +153,5 @@ When reviewing Codex backend changes, verify:
 - local Ollama validation stays explicit and hard-failing
 - validated defaults stay metadata, not an invented hard allowlist
 - blank or placeholder model ids still fail
-- no renderer emits synthetic Codex backend flags without payload support
+- no renderer emits stale Codex OSS argv flags when the upstream CLI expects
+  config-driven model-provider routing

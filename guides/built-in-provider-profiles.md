@@ -90,13 +90,15 @@ The Codex profile does not own model or backend policy.
 It reads the resolved payload for:
 
 - `--model`
-- `--reasoning-effort`
-- `--oss`
-- `--local-provider`
+- `--config model_reasoning_effort=...`
+- `--config model_provider="..."`
+- `--config model="..."`
 
 That is what allows the same profile to render either the normal OpenAI Codex
 path or the local Codex OSS/Ollama path without inventing a second fallback or
-validation layer.
+validation layer. For one-shot exec runs it also closes stdin on start so the
+upstream Codex CLI does not block on EOF after the prompt is already present on
+argv.
 
 ## Gemini
 
