@@ -36,6 +36,21 @@ iex> CliSubprocessCore.ProviderFeatures.permission_args(:amp, :dangerously_allow
 This keeps provider profiles authoritative for the real CLI contract while
 still giving adapter layers a stable public lookup surface.
 
+Important boundary:
+
+- this metadata is about provider-native permission terminology and rendered
+  CLI args
+- it is not a general sandbox, approval-policy, or thread-options catalog
+- if a provider has extra knobs outside the shared permission concept, those
+  remain in the provider profile or the provider SDK layer
+
+Examples:
+
+- Codex `--dangerously-bypass-approvals-and-sandbox` appears here because it is
+  the provider-native rendering of a permission choice
+- Gemini `--sandbox` does not appear here because it is a separate
+  provider-specific option, not a permission-mode alias
+
 ## Partial Features
 
 Use `partial_feature!/2` when you need to know whether a built-in provider

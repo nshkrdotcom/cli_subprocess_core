@@ -35,6 +35,18 @@ All built-in profiles own:
 All provider-specific options live on the session startup keyword list and are
 passed through to the selected profile.
 
+One important distinction:
+
+- `permission_mode`
+  - common higher-layer approval/edit posture that this repo maps onto
+    provider-native CLI flags
+- `provider_permission_mode`
+  - explicit provider-native permission choice when a caller already knows the
+    exact native mode to use
+- provider-native options such as Gemini `sandbox`
+  - extra provider-specific flags that are not part of the shared permission
+    abstraction
+
 If you need the shipped module list directly, call
 `CliSubprocessCore.first_party_profile_modules/0`.
 
@@ -119,6 +131,10 @@ Common Gemini options:
 - `:permission_mode`
 - `:provider_permission_mode`
 
+Gemini is the built-in profile that currently exposes an explicit provider
+`sandbox` flag on the common CLI lane. That is provider-native behavior, not a
+generic `CliSubprocessCore` sandbox abstraction shared across all providers.
+
 ## Amp
 
 Command shape:
@@ -141,6 +157,18 @@ Common Amp options:
 - `:include_thinking`
 - `:permission_mode`
 - `:provider_permission_mode`
+
+## How To Read These Knobs
+
+`CliSubprocessCore` is the built-in CLI profile layer. At this layer:
+
+- `permission_mode` means "use the shared normalized permission concept and let
+  the profile map it to native CLI args"
+- `provider_permission_mode` means "skip the normalized concept and specify the
+  provider-native permission term directly"
+- provider-specific options such as Gemini `sandbox` are separate from the
+  permission mapping and only exist for the providers that actually support
+  them
 
 ## Capability Hints
 
