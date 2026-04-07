@@ -1,7 +1,7 @@
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.1.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -109,7 +109,7 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       description: description(),
       files:
-        ~w(lib priv guides examples scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
+        ~w(lib priv/models scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -136,7 +136,7 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
-      {:external_runtime_transport, path: "../external_runtime_transport"},
+      {:external_runtime_transport, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},

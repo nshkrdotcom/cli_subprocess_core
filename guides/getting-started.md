@@ -11,7 +11,7 @@ events instead of working directly with the raw transport substrate.
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.1.1"}
+    {:cli_subprocess_core, "~> 0.1.0"}
   ]
 end
 ```
