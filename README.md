@@ -193,3 +193,7 @@ instead of flattening them away inside provider defaults.
 
 This repo is still not a retry engine. It is the boundary that keeps subprocess and provider
 profiles honest about what can be recovered and what must fail.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
