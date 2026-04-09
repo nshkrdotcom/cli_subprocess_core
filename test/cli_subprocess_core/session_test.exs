@@ -6,7 +6,7 @@ defmodule CliSubprocessCore.SessionTest do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
   alias CliSubprocessCore.Session
-  alias ExternalRuntimeTransport.Transport
+  alias ExternalRuntimeTransport.Transport.Info
 
   @session_event_tag :cli_subprocess_core_session
 
@@ -56,7 +56,7 @@ defmodule CliSubprocessCore.SessionTest do
     ref = make_ref()
 
     info = Session.info(session)
-    assert %Transport.Info{} = info.transport.info
+    assert %Info{} = info.transport.info
     assert info.transport.status == :connected
     assert is_pid(info.transport.subprocess_pid)
     assert is_integer(info.transport.os_pid)
@@ -127,7 +127,7 @@ defmodule CliSubprocessCore.SessionTest do
                startup_mode: :lazy
              )
 
-    assert %Transport.Info{} = info.transport.info
+    assert %Info{} = info.transport.info
     assert info.transport.info.surface_kind == :local_subprocess
     assert info.transport.info.target_id == "target-1"
     assert info.transport.info.lease_ref == "lease-1"

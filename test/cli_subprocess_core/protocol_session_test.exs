@@ -224,7 +224,7 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
 
     ProtocolSession.start_link(
       [
-        adapter: CliSubprocessCore.JSONRPC.Adapter,
+        adapter: ExecutionPlane.Protocols.JsonRpc.Adapter,
         adapter_options: [request_id_start: 1],
         command: script,
         startup_requests: [%{id: 0, method: "initialize", params: %{"client" => "test"}}],

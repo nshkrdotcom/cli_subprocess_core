@@ -8,8 +8,8 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
   alias CliSubprocessCore.TestSupport.ProviderProfiles.Echo
+  alias ExecutionPlane.Process.Transport
   alias ExternalRuntimeTransport.ExecutionSurface
-  alias ExternalRuntimeTransport.Transport
   alias ExternalRuntimeTransport.Transport.Info
   alias ExternalRuntimeTransport.Transport.RunResult
 
@@ -55,7 +55,7 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
     assert execution_surface.transport_options[:bridge_ref] == "bridge-1"
   end
 
-  test "raw session defaults to the extracted transport substrate" do
+  test "raw session defaults to the execution-plane session transport" do
     script = create_test_script("printf 'ready\\n'")
 
     assert {:ok, session} = RawSession.start(script, [], stdin?: false)

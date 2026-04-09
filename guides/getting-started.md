@@ -57,9 +57,10 @@ outcome back into the core-owned command shape.
 {:ok, result} = CliSubprocessCore.RawSession.collect(session, 5_000)
 ```
 
-`RawSession` is the lowest public CLI-owned layer. It uses
-`ExternalRuntimeTransport.Transport` underneath but keeps the public placement
-seam generic.
+`RawSession` is the lowest public CLI-owned layer. For the covered local
+session-bearing lane it uses `ExecutionPlane.Process.Transport` underneath
+while keeping the public placement seam generic. Non-local surfaces still
+resolve through the underlying external transport substrate.
 
 ## Normalized Sessions
 
@@ -96,8 +97,10 @@ Pass that value through `Command.run/1`, `Command.run/2`,
 `RawSession.start/2`, or `Session.start_session/1`.
 
 When `Command.run/1,2` receives `surface_kind: :local_subprocess`, the covered
-minimal one-shot lane runs through `execution_plane`. The other public entry
-points still use `external_runtime_transport`.
+minimal one-shot lane runs through `execution_plane`. `RawSession`,
+`Channel`, and `Session` now use the Execution Plane-backed local session lane
+for `:local_subprocess` as well. Non-local surfaces still resolve through the
+underlying external transport substrate.
 
 Supported landed surface kinds are:
 

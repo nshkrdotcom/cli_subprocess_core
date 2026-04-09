@@ -18,7 +18,7 @@ defmodule CliSubprocessCore.Session do
     Session.Options
   }
 
-  alias ExternalRuntimeTransport.Transport
+  alias ExecutionPlane.Process.Transport
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
   alias ExternalRuntimeTransport.Transport.Info
 
@@ -256,15 +256,15 @@ defmodule CliSubprocessCore.Session do
 
   @impl GenServer
   def handle_call({:send, input}, _from, state) do
-    {:reply, ExternalRuntimeTransport.Transport.send(state.transport_pid, input), state}
+    {:reply, Transport.send(state.transport_pid, input), state}
   end
 
   def handle_call(:end_input, _from, state) do
-    {:reply, ExternalRuntimeTransport.Transport.end_input(state.transport_pid), state}
+    {:reply, Transport.end_input(state.transport_pid), state}
   end
 
   def handle_call(:interrupt, _from, state) do
-    {:reply, ExternalRuntimeTransport.Transport.interrupt(state.transport_pid), state}
+    {:reply, Transport.interrupt(state.transport_pid), state}
   end
 
   def handle_call({:subscribe, pid, tag}, _from, state) do
@@ -328,7 +328,7 @@ defmodule CliSubprocessCore.Session do
   @impl GenServer
   def terminate(_reason, state) do
     if is_pid(state.transport_pid) do
-      _ = ExternalRuntimeTransport.Transport.close(state.transport_pid)
+      _ = Transport.close(state.transport_pid)
     end
 
     :ok

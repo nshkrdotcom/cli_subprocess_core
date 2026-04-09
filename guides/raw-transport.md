@@ -1,8 +1,9 @@
 # Raw Sessions And Transport
 
 `cli_subprocess_core` no longer owns the raw subprocess substrate.
-`ExternalRuntimeTransport.Transport` owns process startup, streaming IO,
-shutdown, execution-surface placement, and transport result types.
+`ExecutionPlane.Process.Transport` owns the local session-bearing process lane,
+while the remaining non-local placement substrate still flows through the
+shared lower transport packages.
 
 `CliSubprocessCore.RawSession` is the core-owned handle above that substrate
 when you want exact-byte stdin/stdout defaults without provider parsing.
@@ -11,7 +12,7 @@ when you want exact-byte stdin/stdout defaults without provider parsing.
 
 - `CliSubprocessCore.RawSession` for a stable raw-session handle above the
   extracted transport layer
-- `ExternalRuntimeTransport.Transport` for direct transport lifecycle control
+- `ExecutionPlane.Process.Transport` for direct local session transport lifecycle control
 - `ExternalRuntimeTransport.Transport.Info` for transport metadata snapshots
 - `ExternalRuntimeTransport.Transport.Options` for validated startup options
 - `ExternalRuntimeTransport.Transport.RunOptions` for validated one-shot
@@ -67,12 +68,12 @@ higher layer needs to reason about placement without reaching around the seam.
 
 ## Direct Transport Access
 
-Use `ExternalRuntimeTransport.Transport` directly when you need transport-level
+Use `ExecutionPlane.Process.Transport` directly when you need transport-level
 lifecycle control or exact non-provider one-shot execution.
 
 ```elixir
 alias ExternalRuntimeTransport.Command
-alias ExternalRuntimeTransport.Transport
+alias ExecutionPlane.Process.Transport
 
 command =
   Command.new("sh", ["-c", "cat"],
@@ -89,8 +90,8 @@ ref = make_ref()
   )
 ```
 
-Supported startup options are normalized by
-`ExternalRuntimeTransport.Transport.Options`:
+Supported startup options are normalized by the shared lower transport options
+contract:
 
 - `:command` or a normalized `ExternalRuntimeTransport.Command`
 - `:args`, default `[]`

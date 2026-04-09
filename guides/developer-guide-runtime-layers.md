@@ -81,7 +81,8 @@ longer-lived sessions.
 Owned by the lower owner for the selected lane:
 
 - `ExecutionPlane.Process` for the covered local one-shot command lane
-- `ExternalRuntimeTransport.Transport` for the remaining raw/session-bearing and non-local surfaces
+- `ExecutionPlane.Process.Transport` for the covered local session-bearing lane
+- `ExternalRuntimeTransport.Transport` for the remaining non-local transport substrate beneath those seams
 
 This layer starts the external process, manages stdin/stdout/stderr, and
 captures process exit information through the shared substrate.
@@ -117,7 +118,8 @@ When deciding where a change belongs, use this rule:
 - if the change affects model choice, put it in the registry/catalog
 - if the change affects provider CLI syntax, put it in the provider profile
 - if the change affects the covered local one-shot subprocess lane, put it in the execution-plane-backed lower runtime
-- if the change affects raw/session or non-local subprocess lifecycle, put it in transport/session
+- if the change affects the covered local session-bearing subprocess lane, put it in the execution-plane-backed transport seam
+- if the change affects non-local subprocess lifecycle or lower transport internals beneath those seams, put it in transport/session
 - if the change affects normalized output shape, put it in payload/runtime
 
 That rule prevents policy leakage across layers.
@@ -129,7 +131,7 @@ External repos should consume the core in this order:
 1. prepare normalized options
 2. call the core’s model registry
 3. pass the resolved selection into provider-facing command building
-4. let the core route the request to the execution-plane-backed command lane or the raw/session transport runtime as appropriate
+4. let the core route the request to the execution-plane-backed command lane, the execution-plane-backed local session lane, or the non-local transport runtime as appropriate
 
 The core is therefore both:
 

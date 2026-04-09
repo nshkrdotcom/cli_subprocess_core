@@ -15,7 +15,8 @@ Add a custom profile when:
 - downstream code should not duplicate command-building or JSONL parsing logic
 
 If you only need raw subprocess ownership, use `CliSubprocessCore.RawSession`
-or `ExternalRuntimeTransport.Transport` directly and skip the profile layer.
+or `ExecutionPlane.Process.Transport` directly for the covered local
+session-bearing lane and skip the profile layer.
 
 The packaging rule for this layer is:
 

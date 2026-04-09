@@ -329,6 +329,9 @@ defmodule CliSubprocessCore.Command do
       {:timeout, _payload} ->
         TransportError.transport_error(:timeout, context)
 
+      {_, %{send_failed: reason}} ->
+        TransportError.transport_error({:send_failed, reason}, context)
+
       {_, %{command: command}} when is_binary(command) ->
         TransportError.transport_error({:command_not_found, command}, context)
 

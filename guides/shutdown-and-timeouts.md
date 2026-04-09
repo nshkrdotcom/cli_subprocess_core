@@ -5,8 +5,10 @@
 `CliSubprocessCore.Session`.
 
 The lower shutdown, interrupt, timeout, and buffering mechanics are owned by
-`ExternalRuntimeTransport.Transport`. The core keeps those semantics visible
-without re-owning the substrate internals.
+`ExecutionPlane.Process.Transport` for the covered local session-bearing lane
+and by the underlying external transport substrate for the remaining non-local
+surfaces. The core keeps those semantics visible without re-owning the
+substrate internals.
 
 ## Normal Close
 

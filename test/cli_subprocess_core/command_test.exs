@@ -143,6 +143,26 @@ defmodule CliSubprocessCore.CommandTest do
     assert error.context.raw_payload == %{command: "/definitely/not/a/real/command"}
   end
 
+  test "run/2 preserves execution-plane send_failed invalid_input errors" do
+    invocation = Command.new(System.find_executable("sh") || "/bin/sh", ["-c", "cat > /dev/null"])
+    invalid_stdin = [List.duplicate("a", 20_000), {:invalid}]
+
+    assert {:error, %Error{} = error} =
+             Command.run(invocation, stdin: invalid_stdin, timeout: 500)
+
+    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+
+    assert {:send_failed, {:invalid_input, %Protocol.UndefinedError{}}} =
+             transport_error.reason
+
+    assert error.context.failure_class == :launch_failed
+
+    assert match?(
+             %{send_failed: {:invalid_input, %Protocol.UndefinedError{}}},
+             error.context.raw_payload
+           )
+  end
+
   test "run/1 returns a structured error when the provider cannot be resolved" do
     assert {:error, %Error{} = error} = Command.run(provider: :missing_phase_2a_provider)
 

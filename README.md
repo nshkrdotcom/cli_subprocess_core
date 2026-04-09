@@ -21,10 +21,10 @@ provider profile resolution, normalized command/session APIs, event and payload
 shaping, model policy helpers, and the built-in first-party profiles for
 Claude, Codex, Gemini, and Amp.
 
-The covered minimal one-shot local process lane now runs on `execution_plane`.
-`cli_subprocess_core` keeps one public placement seam, `execution_surface`, and
-continues to use `external_runtime_transport` for the not-yet-migrated
-non-local and session-bearing surfaces.
+The covered one-shot local process lane and the local session-bearing process
+lane now run on `execution_plane`. `cli_subprocess_core` keeps one public
+placement seam, `execution_surface`, while the remaining non-local placement
+families still resolve through the shared lower substrate.
 
 For downstream packages that still type against the historical module name,
 `CliSubprocessCore.ExecutionSurface` remains available as a compatibility
@@ -54,13 +54,13 @@ For the covered Wave 3 minimal lane:
 - `execution_plane` owns local one-shot process execution and the minimal unary JSON-RPC substrate beneath that lane
 - `cli_subprocess_core` owns provider planning, normalized command/session APIs, and event projection above that lower owner
 
-For the currently exposed raw/session-bearing and non-local surfaces, the
-following still live in `external_runtime_transport`:
+For the still-exposed non-local placement families, the following lower
+capabilities still live in `external_runtime_transport` and are consumed
+through the shared seams:
 
 - `ExternalRuntimeTransport.ExecutionSurface`
-- `ExternalRuntimeTransport.Transport`
 - adapter registry and transport contracts
-- built-in `:local_subprocess`, `:ssh_exec`, and `:guest_bridge` families
+- built-in `:ssh_exec` and `:guest_bridge` families
 - shared `ProcessExit`, `LineFraming`, and transport result types
 
 That separation keeps provider/runtime behavior in the core while leaving raw

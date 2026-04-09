@@ -2,17 +2,17 @@ defmodule CliSubprocessCore.RawSession do
   @moduledoc """
   Provider-agnostic handle for long-lived raw subprocess sessions.
 
-  `ExternalRuntimeTransport.Transport` owns the subprocess lifecycle itself. This
-  module provides a higher-level contract for consumers that need a stable raw
-  session handle, exact-byte stdin/stdout defaults, optional PTY startup, and
-  normalized result collection without re-implementing lifecycle rules in
-  provider repos.
+  `ExecutionPlane.Process.Transport` owns the lower subprocess lifecycle for the
+  session-bearing lane. This module provides a higher-level contract for
+  consumers that need a stable raw session handle, exact-byte stdin/stdout
+  defaults, optional PTY startup, and normalized result collection without
+  re-implementing lifecycle rules in provider repos.
   """
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.RawSession.Delivery
+  alias ExecutionPlane.Process.Transport
   alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport
   alias ExternalRuntimeTransport.Transport.Delivery, as: TransportDelivery
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
   alias ExternalRuntimeTransport.Transport.{Info, RunResult}

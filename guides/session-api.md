@@ -32,12 +32,12 @@ outer mailbox shape.
 
 `Session.info/1` exposes transport data through the extracted substrate:
 
-- `info.transport.module` is `ExternalRuntimeTransport.Transport`
+- `info.transport.module` is `ExecutionPlane.Process.Transport`
 - `info.transport.info` is `ExternalRuntimeTransport.Transport.Info`
 - `info.transport.status` reflects the normalized transport status
 
-That keeps the core session API stable while the raw execution substrate stays
-shared across repos.
+That keeps the core session API stable while the local session-bearing lane now
+runs on the Execution Plane-owned process transport seam.
 
 ## Placement
 
