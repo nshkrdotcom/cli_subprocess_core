@@ -10,7 +10,7 @@ These examples show the current public placement seam honestly: callers use
 - `examples/execution_surface_compatibility.exs` shows the compatibility
   `CliSubprocessCore.ExecutionSurface` struct flowing through the public
   command options API without taking transport ownership back from
-  `external_runtime_transport`.
+  `execution_plane`.
 ## Hardening Notes
 
 The emergency hardening work in this repo is primarily profile and contract work, so the strongest

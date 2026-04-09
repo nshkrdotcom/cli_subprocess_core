@@ -11,11 +11,11 @@ defmodule CliSubprocessCore.RawSession do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.RawSession.Delivery
+  alias CliSubprocessCore.TransportCompat
   alias ExecutionPlane.Process.Transport
-  alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport.Delivery, as: TransportDelivery
+  alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
-  alias ExternalRuntimeTransport.Transport.{Info, RunResult}
+  alias ExternalRuntimeTransport.Transport.RunResult
 
   @default_event_tag :cli_subprocess_core_raw_session
   @transport_start_timeout_ms 5_000
@@ -228,7 +228,9 @@ defmodule CliSubprocessCore.RawSession do
   """
   @spec info(t()) :: info_t()
   def info(%__MODULE__{} = session) do
-    transport_info = session.transport_api.info(session.transport)
+    transport_info =
+      session.transport_api.info(session.transport)
+      |> TransportCompat.to_transport_info()
 
     %{
       delivery: delivery_info(session),
@@ -295,7 +297,7 @@ defmodule CliSubprocessCore.RawSession do
       transport_opts =
         opts
         |> Keyword.drop(@reserved_keys)
-        |> Keyword.put(:command, Command.to_transport_command(invocation))
+        |> Keyword.put(:command, Command.to_runtime_command(invocation, transport_api))
         |> Keyword.put(:subscriber, {receiver, transport_ref})
         |> Keyword.put(:event_tag, event_tag)
         |> Keyword.put_new(:stdout_mode, stdout_mode)
@@ -320,8 +322,8 @@ defmodule CliSubprocessCore.RawSession do
 
           start_transport_session(session_config, transport)
 
-        {:error, _reason} = error ->
-          error
+        {:error, reason} ->
+          {:error, normalize_transport_start_reason(reason)}
       end
     end
   end
@@ -352,7 +354,7 @@ defmodule CliSubprocessCore.RawSession do
          },
          transport
        ) do
-    %Info{} = transport_info = transport_api.info(transport)
+    transport_info = transport_api.info(transport)
 
     {:ok,
      %__MODULE__{
@@ -385,9 +387,10 @@ defmodule CliSubprocessCore.RawSession do
             do_collect(session, timeout, stdout, [chunk | stderr])
 
           {:ok, {:error, reason}} ->
-            {:error, {:transport, reason}}
+            {:error, {:transport, TransportCompat.to_transport_error(reason)}}
 
-          {:ok, {:exit, %ProcessExit{} = exit}} ->
+          {:ok, {:exit, exit}} ->
+            exit = TransportCompat.to_process_exit(exit)
             stdout = stdout |> Enum.reverse() |> IO.iodata_to_binary()
             stderr = stderr |> Enum.reverse() |> IO.iodata_to_binary()
 
@@ -457,28 +460,45 @@ defmodule CliSubprocessCore.RawSession do
   defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
+  defp normalize_transport_start_exit({:transport, %RuntimeTransportError{} = error}),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+
   defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(%RuntimeTransportError{} = error),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
 
   defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
+  defp normalize_transport_start_exit({:shutdown, %RuntimeTransportError{} = error}),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+
   defp normalize_transport_start_exit(:normal), do: :ok
   defp normalize_transport_start_exit(reason), do: {:error, reason}
 
-  defp resolve_transport_contract(%Info{status: :connected} = transport_info, key, _fallback),
+  defp normalize_transport_start_reason({:transport, %TransportError{} = error}),
+    do: {:transport, error}
+
+  defp normalize_transport_start_reason({:transport, %RuntimeTransportError{} = error}),
+    do: {:transport, TransportCompat.to_transport_error(error)}
+
+  defp normalize_transport_start_reason(reason), do: reason
+
+  defp resolve_transport_contract(%{status: :connected} = transport_info, key, _fallback),
     do: Map.fetch!(transport_info, key)
 
-  defp resolve_transport_contract(%Info{}, _key, fallback), do: fallback
+  defp resolve_transport_contract(_transport_info, _key, fallback), do: fallback
 
   defp resolve_delivery_event_tag(
-         %Info{delivery: %TransportDelivery{tagged_event_tag: tagged_event_tag}},
+         %{delivery: %{tagged_event_tag: tagged_event_tag}},
          _fallback
        )
        when is_atom(tagged_event_tag),
        do: tagged_event_tag
 
-  defp resolve_delivery_event_tag(%Info{}, fallback), do: fallback
+  defp resolve_delivery_event_tag(_transport_info, fallback), do: fallback
 
   defp safe_close_transport(module, transport) do
     module.close(transport)

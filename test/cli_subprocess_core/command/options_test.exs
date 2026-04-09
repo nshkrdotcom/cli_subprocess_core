@@ -30,4 +30,16 @@ defmodule CliSubprocessCore.Command.OptionsTest do
     assert options.observability == %{suite: :phase_b}
     assert options.transport_options == [connect_timeout_ms: 1_500]
   end
+
+  test "accepts execution-plane-only surface kinds" do
+    assert {:ok, %Options{} = options} =
+             Options.new(
+               profile: CommandRunner,
+               command: "/bin/sh",
+               args: ["-c", "printf ready"],
+               execution_surface: [surface_kind: :test_guest_local]
+             )
+
+    assert options.surface_kind == :test_guest_local
+  end
 end

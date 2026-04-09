@@ -13,6 +13,13 @@ defmodule CliSubprocessCore.DocumentationContractTest do
     ":kill_group",
     "shared exec worker"
   ]
+  @owner_drift_tokens [
+    "still live in `external_runtime_transport`",
+    "continue through `external_runtime_transport`",
+    "belong in `external_runtime_transport`",
+    "route through `external_runtime_transport`",
+    "facade over `ExternalRuntimeTransport.ExecutionSurface`"
+  ]
   @substrate_internal_tokens [
     "Process.whereis(:exec)",
     ":exec.kill",
@@ -26,6 +33,13 @@ defmodule CliSubprocessCore.DocumentationContractTest do
 
     assert offenders == [],
            "legacy transport references remain in docs:\n#{format_offenders(offenders)}"
+  end
+
+  test "public docs do not describe external_runtime_transport as the active owner" do
+    offenders = collect_token_matches(@doc_paths, @owner_drift_tokens)
+
+    assert offenders == [],
+           "owner-drift references remain in docs:\n#{format_offenders(offenders)}"
   end
 
   test "core code and tests do not own raw substrate internals" do

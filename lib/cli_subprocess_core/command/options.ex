@@ -3,12 +3,10 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{Command, ProviderProfile, ProviderRegistry}
-  alias ExternalRuntimeTransport.ExecutionSurface
-  alias ExternalRuntimeTransport.Transport
-  alias ExternalRuntimeTransport.Transport.RunOptions
+  alias CliSubprocessCore.{Command, ExecutionSurface, ProviderProfile, ProviderRegistry}
 
   @default_registry ProviderRegistry
+  @default_timeout_ms 30_000
   @reserved_keys [
     :provider,
     :profile,
@@ -32,7 +30,7 @@ defmodule CliSubprocessCore.Command.Options do
             profile: nil,
             registry: @default_registry,
             stdin: nil,
-            timeout: RunOptions.default_timeout_ms(),
+            timeout: @default_timeout_ms,
             stderr: :separate,
             close_stdin: true,
             surface_kind: ExecutionSurface.default_surface_kind(),
@@ -51,17 +49,19 @@ defmodule CliSubprocessCore.Command.Options do
           registry: pid() | atom(),
           stdin: term(),
           timeout: timeout(),
-          stderr: RunOptions.stderr_mode(),
+          stderr: stderr_mode(),
           close_stdin: boolean(),
-          surface_kind: Transport.surface_kind(),
+          surface_kind: atom(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,
-          boundary_class: ExecutionSurface.boundary_class(),
+          boundary_class: atom() | String.t() | nil,
           observability: map(),
           provider_options: keyword()
         }
+
+  @type stderr_mode :: :separate | :stdout
 
   @type validation_error ::
           :missing_provider
@@ -95,14 +95,16 @@ defmodule CliSubprocessCore.Command.Options do
     with :ok <- validate_invocation(invocation),
          :ok <- reject_transport_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
-         {:ok, run_options} <- RunOptions.new(Command.to_transport_command(invocation), opts) do
+         :ok <- validate_timeout(Keyword.get(opts, :timeout, @default_timeout_ms)),
+         :ok <- validate_stderr(Keyword.get(opts, :stderr, :separate)),
+         :ok <- validate_close_stdin(Keyword.get(opts, :close_stdin, true)) do
       {:ok,
        %__MODULE__{
          invocation: invocation,
-         stdin: run_options.stdin,
-         timeout: run_options.timeout,
-         stderr: run_options.stderr,
-         close_stdin: run_options.close_stdin,
+         stdin: Keyword.get(opts, :stdin),
+         timeout: Keyword.get(opts, :timeout, @default_timeout_ms),
+         stderr: Keyword.get(opts, :stderr, :separate),
+         close_stdin: Keyword.get(opts, :close_stdin, true),
          surface_kind: execution_surface.surface_kind,
          transport_options: execution_surface.transport_options,
          target_id: execution_surface.target_id,
@@ -130,7 +132,7 @@ defmodule CliSubprocessCore.Command.Options do
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
-         :ok <- validate_timeout(Keyword.get(opts, :timeout, RunOptions.default_timeout_ms())),
+         :ok <- validate_timeout(Keyword.get(opts, :timeout, @default_timeout_ms)),
          :ok <- validate_stderr(Keyword.get(opts, :stderr, :separate)),
          :ok <- validate_close_stdin(Keyword.get(opts, :close_stdin, true)) do
       {:ok,
@@ -139,7 +141,7 @@ defmodule CliSubprocessCore.Command.Options do
          profile: profile,
          registry: Keyword.get(opts, :registry, @default_registry),
          stdin: Keyword.get(opts, :stdin),
-         timeout: Keyword.get(opts, :timeout, RunOptions.default_timeout_ms()),
+         timeout: Keyword.get(opts, :timeout, @default_timeout_ms),
          stderr: Keyword.get(opts, :stderr, :separate),
          close_stdin: Keyword.get(opts, :close_stdin, true),
          surface_kind: execution_surface.surface_kind,
@@ -168,6 +170,13 @@ defmodule CliSubprocessCore.Command.Options do
       )
 
     execution_surface
+  end
+
+  @spec runtime_execution_surface(t()) :: struct()
+  def runtime_execution_surface(%__MODULE__{} = options) do
+    options
+    |> execution_surface()
+    |> ExecutionSurface.to_runtime_surface()
   end
 
   @spec provider_profile_options(t()) :: keyword()

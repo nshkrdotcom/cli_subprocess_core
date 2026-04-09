@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
   alias CliSubprocessCore.ExecutionSurface
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.{CommandRunner, Echo}
+  alias ExecutionPlane.Process.Transport.Surface, as: RuntimeExecutionSurface
   alias ExternalRuntimeTransport.ExecutionSurface, as: TransportExecutionSurface
 
   test "builds a compatibility struct from keyword input" do
@@ -49,6 +50,35 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
     assert capabilities.remote? == true
     assert ExecutionSurface.remote_surface?(surface)
     assert ExecutionSurface.nonlocal_path_surface?(surface)
+  end
+
+  test "projects the compatibility surface onto the execution-plane transport surface contract" do
+    assert {:ok, %ExecutionSurface{} = surface} =
+             ExecutionSurface.new(
+               surface_kind: :ssh_exec,
+               target_id: "runtime-target",
+               boundary_class: "remote_cli",
+               observability: %{suite: :runtime_projection}
+             )
+
+    assert %RuntimeExecutionSurface{} =
+             runtime_surface = ExecutionSurface.to_runtime_surface(surface)
+
+    assert runtime_surface.surface_kind == :ssh_exec
+    assert runtime_surface.target_id == "runtime-target"
+    assert runtime_surface.boundary_class == "remote_cli"
+    assert runtime_surface.observability == %{suite: :runtime_projection}
+
+    assert RuntimeExecutionSurface.to_map(runtime_surface) == ExecutionSurface.to_map(surface)
+  end
+
+  test "exposes execution-plane-only surface capabilities through the compatibility facade" do
+    assert {:ok, capabilities} = ExecutionSurface.capabilities(:test_guest_local)
+    assert capabilities.remote? == false
+    assert capabilities.path_semantics == :guest
+    assert capabilities.supports_run? == true
+    assert ExecutionSurface.nonlocal_path_surface?(:test_guest_local)
+    refute ExecutionSurface.remote_surface?(:test_guest_local)
   end
 
   test "command options accept the compatibility execution surface" do

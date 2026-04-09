@@ -6,9 +6,8 @@
 
 The lower shutdown, interrupt, timeout, and buffering mechanics are owned by
 `ExecutionPlane.Process.Transport` for the covered local session-bearing lane
-and by the underlying external transport substrate for the remaining non-local
-surfaces. The core keeps those semantics visible without re-owning the
-substrate internals.
+and for the shared non-local transport surfaces. The core keeps those
+semantics visible without re-owning the substrate internals.
 
 ## Normal Close
 
@@ -31,7 +30,9 @@ window, callers see:
 ```
 
 That timeout protects the caller from hanging forever while still leaving the
-underlying transport free to complete later if it can recover.
+underlying transport free to complete later if it can recover. The surfaced
+error struct remains compatibility-shaped even though the active owner is the
+Execution Plane transport seam.
 
 ## Interrupt
 
@@ -90,4 +91,5 @@ Normalized call-time failures still surface as
 - `{:call_exit, reason}`
 - `{:send_failed, reason}`
 
-Those are transport-owned errors carried upward through the core handles.
+Those are transport-owned errors carried upward through the core handles as
+compatibility projections.

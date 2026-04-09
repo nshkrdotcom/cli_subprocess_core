@@ -13,7 +13,7 @@ Use `Channel` when you need:
 - the same local-versus-SSH execution surface used by the lower transport APIs
 
 If you only need one-shot execution, use `CliSubprocessCore.Command.run/1,2` or
-`ExternalRuntimeTransport.Transport.run/2`. If you want provider parsing and
+`ExecutionPlane.Process.Transport.run/2`. If you want provider parsing and
 normalized `CliSubprocessCore.Event` values, use `CliSubprocessCore.Session`.
 
 ## Start A Channel

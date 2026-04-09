@@ -6,8 +6,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   module instead of duplicating discovery logic in downstream adapters.
   """
 
-  alias CliSubprocessCore.CommandSpec
-  alias ExternalRuntimeTransport.ExecutionSurface
+  alias CliSubprocessCore.{CommandSpec, ExecutionSurface}
   alias ExternalRuntimeTransport.ProcessExit
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
 

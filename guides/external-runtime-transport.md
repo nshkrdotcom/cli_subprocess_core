@@ -1,13 +1,15 @@
 # External Runtime Transport
 
-`cli_subprocess_core` sits above `external_runtime_transport`.
+`cli_subprocess_core` now sits directly above `execution_plane`.
 
 That means:
 
 - provider planning lives in `cli_subprocess_core`
 - the covered `:local_subprocess` one-shot command lane now runs through `execution_plane`
-- raw non-local and session-bearing process placement still lives in `external_runtime_transport`
+- raw local and non-local process placement now runs through `ExecutionPlane.Process.Transport`
 - the public seam between them is `execution_surface`
+- `external_runtime_transport` remains as a compatibility projection package for
+  historical public structs that some downstream callers still consume
 
 ## Shared Placement Contract
 
@@ -24,8 +26,8 @@ The core accepts one public placement value:
 
 The core passes that contract to the lower owner for the chosen lane without
 leaking adapter module names into its own public API. For the covered local
-one-shot lane that owner is `execution_plane`; for the remaining raw and
-session-bearing surfaces it is `ExternalRuntimeTransport.ExecutionSurface`.
+one-shot lane that owner is `ExecutionPlane.Process`; for the raw and
+session-bearing surfaces it is `ExecutionPlane.Process.Transport`.
 
 For downstream compatibility, `CliSubprocessCore.ExecutionSurface` remains as a
 thin facade over the same transport-owned contract. It preserves the legacy
@@ -36,7 +38,9 @@ versioned map projection for a boundary or fixture.
 
 ## What The Core Gets Back
 
-The raw/session transport substrate returns transport-owned types such as:
+The raw/session transport substrate returns Execution Plane-owned runtime data.
+`cli_subprocess_core` may project that data back into compatibility types such
+as:
 
 - `ExternalRuntimeTransport.Transport.RunResult`
 - `ExternalRuntimeTransport.Transport.Info`

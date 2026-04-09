@@ -7,12 +7,13 @@ defmodule CliSubprocessCore.Command do
   """
 
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
-  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry, TransportCompat}
+  alias ExecutionPlane.Command, as: RuntimeCommand
   alias ExecutionPlane.Process, as: ExecutionPlaneProcess
+  alias ExecutionPlane.Process.Transport, as: RuntimeTransport
   alias ExternalRuntimeTransport.Command, as: TransportCommand
   alias ExternalRuntimeTransport.ProcessExit
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
-  alias ExternalRuntimeTransport.Transport.RunResult, as: TransportRunResult
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
@@ -86,6 +87,26 @@ defmodule CliSubprocessCore.Command do
       clear_env?: command.clear_env?,
       user: command.user
     )
+  end
+
+  @doc """
+  Projects a CLI-domain invocation onto either the Execution Plane or legacy
+  compatibility transport command shape.
+  """
+  @spec to_runtime_command(t(), module()) :: term()
+  def to_runtime_command(%__MODULE__{} = command, ExecutionPlane.Process.Transport) do
+    %RuntimeCommand{
+      command: command.command,
+      args: command.args,
+      cwd: command.cwd,
+      env: command.env,
+      clear_env?: command.clear_env?,
+      user: command.user
+    }
+  end
+
+  def to_runtime_command(%__MODULE__{} = command, _transport_api) do
+    to_transport_command(command)
   end
 
   @doc """
@@ -228,14 +249,15 @@ defmodule CliSubprocessCore.Command do
 
   defp do_run(invocation, %Options{} = options) do
     execution_surface = Options.execution_surface(options)
-    transport_invocation = to_transport_command(invocation)
+    runtime_execution_surface = Options.runtime_execution_surface(options)
+    runtime_invocation = to_runtime_command(invocation, RuntimeTransport)
 
-    case ExternalRuntimeTransport.Transport.run(transport_invocation,
+    case RuntimeTransport.run(runtime_invocation,
            stdin: options.stdin,
            timeout: options.timeout,
            stderr: options.stderr,
            close_stdin: options.close_stdin,
-           execution_surface: execution_surface,
+           execution_surface: runtime_execution_surface,
            transport_options: options.transport_options,
            target_id: execution_surface.target_id,
            lease_ref: execution_surface.lease_ref,
@@ -243,11 +265,12 @@ defmodule CliSubprocessCore.Command do
            boundary_class: execution_surface.boundary_class,
            observability: execution_surface.observability
          ) do
-      {:ok, %TransportRunResult{} = result} ->
+      {:ok, result} ->
         {:ok, RunResult.from_transport(result, invocation)}
 
-      {:error, {:transport, %TransportError{} = error}} ->
-        {:error, Error.transport_error(error, %{invocation: invocation})}
+      {:error, {:transport, error}} ->
+        transport_error = TransportCompat.to_transport_error(error)
+        {:error, Error.transport_error(transport_error, %{invocation: invocation})}
     end
   end
 

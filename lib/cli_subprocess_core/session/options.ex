@@ -3,9 +3,7 @@ defmodule CliSubprocessCore.Session.Options do
   Validated startup options for the common session engine.
   """
 
-  alias CliSubprocessCore.{ProviderProfile, ProviderRegistry}
-  alias ExternalRuntimeTransport.ExecutionSurface
-  alias ExternalRuntimeTransport.Transport
+  alias CliSubprocessCore.{ExecutionSurface, ProviderProfile, ProviderRegistry}
 
   @default_registry ProviderRegistry
   @default_session_event_tag :cli_subprocess_core_session
@@ -52,12 +50,12 @@ defmodule CliSubprocessCore.Session.Options do
           subscriber: subscriber(),
           metadata: map(),
           session_event_tag: atom(),
-          surface_kind: Transport.surface_kind(),
+          surface_kind: atom(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,
-          boundary_class: ExecutionSurface.boundary_class(),
+          boundary_class: atom() | String.t() | nil,
           observability: map(),
           provider_options: keyword(),
           starter: {pid(), reference()} | nil

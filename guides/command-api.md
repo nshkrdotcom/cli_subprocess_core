@@ -61,7 +61,8 @@ exposing adapter modules:
 
 When that surface resolves to `:local_subprocess`, the covered minimal lane
 emits `ProcessExecutionIntent.v1` and runs through `ExecutionPlane.Process.run/2`.
-Other surfaces continue through `external_runtime_transport`.
+Other surfaces resolve through `ExecutionPlane.Process.Transport.run/2` using
+the same `execution_surface` contract.
 
 ## Result Shape
 
@@ -80,5 +81,6 @@ The returned core-owned result contains:
 Command-lane failures are wrapped as `CliSubprocessCore.Command.Error`.
 
 That wrapper preserves core-facing context such as the invocation or provider
-while carrying the underlying lower-lane failure from either
-`ExecutionPlane` or `ExternalRuntimeTransport`.
+while carrying the underlying lower-lane failure from `execution_plane`. Where
+the public error shape still uses `ExternalRuntimeTransport.Transport.Error`,
+that value is now a compatibility projection rather than an active lower owner.

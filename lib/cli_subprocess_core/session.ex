@@ -15,12 +15,13 @@ defmodule CliSubprocessCore.Session do
     ProviderRegistry,
     Runtime,
     Session.Delivery,
-    Session.Options
+    Session.Options,
+    TransportCompat
   }
 
   alias ExecutionPlane.Process.Transport
+  alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
-  alias ExternalRuntimeTransport.Transport.Info
 
   @session_start_timeout_ms 5_000
   @transport_event_tag :cli_subprocess_core_session_transport
@@ -296,6 +297,8 @@ defmodule CliSubprocessCore.Session do
         {@transport_event_tag, ref, {:error, transport_error}},
         %{transport_ref: ref} = state
       ) do
+    transport_error = TransportCompat.to_transport_error(transport_error)
+
     payload =
       Payload.Error.new(
         message: transport_error.message,
@@ -313,6 +316,7 @@ defmodule CliSubprocessCore.Session do
         {@transport_event_tag, ref, {:exit, process_exit}},
         %{transport_ref: ref} = state
       ) do
+    process_exit = TransportCompat.to_process_exit(process_exit)
     {events, parser_state} = state.profile.handle_exit(process_exit, state.parser_state)
     state = %{state | parser_state: parser_state}
     state = normalize_and_dispatch(state, events)
@@ -356,7 +360,7 @@ defmodule CliSubprocessCore.Session do
         await_started_session(pid, ref)
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, normalize_transport_start_reason(reason)}
     end
   end
 
@@ -418,7 +422,11 @@ defmodule CliSubprocessCore.Session do
       ] ++ transport_runtime_opts
 
     case Transport.start(
-           Keyword.put(transport_opts, :command, Command.to_transport_command(invocation))
+           Keyword.put(
+             transport_opts,
+             :command,
+             Command.to_runtime_command(invocation, Transport)
+           )
          ) do
       {:ok, transport_pid} ->
         case await_transport_started(Transport, transport_pid) do
@@ -584,27 +592,45 @@ defmodule CliSubprocessCore.Session do
   defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
+  defp normalize_transport_start_exit({:transport, %RuntimeTransportError{} = error}),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+
   defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
+
+  defp normalize_transport_start_exit(%RuntimeTransportError{} = error),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
 
   defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
+  defp normalize_transport_start_exit({:shutdown, %RuntimeTransportError{} = error}),
+    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+
   defp normalize_transport_start_exit(:normal), do: :ok
   defp normalize_transport_start_exit(reason), do: {:error, reason}
+
+  defp normalize_transport_start_reason({:transport, %TransportError{} = error}),
+    do: {:transport, error}
+
+  defp normalize_transport_start_reason({:transport, %RuntimeTransportError{} = error}),
+    do: {:transport, TransportCompat.to_transport_error(error)}
+
+  defp normalize_transport_start_reason(reason), do: reason
 
   defp maybe_transport_info(module, transport_pid) do
     if function_exported?(module, :info, 1) do
       module.info(transport_pid)
+      |> TransportCompat.to_transport_info()
     else
       nil
     end
   end
 
-  defp transport_status(_module, _transport_pid, %Info{} = info), do: info.status
+  defp transport_status(_module, _transport_pid, %{status: status}), do: status
   defp transport_status(module, transport_pid, nil), do: module.status(transport_pid)
 
-  defp transport_stderr(_module, _transport_pid, %Info{} = info), do: info.stderr
+  defp transport_stderr(_module, _transport_pid, %{stderr: stderr}), do: stderr
   defp transport_stderr(module, transport_pid, nil), do: module.stderr(transport_pid)
 
   defp build_transport_snapshot(module, transport_pid, status, stderr, nil) do
@@ -617,20 +643,34 @@ defmodule CliSubprocessCore.Session do
     }
   end
 
-  defp build_transport_snapshot(module, transport_pid, status, stderr, %Info{} = info) do
+  defp build_transport_snapshot(
+         module,
+         transport_pid,
+         status,
+         stderr,
+         %{
+           delivery: delivery,
+           pid: subprocess_pid,
+           os_pid: os_pid,
+           stdout_mode: stdout_mode,
+           stdin_mode: stdin_mode,
+           pty?: pty?,
+           interrupt_mode: interrupt_mode
+         } = info
+       ) do
     %{
-      delivery: info.delivery,
+      delivery: delivery,
       module: module,
       pid: transport_pid,
       status: status,
       stderr: stderr,
       info: info,
-      subprocess_pid: info.pid,
-      os_pid: info.os_pid,
-      stdout_mode: info.stdout_mode,
-      stdin_mode: info.stdin_mode,
-      pty?: info.pty?,
-      interrupt_mode: info.interrupt_mode
+      subprocess_pid: subprocess_pid,
+      os_pid: os_pid,
+      stdout_mode: stdout_mode,
+      stdin_mode: stdin_mode,
+      pty?: pty?,
+      interrupt_mode: interrupt_mode
     }
   end
 

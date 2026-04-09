@@ -2,8 +2,8 @@
 
 `cli_subprocess_core` no longer owns the raw subprocess substrate.
 `ExecutionPlane.Process.Transport` owns the local session-bearing process lane,
-while the remaining non-local placement substrate still flows through the
-shared lower transport packages.
+and the same transport seam also owns non-local placement beneath the shared
+`execution_surface` contract.
 
 `CliSubprocessCore.RawSession` is the core-owned handle above that substrate
 when you want exact-byte stdin/stdout defaults without provider parsing.
@@ -12,14 +12,17 @@ when you want exact-byte stdin/stdout defaults without provider parsing.
 
 - `CliSubprocessCore.RawSession` for a stable raw-session handle above the
   extracted transport layer
-- `ExecutionPlane.Process.Transport` for direct local session transport lifecycle control
-- `ExternalRuntimeTransport.Transport.Info` for transport metadata snapshots
-- `ExternalRuntimeTransport.Transport.Options` for validated startup options
-- `ExternalRuntimeTransport.Transport.RunOptions` for validated one-shot
+- `ExecutionPlane.Process.Transport` for direct transport lifecycle control
+- `ExecutionPlane.Process.Transport.Options` for validated startup options
+- `ExecutionPlane.Process.Transport.RunOptions` for validated one-shot
   execution options
-- `ExternalRuntimeTransport.Transport.RunResult` for captured execution results
-- `ExternalRuntimeTransport.Transport.Error` for structured transport failures
-- `ExternalRuntimeTransport.ProcessExit` for normalized exit data
+- `ExecutionPlane.Process.Transport.RunResult` for captured direct transport
+  execution results
+- `ExecutionPlane.Process.Transport.Error` for direct transport failures
+- compatibility-projected `ExternalRuntimeTransport.Transport.Info`,
+  `ExternalRuntimeTransport.Transport.Error`, and
+  `ExternalRuntimeTransport.ProcessExit` where `RawSession`, `Channel`, or
+  `Session` preserve historical public shapes
 
 ## Start A Raw Session
 
@@ -62,7 +65,7 @@ Landed built-in surface kinds are:
 - `:ssh_exec`
 - `:guest_bridge`
 
-Use `ExternalRuntimeTransport.ExecutionSurface.capabilities/1`,
+Use `CliSubprocessCore.ExecutionSurface.capabilities/1`,
 `path_semantics/1`, `remote_surface?/1`, and `nonlocal_path_surface?/1` when a
 higher layer needs to reason about placement without reaching around the seam.
 
@@ -72,7 +75,7 @@ Use `ExecutionPlane.Process.Transport` directly when you need transport-level
 lifecycle control or exact non-provider one-shot execution.
 
 ```elixir
-alias ExternalRuntimeTransport.Command
+alias ExecutionPlane.Command
 alias ExecutionPlane.Process.Transport
 
 command =
@@ -93,7 +96,7 @@ ref = make_ref()
 Supported startup options are normalized by the shared lower transport options
 contract:
 
-- `:command` or a normalized `ExternalRuntimeTransport.Command`
+- `:command` or a normalized `ExecutionPlane.Command`
 - `:args`, default `[]`
 - `:cwd`, default `nil`
 - `:env`, default `%{}`
@@ -105,8 +108,8 @@ contract:
 - `:interrupt_mode`, `:signal` or `{:stdin, payload}`
 - `:subscriber`, `pid()` or `{pid(), :legacy | reference()}`
 - `:startup_mode`, `:eager` or `:lazy`
-- `:task_supervisor`, default `ExternalRuntimeTransport.TaskSupervisor`
-- `:event_tag`, default `:external_runtime_transport`
+- `:task_supervisor`, default `ExecutionPlane.TaskSupervisor`
+- `:event_tag`, default `:execution_plane_process`
 - `:headless_timeout_ms`, default `30_000`
 - `:max_buffer_size`, default `1_048_576`
 - `:max_stderr_buffer_size`, default `262_144`
@@ -123,25 +126,25 @@ Legacy subscribers receive:
 
 - `{:transport_message, line}`
 - `{:transport_data, chunk}`
-- `{:transport_error, %ExternalRuntimeTransport.Transport.Error{}}`
+- `{:transport_error, %ExecutionPlane.Process.Transport.Error{}}`
 - `{:transport_stderr, chunk}`
-- `{:transport_exit, %ExternalRuntimeTransport.ProcessExit{}}`
+- `{:transport_exit, %ExecutionPlane.ProcessExit{}}`
 
 Tagged subscribers receive:
 
 - `{event_tag, ref, {:message, line}}`
 - `{event_tag, ref, {:data, chunk}}`
-- `{event_tag, ref, {:error, %ExternalRuntimeTransport.Transport.Error{}}}`
+- `{event_tag, ref, {:error, %ExecutionPlane.Process.Transport.Error{}}}`
 - `{event_tag, ref, {:stderr, chunk}}`
-- `{event_tag, ref, {:exit, %ExternalRuntimeTransport.ProcessExit{}}}`
+- `{event_tag, ref, {:exit, %ExecutionPlane.ProcessExit{}}}`
 
-Use `ExternalRuntimeTransport.Transport.extract_event/2` instead of
+Use `ExecutionPlane.Process.Transport.extract_event/2` instead of
 hard-coding the outer event atom:
 
 ```elixir
 receive do
   message ->
-    case ExternalRuntimeTransport.Transport.extract_event(message, ref) do
+    case ExecutionPlane.Process.Transport.extract_event(message, ref) do
       {:ok, {:message, line}} -> IO.puts(line)
       {:ok, {:exit, exit}} -> IO.inspect(exit.code)
       :error -> :ignore
@@ -154,25 +157,26 @@ payloads while carrying them through a core-owned session handle.
 
 ## IO Operations
 
-`ExternalRuntimeTransport.Transport.send/2` normalizes payloads through the
+`ExecutionPlane.Process.Transport.send/2` normalizes payloads through the
 active stdin mode:
 
 - line mode appends a trailing newline when needed
 - raw mode preserves exact bytes
 
 ```elixir
-:ok = ExternalRuntimeTransport.Transport.send(transport, %{kind: "ping"})
-:ok = ExternalRuntimeTransport.Transport.end_input(transport)
+:ok = ExecutionPlane.Process.Transport.send(transport, %{kind: "ping"})
+:ok = ExecutionPlane.Process.Transport.end_input(transport)
 ```
 
 `end_input/1` sends EOF through the active stdin contract. `interrupt/1`
 follows the transport-owned interrupt contract and surfaces the resulting exit
-as an `ExternalRuntimeTransport.ProcessExit`.
+as an `ExecutionPlane.ProcessExit`.
 
 ## Metadata
 
 `CliSubprocessCore.RawSession.info/1` includes a `transport` entry containing
-`%ExternalRuntimeTransport.Transport.Info{}`.
+`%ExternalRuntimeTransport.Transport.Info{}` projected from the shared
+Execution Plane transport snapshot.
 
 That transport snapshot carries:
 
@@ -195,11 +199,11 @@ The generic placement metadata remains:
 ## One-Shot Command Execution
 
 For direct exact-byte execution below provider parsing, use
-`ExternalRuntimeTransport.Transport.run/2`:
+`ExecutionPlane.Process.Transport.run/2`:
 
 ```elixir
-alias ExternalRuntimeTransport.Command
-alias ExternalRuntimeTransport.Transport
+alias ExecutionPlane.Command
+alias ExecutionPlane.Process.Transport
 
 command =
   Command.new("sh", ["-c", "printf \"alpha\" && printf \"beta\" >&2"])
@@ -218,7 +222,7 @@ Supported run options are:
 - `:stderr`
 - `:close_stdin`
 
-The return value is `%ExternalRuntimeTransport.Transport.RunResult{}` with
+The return value is `%ExecutionPlane.Process.Transport.RunResult{}` with
 captured `stdout`, `stderr`, `output`, and normalized `exit` data.
 
 ## Buffering And Shutdown

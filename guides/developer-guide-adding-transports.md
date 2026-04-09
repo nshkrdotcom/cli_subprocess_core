@@ -3,16 +3,16 @@
 `cli_subprocess_core` no longer owns built-in transport families.
 
 If you need to add or change a built-in execution surface such as a new
-`surface_kind`, the change belongs in `external_runtime_transport`.
+`surface_kind`, the change belongs in `execution_plane`.
 
 ## Ownership Rule
 
 Transport-family ownership lives in:
 
-- `ExternalRuntimeTransport.ExecutionSurface`
-- `ExternalRuntimeTransport.ExecutionSurface.Adapter`
-- the external adapter registry
-- `ExternalRuntimeTransport.Transport.*`
+- `ExecutionPlane.Process.Transport.Surface`
+- `ExecutionPlane.Process.Transport.Surface.Adapter`
+- the Execution Plane adapter registry
+- `ExecutionPlane.Process.Transport.*`
 
 `cli_subprocess_core` owns provider/runtime behavior above that substrate.
 
@@ -29,7 +29,7 @@ Changes belong in `cli_subprocess_core` when they affect:
 
 ## What Leaves This Repo
 
-Changes belong in `external_runtime_transport` when they affect:
+Changes belong in `execution_plane` when they affect:
 
 - a new built-in `surface_kind`
 - adapter capability declarations

@@ -3,16 +3,20 @@ defmodule CliSubprocessCore.ExecutionSurface do
   Backward-compatible execution-surface facade for downstream CLI packages.
 
   `cli_subprocess_core` no longer owns the transport substrate. This module
-  preserves the historical `CliSubprocessCore.ExecutionSurface` struct and
-  delegates validation and transport capability lookup to
-  `ExternalRuntimeTransport.ExecutionSurface`.
+  preserves the historical `CliSubprocessCore.ExecutionSurface` struct while
+  delegating validation and capability lookup to
+  `ExecutionPlane.Process.Transport.Surface`.
   """
 
+  alias ExecutionPlane.Process.Transport.Surface, as: RuntimeExecutionSurface
   alias ExternalRuntimeTransport.ExecutionSurface, as: TransportExecutionSurface
-  alias ExternalRuntimeTransport.ExecutionSurface.Capabilities
 
-  defstruct contract_version: TransportExecutionSurface.contract_version(),
-            surface_kind: TransportExecutionSurface.default_surface_kind(),
+  @runtime_surface ExecutionPlane.Process.Transport.Surface
+  @contract_version RuntimeExecutionSurface.contract_version()
+  @default_surface_kind RuntimeExecutionSurface.default_surface_kind()
+
+  defstruct contract_version: @contract_version,
+            surface_kind: @default_surface_kind,
             transport_options: [],
             target_id: nil,
             lease_ref: nil,
@@ -20,50 +24,65 @@ defmodule CliSubprocessCore.ExecutionSurface do
             boundary_class: nil,
             observability: %{}
 
+  @type contract_version :: String.t()
+  @type surface_kind :: atom()
+  @type boundary_class :: atom() | String.t() | nil
+  @type reserved_key ::
+          :contract_version
+          | :surface_kind
+          | :transport_options
+          | :target_id
+          | :lease_ref
+          | :surface_ref
+          | :boundary_class
+          | :observability
+
   @type t :: %__MODULE__{
-          contract_version: TransportExecutionSurface.contract_version(),
-          surface_kind: TransportExecutionSurface.surface_kind(),
+          contract_version: contract_version(),
+          surface_kind: surface_kind(),
           transport_options: keyword(),
           target_id: String.t() | nil,
           lease_ref: String.t() | nil,
           surface_ref: String.t() | nil,
-          boundary_class: TransportExecutionSurface.boundary_class(),
+          boundary_class: boundary_class(),
           observability: map()
         }
 
   @type projected_t :: %{
-          required(:contract_version) => String.t(),
-          required(:surface_kind) => TransportExecutionSurface.surface_kind(),
+          required(:contract_version) => contract_version(),
+          required(:surface_kind) => surface_kind(),
           required(:transport_options) => map(),
           required(:target_id) => String.t() | nil,
           required(:lease_ref) => String.t() | nil,
           required(:surface_ref) => String.t() | nil,
-          required(:boundary_class) => TransportExecutionSurface.boundary_class(),
+          required(:boundary_class) => boundary_class(),
           required(:observability) => map()
         }
 
-  @type validation_error :: TransportExecutionSurface.validation_error()
-  @type resolution_error :: TransportExecutionSurface.resolution_error()
-  @type resolved :: TransportExecutionSurface.resolved()
+  @type validation_error :: term()
+  @type resolution_error :: term()
+  @type resolved :: map()
 
-  @spec default_surface_kind() :: TransportExecutionSurface.surface_kind()
-  defdelegate default_surface_kind(), to: TransportExecutionSurface
+  @spec default_surface_kind() :: surface_kind()
+  def default_surface_kind, do: runtime_surface_apply(:default_surface_kind, [])
 
-  @spec contract_version() :: String.t()
-  defdelegate contract_version(), to: TransportExecutionSurface
+  @spec contract_version() :: contract_version()
+  def contract_version, do: runtime_surface_apply(:contract_version, [])
 
-  @spec reserved_keys() :: [TransportExecutionSurface.reserved_key(), ...]
-  defdelegate reserved_keys(), to: TransportExecutionSurface
+  @spec reserved_keys() :: [reserved_key(), ...]
+  def reserved_keys, do: runtime_surface_apply(:reserved_keys, [])
 
-  @spec supported_surface_kinds() :: [TransportExecutionSurface.adapter_surface_kind(), ...]
-  defdelegate supported_surface_kinds(), to: TransportExecutionSurface
+  @spec supported_surface_kinds() :: [atom(), ...]
+  def supported_surface_kinds, do: runtime_surface_apply(:supported_surface_kinds, [])
 
-  @spec remote_surface_kind?(TransportExecutionSurface.surface_kind()) :: boolean()
-  defdelegate remote_surface_kind?(surface_kind), to: TransportExecutionSurface
+  @spec remote_surface_kind?(surface_kind()) :: boolean()
+  def remote_surface_kind?(surface_kind),
+    do: runtime_surface_apply(:remote_surface_kind?, [surface_kind])
 
-  @spec new(keyword() | map() | t() | TransportExecutionSurface.t()) ::
+  @spec new(keyword() | map() | t() | struct() | TransportExecutionSurface.t()) ::
           {:ok, t()} | {:error, validation_error()}
   def new(%__MODULE__{} = surface), do: {:ok, surface}
+  def new(%RuntimeExecutionSurface{} = surface), do: {:ok, from_runtime_surface(surface)}
   def new(%TransportExecutionSurface{} = surface), do: {:ok, from_external(surface)}
 
   def new(attrs) when is_map(attrs) do
@@ -73,9 +92,9 @@ defmodule CliSubprocessCore.ExecutionSurface do
   end
 
   def new(opts) when is_list(opts) do
-    case TransportExecutionSurface.new(opts) do
-      {:ok, %TransportExecutionSurface{} = surface} ->
-        {:ok, from_external(surface)}
+    case runtime_surface_apply(:new, [opts]) do
+      {:ok, %RuntimeExecutionSurface{} = surface} ->
+        {:ok, from_runtime_surface(surface)}
 
       {:error, _reason} = error ->
         error
@@ -84,7 +103,7 @@ defmodule CliSubprocessCore.ExecutionSurface do
 
   def new(other), do: {:error, {:invalid_execution_surface, other}}
 
-  @spec new!(keyword() | map() | t() | TransportExecutionSurface.t()) :: t()
+  @spec new!(keyword() | map() | t() | struct() | TransportExecutionSurface.t()) :: t()
   def new!(attrs) do
     case new(attrs) do
       {:ok, %__MODULE__{} = surface} ->
@@ -95,70 +114,96 @@ defmodule CliSubprocessCore.ExecutionSurface do
     end
   end
 
-  @spec capabilities(t() | TransportExecutionSurface.t() | atom() | keyword() | map() | nil) ::
-          {:ok, Capabilities.t()} | {:error, term()}
-  def capabilities(surface), do: TransportExecutionSurface.capabilities(external_input(surface))
-
-  @spec path_semantics(t() | TransportExecutionSurface.t() | atom() | keyword() | map() | nil) ::
-          Capabilities.path_semantics() | nil
-  def path_semantics(surface),
-    do: TransportExecutionSurface.path_semantics(external_input(surface))
-
-  @spec nonlocal_path_surface?(
+  @spec capabilities(
           t()
+          | struct()
           | TransportExecutionSurface.t()
           | atom()
           | keyword()
           | map()
           | nil
-        ) :: boolean()
-  def nonlocal_path_surface?(surface),
-    do: TransportExecutionSurface.nonlocal_path_surface?(external_input(surface))
+        ) ::
+          {:ok, term()} | {:error, term()}
+  def capabilities(surface), do: runtime_surface_apply(:capabilities, [runtime_input(surface)])
 
-  @spec remote_surface?(t() | TransportExecutionSurface.t() | atom() | keyword() | map() | nil) ::
+  @spec path_semantics(
+          t()
+          | struct()
+          | TransportExecutionSurface.t()
+          | atom()
+          | keyword()
+          | map()
+          | nil
+        ) ::
+          atom() | nil
+  def path_semantics(surface),
+    do: runtime_surface_apply(:path_semantics, [runtime_input(surface)])
+
+  @spec nonlocal_path_surface?(
+          t()
+          | struct()
+          | TransportExecutionSurface.t()
+          | atom()
+          | keyword()
+          | map()
+          | nil
+        ) ::
+          boolean()
+  def nonlocal_path_surface?(surface),
+    do: runtime_surface_apply(:nonlocal_path_surface?, [runtime_input(surface)])
+
+  @spec remote_surface?(
+          t()
+          | struct()
+          | TransportExecutionSurface.t()
+          | atom()
+          | keyword()
+          | map()
+          | nil
+        ) ::
           boolean()
   def remote_surface?(surface),
-    do: TransportExecutionSurface.remote_surface?(external_input(surface))
+    do: runtime_surface_apply(:remote_surface?, [runtime_input(surface)])
 
   @spec resolve(keyword()) ::
           {:ok, resolved()} | {:error, validation_error() | resolution_error()}
   def resolve(opts) when is_list(opts) do
-    case TransportExecutionSurface.resolve(opts) do
+    case runtime_surface_apply(:resolve, [opts]) do
       {:ok, resolved} ->
-        {:ok, %{resolved | surface: from_external(resolved.surface)}}
+        {:ok, %{resolved | surface: from_runtime_surface(resolved.surface)}}
 
       {:error, _reason} = error ->
         error
     end
   end
 
-  @spec normalize_surface_kind(term()) ::
-          {:ok, TransportExecutionSurface.surface_kind()}
-          | {:error, {:invalid_surface_kind, term()}}
-  defdelegate normalize_surface_kind(surface_kind), to: TransportExecutionSurface
+  @spec normalize_surface_kind(term()) :: {:ok, surface_kind()} | {:error, term()}
+  def normalize_surface_kind(surface_kind),
+    do: runtime_surface_apply(:normalize_surface_kind, [surface_kind])
 
-  @spec normalize_transport_options(term()) ::
-          {:ok, keyword()} | {:error, {:invalid_transport_options, term()}}
-  defdelegate normalize_transport_options(options), to: TransportExecutionSurface
+  @spec normalize_transport_options(term()) :: {:ok, keyword()} | {:error, term()}
+  def normalize_transport_options(options),
+    do: runtime_surface_apply(:normalize_transport_options, [options])
 
-  @spec surface_metadata(t() | TransportExecutionSurface.t()) :: keyword()
-  def surface_metadata(%__MODULE__{} = surface) do
+  @spec surface_metadata(t() | struct() | TransportExecutionSurface.t()) :: keyword()
+  def surface_metadata(surface) do
     surface
-    |> to_external()
-    |> TransportExecutionSurface.surface_metadata()
+    |> to_runtime_surface()
+    |> then(&runtime_surface_apply(:surface_metadata, [&1]))
   end
 
-  def surface_metadata(%TransportExecutionSurface{} = surface),
-    do: TransportExecutionSurface.surface_metadata(surface)
+  @spec to_map(t() | struct() | TransportExecutionSurface.t()) :: projected_t()
+  def to_map(surface) do
+    surface
+    |> to_runtime_surface()
+    |> then(&runtime_surface_apply(:to_map, [&1]))
+  end
 
-  @spec to_map(t() | TransportExecutionSurface.t()) :: projected_t()
-  def to_map(surface), do: surface |> to_external() |> TransportExecutionSurface.to_map()
+  @spec to_runtime_surface(t() | struct() | TransportExecutionSurface.t()) :: struct()
+  def to_runtime_surface(%RuntimeExecutionSurface{} = surface), do: surface
 
-  @spec to_external(t() | TransportExecutionSurface.t()) :: TransportExecutionSurface.t()
-  def to_external(%TransportExecutionSurface{} = surface), do: surface
-
-  def to_external(%__MODULE__{} = surface) do
-    %TransportExecutionSurface{
+  def to_runtime_surface(%TransportExecutionSurface{} = surface) do
+    %RuntimeExecutionSurface{
       contract_version: surface.contract_version,
       surface_kind: surface.surface_kind,
       transport_options: surface.transport_options,
@@ -167,6 +212,52 @@ defmodule CliSubprocessCore.ExecutionSurface do
       surface_ref: surface.surface_ref,
       boundary_class: surface.boundary_class,
       observability: surface.observability
+    }
+  end
+
+  def to_runtime_surface(%__MODULE__{} = surface) do
+    %RuntimeExecutionSurface{
+      contract_version: surface.contract_version,
+      surface_kind: surface.surface_kind,
+      transport_options: surface.transport_options,
+      target_id: surface.target_id,
+      lease_ref: surface.lease_ref,
+      surface_ref: surface.surface_ref,
+      boundary_class: surface.boundary_class,
+      observability: surface.observability
+    }
+  end
+
+  @spec from_runtime_surface(struct()) :: t()
+  def from_runtime_surface(%RuntimeExecutionSurface{} = surface) do
+    %__MODULE__{
+      contract_version: surface.contract_version,
+      surface_kind: surface.surface_kind,
+      transport_options: surface.transport_options,
+      target_id: surface.target_id,
+      lease_ref: surface.lease_ref,
+      surface_ref: surface.surface_ref,
+      boundary_class: surface.boundary_class,
+      observability: surface.observability
+    }
+  end
+
+  @spec to_external(t() | struct() | TransportExecutionSurface.t()) ::
+          TransportExecutionSurface.t()
+  def to_external(%TransportExecutionSurface{} = surface), do: surface
+
+  def to_external(surface) do
+    runtime_surface = to_runtime_surface(surface)
+
+    %TransportExecutionSurface{
+      contract_version: runtime_surface.contract_version,
+      surface_kind: runtime_surface.surface_kind,
+      transport_options: runtime_surface.transport_options,
+      target_id: runtime_surface.target_id,
+      lease_ref: runtime_surface.lease_ref,
+      surface_ref: runtime_surface.surface_ref,
+      boundary_class: runtime_surface.boundary_class,
+      observability: runtime_surface.observability
     }
   end
 
@@ -184,8 +275,9 @@ defmodule CliSubprocessCore.ExecutionSurface do
     }
   end
 
-  defp external_input(%__MODULE__{} = surface), do: to_external(surface)
-  defp external_input(other), do: other
+  defp runtime_input(%__MODULE__{} = surface), do: to_runtime_surface(surface)
+  defp runtime_input(%TransportExecutionSurface{} = surface), do: to_runtime_surface(surface)
+  defp runtime_input(other), do: other
 
   defp execution_surface_attrs(attrs) do
     [
@@ -198,5 +290,9 @@ defmodule CliSubprocessCore.ExecutionSurface do
       boundary_class: Map.get(attrs, :boundary_class, Map.get(attrs, "boundary_class")),
       observability: Map.get(attrs, :observability, Map.get(attrs, "observability", %{}))
     ]
+  end
+
+  defp runtime_surface_apply(function_name, args) do
+    apply(@runtime_surface, function_name, args)
   end
 end

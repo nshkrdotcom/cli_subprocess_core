@@ -34,6 +34,7 @@ outer mailbox shape.
 
 - `info.transport.module` is `ExecutionPlane.Process.Transport`
 - `info.transport.info` is `ExternalRuntimeTransport.Transport.Info`
+  projected from the shared Execution Plane transport snapshot
 - `info.transport.status` reflects the normalized transport status
 
 That keeps the core session API stable while the local session-bearing lane now

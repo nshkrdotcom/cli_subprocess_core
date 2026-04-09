@@ -62,4 +62,15 @@ defmodule CliSubprocessCore.Session.OptionsTest do
                transport_module: ExternalRuntimeTransport.Transport
              )
   end
+
+  test "accepts execution-plane-only surface kinds" do
+    assert {:ok, %Options{} = options} =
+             Options.new(
+               provider: :echo,
+               prompt: "hello",
+               execution_surface: [surface_kind: :test_guest_local]
+             )
+
+    assert options.surface_kind == :test_guest_local
+  end
 end

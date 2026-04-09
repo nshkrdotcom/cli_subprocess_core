@@ -4,16 +4,16 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Command.Options, as: CommandOptions
   alias CliSubprocessCore.Command.RunResult, as: CommandRunResult
+  alias CliSubprocessCore.ExecutionSurface
   alias CliSubprocessCore.RawSession
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
   alias CliSubprocessCore.TestSupport.ProviderProfiles.Echo
   alias ExecutionPlane.Process.Transport
-  alias ExternalRuntimeTransport.ExecutionSurface
   alias ExternalRuntimeTransport.Transport.Info
   alias ExternalRuntimeTransport.Transport.RunResult
 
-  test "command options build the external execution-surface contract" do
+  test "command options build the compatibility execution-surface contract" do
     invocation = Command.new("printf", ["ready"])
 
     assert {:ok, options} =
@@ -32,7 +32,7 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
     assert execution_surface.transport_options[:destination] == "ssh.example"
   end
 
-  test "session options build the external execution-surface contract" do
+  test "session options build the compatibility execution-surface contract" do
     assert {:ok, options} =
              SessionOptions.new(
                profile: Echo,

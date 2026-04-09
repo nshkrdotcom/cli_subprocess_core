@@ -6,9 +6,9 @@ execution substrate.
 Use it when you want normalized provider commands, sessions, payloads, and
 events instead of working directly with the raw transport substrate.
 
-For the covered minimal lane, provider-aware local one-shot commands now route
-through `execution_plane`. Raw sessions and the not-yet-migrated non-local
-surfaces still route through `external_runtime_transport`.
+For the covered runtime slice, provider-aware local one-shot commands route
+through `ExecutionPlane.Process.run/2`, while raw sessions and non-local
+surfaces route through `ExecutionPlane.Process.Transport`.
 
 ## Install
 
@@ -59,8 +59,8 @@ outcome back into the core-owned command shape.
 
 `RawSession` is the lowest public CLI-owned layer. For the covered local
 session-bearing lane it uses `ExecutionPlane.Process.Transport` underneath
-while keeping the public placement seam generic. Non-local surfaces still
-resolve through the underlying external transport substrate.
+while keeping the public placement seam generic. The same transport seam also
+handles non-local placement through `execution_surface`.
 
 ## Normalized Sessions
 
@@ -99,8 +99,8 @@ Pass that value through `Command.run/1`, `Command.run/2`,
 When `Command.run/1,2` receives `surface_kind: :local_subprocess`, the covered
 minimal one-shot lane runs through `execution_plane`. `RawSession`,
 `Channel`, and `Session` now use the Execution Plane-backed local session lane
-for `:local_subprocess` as well. Non-local surfaces still resolve through the
-underlying external transport substrate.
+for `:local_subprocess` as well. Non-local surfaces also resolve through the
+same Execution Plane-backed transport seam.
 
 Supported landed surface kinds are:
 

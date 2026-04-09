@@ -5,7 +5,9 @@ defmodule CliSubprocessCore.CommandTest do
   alias CliSubprocessCore.Command.Error
   alias CliSubprocessCore.Command.RunResult
   alias CliSubprocessCore.CommandSpec
+  alias CliSubprocessCore.TestSupport.FakeSSH
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
+  alias ExecutionPlane.Process.Transport.Surface, as: RuntimeExecutionSurface
 
   test "builds normalized invocations" do
     command =
@@ -161,6 +163,50 @@ defmodule CliSubprocessCore.CommandTest do
              %{send_failed: {:invalid_input, %Protocol.UndefinedError{}}},
              error.context.raw_payload
            )
+  end
+
+  test "run/2 routes execution-plane-only surface kinds through the shared runtime transport" do
+    invocation = Command.new("echo", [], cwd: "/tmp/project")
+
+    assert {:ok, runtime_surface} =
+             RuntimeExecutionSurface.new(surface_kind: :test_restricted_spawn)
+
+    assert {:error, %Error{} = error} =
+             Command.run(
+               invocation,
+               execution_surface: runtime_surface
+             )
+
+    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+    assert transport_error.reason == {:unsupported_capability, :run, :test_restricted_spawn}
+    assert error.context.invocation == invocation
+  end
+
+  test "run/2 accepts execution-plane surface structs for SSH placement" do
+    fake_ssh = FakeSSH.new!()
+    on_exit(fn -> FakeSSH.cleanup(fake_ssh) end)
+
+    script = create_test_script("printf 'ssh-command\\n'")
+
+    assert {:ok, runtime_surface} =
+             RuntimeExecutionSurface.new(
+               surface_kind: :ssh_exec,
+               target_id: "command-ssh-target",
+               transport_options:
+                 FakeSSH.transport_options(fake_ssh,
+                   destination: "command.test.example",
+                   port: 2222
+                 )
+             )
+
+    assert {:ok, result} = Command.run(Command.new(script), execution_surface: runtime_surface)
+    assert result.stdout == "ssh-command\n"
+    assert result.exit.status == :success
+
+    assert FakeSSH.wait_until_written(fake_ssh, 1_000) == :ok
+    manifest = FakeSSH.read_manifest!(fake_ssh)
+    assert manifest =~ "destination=command.test.example"
+    assert manifest =~ "port=2222"
   end
 
   test "run/1 returns a structured error when the provider cannot be resolved" do

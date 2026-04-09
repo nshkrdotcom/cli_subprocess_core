@@ -1,7 +1,7 @@
 # Execution Surface Compatibility
 
 `cli_subprocess_core` now relies on
-`ExternalRuntimeTransport.ExecutionSurface` for the actual transport contract.
+`ExecutionPlane.Process.Transport.Surface` for the actual transport contract.
 
 Some downstream packages still type against the older
 `CliSubprocessCore.ExecutionSurface` module name, especially where they:
@@ -28,9 +28,11 @@ The compatibility module preserves the historical struct shape:
 - `observability`
 
 It delegates validation and capability lookup to
-`ExternalRuntimeTransport.ExecutionSurface`.
+`ExecutionPlane.Process.Transport.Surface`.
 It also delegates map projection through
 `CliSubprocessCore.ExecutionSurface.to_map/1`.
+When a legacy compatibility struct is still required, it can also project with
+`CliSubprocessCore.ExecutionSurface.to_external/1`.
 
 ## What The Facade Does Not Do
 
@@ -41,7 +43,7 @@ The compatibility module does not own:
 - substrate capability definitions
 - raw transport result types
 
-Those still belong to `external_runtime_transport`.
+Those now belong to the Execution Plane transport surface and adapter registry.
 
 ## Preferred Caller Shapes
 
@@ -72,4 +74,4 @@ CliSubprocessCore.Command.Options.new(
 ```
 
 That keeps existing public contracts stable while routing all real validation
-through the extracted transport package.
+through the shared Execution Plane transport package.
