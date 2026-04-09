@@ -1,10 +1,14 @@
 # Getting Started
 
-`cli_subprocess_core` is the provider-facing runtime layer above
-`external_runtime_transport`.
+`cli_subprocess_core` is the provider-facing runtime layer above the lower
+execution substrate.
 
 Use it when you want normalized provider commands, sessions, payloads, and
 events instead of working directly with the raw transport substrate.
+
+For the covered minimal lane, provider-aware local one-shot commands now route
+through `execution_plane`. Raw sessions and the not-yet-migrated non-local
+surfaces still route through `external_runtime_transport`.
 
 ## Install
 
@@ -36,9 +40,10 @@ Use:
   )
 ```
 
-The result type is
-`ExternalRuntimeTransport.Transport.RunResult`. The core keeps provider-facing
-planning and error wrapping around that transport-owned result.
+The result type is `CliSubprocessCore.Command.RunResult`. For
+`surface_kind: :local_subprocess`, the core emits `ProcessExecutionIntent.v1`
+and delegates the lower one-shot hop to `execution_plane` before projecting the
+outcome back into the core-owned command shape.
 
 ## Raw Sessions
 
@@ -89,6 +94,10 @@ execution_surface = [
 
 Pass that value through `Command.run/1`, `Command.run/2`,
 `RawSession.start/2`, or `Session.start_session/1`.
+
+When `Command.run/1,2` receives `surface_kind: :local_subprocess`, the covered
+minimal one-shot lane runs through `execution_plane`. The other public entry
+points still use `external_runtime_transport`.
 
 Supported landed surface kinds are:
 

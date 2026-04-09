@@ -130,6 +130,19 @@ defmodule CliSubprocessCore.CommandTest do
     assert File.read!(stdin_path) == "payload-without-newline"
   end
 
+  test "run/2 maps execution-plane launch failures into structured transport errors" do
+    invocation = Command.new("/definitely/not/a/real/command", [])
+
+    assert {:error, %Error{} = error} = Command.run(invocation, [])
+
+    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+    assert transport_error.reason == {:command_not_found, "/definitely/not/a/real/command"}
+    assert error.context.invocation == invocation
+    assert error.context.surface_kind == :local_subprocess
+    assert error.context.failure_class == :launch_failed
+    assert error.context.raw_payload == %{command: "/definitely/not/a/real/command"}
+  end
+
   test "run/1 returns a structured error when the provider cannot be resolved" do
     assert {:error, %Error{} = error} = Command.run(provider: :missing_phase_2a_provider)
 

@@ -149,8 +149,6 @@ Common Amp options:
 - `:command`
 - `:model`
 - `:mode`
-- `:max_turns`
-- `:system_prompt`
 - `:permissions`
 - `:mcp_config`
 - `:tools`

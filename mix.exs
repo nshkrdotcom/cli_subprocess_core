@@ -136,6 +136,7 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
+      {:execution_plane, path: "../execution_plane"},
       {:external_runtime_transport, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},

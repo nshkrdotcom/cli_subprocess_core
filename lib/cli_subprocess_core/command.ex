@@ -8,7 +8,9 @@ defmodule CliSubprocessCore.Command do
 
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
   alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
+  alias ExecutionPlane.Process, as: ExecutionPlaneProcess
   alias ExternalRuntimeTransport.Command, as: TransportCommand
+  alias ExternalRuntimeTransport.ProcessExit
   alias ExternalRuntimeTransport.Transport.Error, as: TransportError
   alias ExternalRuntimeTransport.Transport.RunResult, as: TransportRunResult
 
@@ -215,6 +217,15 @@ defmodule CliSubprocessCore.Command do
     end
   end
 
+  defp do_run(invocation, %Options{surface_kind: :local_subprocess} = options) do
+    execution_surface = Options.execution_surface(options)
+
+    invocation
+    |> execution_plane_request(options, execution_surface)
+    |> ExecutionPlaneProcess.run()
+    |> normalize_execution_plane_run(invocation, options, execution_surface)
+  end
+
   defp do_run(invocation, %Options{} = options) do
     execution_surface = Options.execution_surface(options)
     transport_invocation = to_transport_command(invocation)
@@ -237,6 +248,98 @@ defmodule CliSubprocessCore.Command do
 
       {:error, {:transport, %TransportError{} = error}} ->
         {:error, Error.transport_error(error, %{invocation: invocation})}
+    end
+  end
+
+  defp execution_plane_request(invocation, %Options{} = options, execution_surface) do
+    %{
+      command: invocation.command,
+      argv: invocation.args,
+      cwd: invocation.cwd,
+      env: invocation.env,
+      clear_env: invocation.clear_env?,
+      user: invocation.user,
+      stdin: options.stdin,
+      stderr_mode: Atom.to_string(options.stderr),
+      close_stdin: options.close_stdin,
+      timeout_ms: options.timeout,
+      execution_surface: %{surface_kind: Atom.to_string(execution_surface.surface_kind)},
+      target_id: execution_surface.target_id
+    }
+  end
+
+  defp normalize_execution_plane_run({:ok, result}, invocation, %Options{} = options, _surface) do
+    {:ok, execution_plane_run_result(result, invocation, options)}
+  end
+
+  defp normalize_execution_plane_run(
+         {:error, %{outcome: %{failure: nil}} = result},
+         invocation,
+         %Options{} = options,
+         _surface
+       ) do
+    {:ok, execution_plane_run_result(result, invocation, options)}
+  end
+
+  defp normalize_execution_plane_run(
+         {:error, %{outcome: %{failure: failure, raw_payload: raw_payload}}},
+         invocation,
+         _options,
+         execution_surface
+       ) do
+    error =
+      failure
+      |> execution_plane_transport_error(raw_payload, execution_surface)
+      |> Error.transport_error(%{invocation: invocation})
+
+    {:error, error}
+  end
+
+  defp execution_plane_run_result(result, invocation, %Options{} = options) do
+    raw_payload = result.outcome.raw_payload
+
+    %RunResult{
+      invocation: invocation,
+      output: Map.get(raw_payload, :output, ""),
+      stdout: Map.get(raw_payload, :stdout, ""),
+      stderr: Map.get(raw_payload, :stderr, ""),
+      exit: normalize_execution_plane_exit(Map.get(raw_payload, :exit, %{})),
+      stderr_mode: options.stderr
+    }
+  end
+
+  defp normalize_execution_plane_exit(exit) when is_map(exit) do
+    %ProcessExit{
+      status: Map.get(exit, :status) || Map.get(exit, "status") || :error,
+      code: Map.get(exit, :code) || Map.get(exit, "code"),
+      signal: Map.get(exit, :signal) || Map.get(exit, "signal"),
+      reason: Map.get(exit, :reason) || Map.get(exit, "reason"),
+      stderr: Map.get(exit, :stderr) || Map.get(exit, "stderr")
+    }
+  end
+
+  defp execution_plane_transport_error(failure, raw_payload, execution_surface) do
+    context = %{
+      failure_class: failure.failure_class,
+      raw_payload: raw_payload,
+      surface_kind: execution_surface.surface_kind
+    }
+
+    case {failure.failure_class, raw_payload} do
+      {:timeout, _payload} ->
+        TransportError.transport_error(:timeout, context)
+
+      {_, %{command: command}} when is_binary(command) ->
+        TransportError.transport_error({:command_not_found, command}, context)
+
+      {_, %{cwd: cwd}} when is_binary(cwd) ->
+        TransportError.transport_error({:cwd_not_found, cwd}, context)
+
+      _other ->
+        TransportError.transport_error(
+          {:startup_failed, failure.reason || failure.failure_class},
+          context
+        )
     end
   end
 

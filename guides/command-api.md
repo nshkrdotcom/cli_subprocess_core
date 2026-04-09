@@ -7,7 +7,7 @@ It combines:
 - provider profile resolution
 - normalized command construction
 - generic `execution_surface` placement
-- wrapped transport failures with provider context
+- wrapped lower-lane failures with provider context
 
 ## Public Entry Points
 
@@ -25,7 +25,7 @@ It combines:
   )
 ```
 
-The return value is `ExternalRuntimeTransport.Transport.RunResult`.
+The return value is `CliSubprocessCore.Command.RunResult`.
 
 ## Prebuilt Invocation Execution
 
@@ -59,9 +59,13 @@ exposing adapter modules:
   )
 ```
 
+When that surface resolves to `:local_subprocess`, the covered minimal lane
+emits `ProcessExecutionIntent.v1` and runs through `ExecutionPlane.Process.run/2`.
+Other surfaces continue through `external_runtime_transport`.
+
 ## Result Shape
 
-The returned transport-owned result contains:
+The returned core-owned result contains:
 
 - `stdout`
 - `stderr`
@@ -76,5 +80,5 @@ The returned transport-owned result contains:
 Command-lane failures are wrapped as `CliSubprocessCore.Command.Error`.
 
 That wrapper preserves core-facing context such as the invocation or provider
-while carrying the underlying transport failure from
-`ExternalRuntimeTransport.Transport.Error`.
+while carrying the underlying lower-lane failure from either
+`ExecutionPlane` or `ExternalRuntimeTransport`.

@@ -12,7 +12,7 @@ or trying to understand where a change should land.
 1. model policy
 2. provider profile adaptation
 3. command/session normalization
-4. execution-surface and raw transport execution
+4. execution-surface routing and lower runtime execution
 5. normalized event and payload emission
 
 These layers exist so the runtime can stay consistent while still supporting
@@ -76,11 +76,12 @@ Owned by modules such as:
 This layer gives the core a provider-agnostic API for one-shot commands and
 longer-lived sessions.
 
-## Layer 4: Raw Transport Execution
+## Layer 4: Lower Runtime Execution
 
-Owned by:
+Owned by the lower owner for the selected lane:
 
-- `ExternalRuntimeTransport.Transport`
+- `ExecutionPlane.Process` for the covered local one-shot command lane
+- `ExternalRuntimeTransport.Transport` for the remaining raw/session-bearing and non-local surfaces
 
 This layer starts the external process, manages stdin/stdout/stderr, and
 captures process exit information through the shared substrate.
@@ -115,7 +116,8 @@ When deciding where a change belongs, use this rule:
 
 - if the change affects model choice, put it in the registry/catalog
 - if the change affects provider CLI syntax, put it in the provider profile
-- if the change affects subprocess lifecycle, put it in transport/session
+- if the change affects the covered local one-shot subprocess lane, put it in the execution-plane-backed lower runtime
+- if the change affects raw/session or non-local subprocess lifecycle, put it in transport/session
 - if the change affects normalized output shape, put it in payload/runtime
 
 That rule prevents policy leakage across layers.
@@ -127,12 +129,12 @@ External repos should consume the core in this order:
 1. prepare normalized options
 2. call the core’s model registry
 3. pass the resolved selection into provider-facing command building
-4. let the core transport/session runtime execute the process
+4. let the core route the request to the execution-plane-backed command lane or the raw/session transport runtime as appropriate
 
 The core is therefore both:
 
 - a policy owner
-- and a subprocess runtime owner
+- and a command/session boundary above lower runtime owners
 
 But those are still separate internal responsibilities.
 

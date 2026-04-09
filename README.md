@@ -21,9 +21,10 @@ provider profile resolution, normalized command/session APIs, event and payload
 shaping, model policy helpers, and the built-in first-party profiles for
 Claude, Codex, Gemini, and Amp.
 
-The raw execution substrate now lives in `external_runtime_transport`.
-`cli_subprocess_core` consumes that package through one public placement seam:
-`execution_surface`.
+The covered minimal one-shot local process lane now runs on `execution_plane`.
+`cli_subprocess_core` keeps one public placement seam, `execution_surface`, and
+continues to use `external_runtime_transport` for the not-yet-migrated
+non-local and session-bearing surfaces.
 
 For downstream packages that still type against the historical module name,
 `CliSubprocessCore.ExecutionSurface` remains available as a compatibility
@@ -46,8 +47,15 @@ facade over `ExternalRuntimeTransport.ExecutionSurface`.
 
 ## What This Package Does Not Own
 
-`cli_subprocess_core` no longer owns the raw execution substrate modules. The
-following are owned by `external_runtime_transport`:
+`cli_subprocess_core` no longer owns the lower process substrate.
+
+For the covered Wave 3 minimal lane:
+
+- `execution_plane` owns local one-shot process execution and the minimal unary JSON-RPC substrate beneath that lane
+- `cli_subprocess_core` owns provider planning, normalized command/session APIs, and event projection above that lower owner
+
+For the currently exposed raw/session-bearing and non-local surfaces, the
+following still live in `external_runtime_transport`:
 
 - `ExternalRuntimeTransport.ExecutionSurface`
 - `ExternalRuntimeTransport.Transport`
@@ -164,6 +172,11 @@ When that surface needs to cross a boundary, use
 `CliSubprocessCore.ExecutionSurface.to_map/1` or
 `ExternalRuntimeTransport.ExecutionSurface.to_map/1` to project the versioned
 map form.
+
+For `CliSubprocessCore.Command.run/1,2`, `surface_kind: :local_subprocess`
+now emits `ProcessExecutionIntent.v1` and delegates the covered minimal one-shot
+lane to `ExecutionPlane.Process.run/2`. Non-local command placement and the
+session-bearing APIs continue through `external_runtime_transport`.
 
 ## Documentation
 
