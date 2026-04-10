@@ -56,12 +56,6 @@ For the covered runtime slice:
 - `cli_subprocess_core` owns provider planning, normalized command/session
   APIs, and event projection above that lower owner
 
-Historical public structs such as `ExternalRuntimeTransport.ProcessExit`,
-`ExternalRuntimeTransport.Transport.Info`, and
-`ExternalRuntimeTransport.Transport.Error` still appear at some core-facing
-boundaries as compatibility projections. They no longer imply active transport
-ownership in `external_runtime_transport`.
-
 ## Installation
 
 ```elixir
@@ -162,21 +156,16 @@ downstream compatibility.
 
 When that surface needs to cross a boundary, use
 `CliSubprocessCore.ExecutionSurface.to_map/1` to project the versioned map
-form. Use `CliSubprocessCore.ExecutionSurface.to_external/1` only when a
-legacy compatibility struct is still required.
+form.
 
 For `CliSubprocessCore.Command.run/1,2`, `surface_kind: :local_subprocess`
 now emits `ProcessExecutionIntent.v1` and delegates the covered minimal one-shot
 lane to `ExecutionPlane.Process.run/2`. Non-local command placement and the
-session-bearing APIs resolve through `ExecutionPlane.Process.Transport`, with
-legacy public exits, errors, and info snapshots projected back into the
-historical compatibility structs where needed.
+session-bearing APIs resolve through `ExecutionPlane.Process.Transport`.
 
 ## Documentation
 
 - `guides/getting-started.md` for the main public entrypoints.
-- `guides/external-runtime-transport.md` for the shared placement seam and
-  compatibility boundary.
 - `guides/execution-surface-compatibility.md` for the compatibility facade
   exported for downstream packages.
 - `guides/command-api.md`, `guides/channel-api.md`, and `guides/session-api.md`

@@ -19,10 +19,8 @@ when you want exact-byte stdin/stdout defaults without provider parsing.
 - `ExecutionPlane.Process.Transport.RunResult` for captured direct transport
   execution results
 - `ExecutionPlane.Process.Transport.Error` for direct transport failures
-- compatibility-projected `ExternalRuntimeTransport.Transport.Info`,
-  `ExternalRuntimeTransport.Transport.Error`, and
-  `ExternalRuntimeTransport.ProcessExit` where `RawSession`, `Channel`, or
-  `Session` preserve historical public shapes
+- `ExecutionPlane.Process.Transport.Info` for transport metadata snapshots
+- `ExecutionPlane.ProcessExit` for normalized process exits
 
 ## Start A Raw Session
 
@@ -175,8 +173,8 @@ as an `ExecutionPlane.ProcessExit`.
 ## Metadata
 
 `CliSubprocessCore.RawSession.info/1` includes a `transport` entry containing
-`%ExternalRuntimeTransport.Transport.Info{}` projected from the shared
-Execution Plane transport snapshot.
+`%ExecutionPlane.Process.Transport.Info{}` from the shared Execution Plane
+transport snapshot.
 
 That transport snapshot carries:
 
@@ -233,7 +231,8 @@ shutdown are transport-owned behaviors now. `CliSubprocessCore.RawSession`,
 substrate internals.
 
 See `guides/shutdown-and-timeouts.md` for the surfaced lifecycle contract and
-`guides/external-runtime-transport.md` for the package split.
+`guides/execution-surface-compatibility.md` for the placement seam surfaced by
+the core.
 ## Chunk-First Overflow Controls
 
 When a provider profile opts into line-based stdout framing, the raw transport now exposes the full

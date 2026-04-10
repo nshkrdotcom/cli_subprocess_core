@@ -1,4 +1,4 @@
-defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
+defmodule CliSubprocessCore.ExecutionPlaneIntegrationTest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Command
@@ -10,8 +10,8 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
   alias CliSubprocessCore.TestSupport.ProviderProfiles.Echo
   alias ExecutionPlane.Process.Transport
-  alias ExternalRuntimeTransport.Transport.Info
-  alias ExternalRuntimeTransport.Transport.RunResult
+  alias ExecutionPlane.Process.Transport.Info
+  alias ExecutionPlane.Process.Transport.RunResult
 
   test "command options build the compatibility execution-surface contract" do
     invocation = Command.new("printf", ["ready"])
@@ -84,7 +84,7 @@ defmodule CliSubprocessCore.ExternalRuntimeTransportIntegrationTest do
     dir =
       Path.join(
         System.tmp_dir!(),
-        "cli_subprocess_core_external_runtime_transport_#{System.unique_integer([:positive])}"
+        "cli_subprocess_core_execution_plane_#{System.unique_integer([:positive])}"
       )
 
     File.mkdir_p!(dir)

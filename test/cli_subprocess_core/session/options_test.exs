@@ -59,7 +59,7 @@ defmodule CliSubprocessCore.Session.OptionsTest do
              Options.new(
                provider: :echo,
                prompt: "hello",
-               transport_module: ExternalRuntimeTransport.Transport
+               transport_module: ExecutionPlane.Process.Transport
              )
   end
 

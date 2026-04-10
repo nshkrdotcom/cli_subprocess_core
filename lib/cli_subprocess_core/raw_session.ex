@@ -11,11 +11,9 @@ defmodule CliSubprocessCore.RawSession do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.RawSession.Delivery
-  alias CliSubprocessCore.TransportCompat
   alias ExecutionPlane.Process.Transport
   alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
-  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
-  alias ExternalRuntimeTransport.Transport.RunResult
+  alias ExecutionPlane.Process.Transport.RunResult
 
   @default_event_tag :cli_subprocess_core_raw_session
   @transport_start_timeout_ms 5_000
@@ -230,7 +228,6 @@ defmodule CliSubprocessCore.RawSession do
   def info(%__MODULE__{} = session) do
     transport_info =
       session.transport_api.info(session.transport)
-      |> TransportCompat.to_transport_info()
 
     %{
       delivery: delivery_info(session),
@@ -387,10 +384,9 @@ defmodule CliSubprocessCore.RawSession do
             do_collect(session, timeout, stdout, [chunk | stderr])
 
           {:ok, {:error, reason}} ->
-            {:error, {:transport, TransportCompat.to_transport_error(reason)}}
+            {:error, {:transport, reason}}
 
           {:ok, {:exit, exit}} ->
-            exit = TransportCompat.to_process_exit(exit)
             stdout = stdout |> Enum.reverse() |> IO.iodata_to_binary()
             stderr = stderr |> Enum.reverse() |> IO.iodata_to_binary()
 
@@ -457,32 +453,20 @@ defmodule CliSubprocessCore.RawSession do
     end
   end
 
-  defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
-    do: {:error, {:transport, error}}
-
   defp normalize_transport_start_exit({:transport, %RuntimeTransportError{} = error}),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
-
-  defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(%RuntimeTransportError{} = error),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
-
-  defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit({:shutdown, %RuntimeTransportError{} = error}),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+    do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(:normal), do: :ok
   defp normalize_transport_start_exit(reason), do: {:error, reason}
 
-  defp normalize_transport_start_reason({:transport, %TransportError{} = error}),
-    do: {:transport, error}
-
   defp normalize_transport_start_reason({:transport, %RuntimeTransportError{} = error}),
-    do: {:transport, TransportCompat.to_transport_error(error)}
+    do: {:transport, error}
 
   defp normalize_transport_start_reason(reason), do: reason
 

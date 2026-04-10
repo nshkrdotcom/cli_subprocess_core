@@ -2,7 +2,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @moduledoc false
 
   alias CliSubprocessCore.{Command, CommandSpec, Event, Payload, ProviderCLI}
-  alias ExternalRuntimeTransport.ProcessExit
+  alias ExecutionPlane.ProcessExit
 
   @transport_option_keys [
     :startup_mode,

@@ -32,7 +32,7 @@ It delegates validation and capability lookup to
 It also delegates map projection through
 `CliSubprocessCore.ExecutionSurface.to_map/1`.
 When a legacy compatibility struct is still required, it can also project with
-`CliSubprocessCore.ExecutionSurface.to_external/1`.
+`CliSubprocessCore.ExecutionSurface.to_runtime_surface/1`.
 
 ## What The Facade Does Not Do
 

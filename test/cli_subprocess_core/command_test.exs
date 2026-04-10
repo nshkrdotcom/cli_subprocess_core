@@ -137,7 +137,7 @@ defmodule CliSubprocessCore.CommandTest do
 
     assert {:error, %Error{} = error} = Command.run(invocation, [])
 
-    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+    assert %ExecutionPlane.Process.Transport.Error{} = transport_error = elem(error.reason, 1)
     assert transport_error.reason == {:command_not_found, "/definitely/not/a/real/command"}
     assert error.context.invocation == invocation
     assert error.context.surface_kind == :local_subprocess
@@ -152,7 +152,7 @@ defmodule CliSubprocessCore.CommandTest do
     assert {:error, %Error{} = error} =
              Command.run(invocation, stdin: invalid_stdin, timeout: 500)
 
-    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+    assert %ExecutionPlane.Process.Transport.Error{} = transport_error = elem(error.reason, 1)
 
     assert {:send_failed, {:invalid_input, %Protocol.UndefinedError{}}} =
              transport_error.reason
@@ -177,7 +177,7 @@ defmodule CliSubprocessCore.CommandTest do
                execution_surface: runtime_surface
              )
 
-    assert %ExternalRuntimeTransport.Transport.Error{} = transport_error = elem(error.reason, 1)
+    assert %ExecutionPlane.Process.Transport.Error{} = transport_error = elem(error.reason, 1)
     assert transport_error.reason == {:unsupported_capability, :run, :test_restricted_spawn}
     assert error.context.invocation == invocation
   end
@@ -241,7 +241,7 @@ defmodule CliSubprocessCore.CommandTest do
     invocation = Command.new("sh", ["-c", "printf ready"])
 
     assert {:error, %Error{} = error} =
-             Command.run(invocation, transport_module: ExternalRuntimeTransport.Transport)
+             Command.run(invocation, transport_module: ExecutionPlane.Process.Transport)
 
     assert error.reason == {:invalid_options, {:unsupported_option, :transport_selector}}
     assert error.context == %{invocation: invocation}

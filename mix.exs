@@ -39,7 +39,6 @@ defmodule CliSubprocessCore.MixProject do
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],
-        "guides/external-runtime-transport.md": [title: "External Runtime Transport"],
         "guides/execution-surface-compatibility.md": [title: "Execution Surface Compatibility"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
@@ -84,7 +83,6 @@ defmodule CliSubprocessCore.MixProject do
         ],
         "Runtime & APIs": [
           "guides/getting-started.md",
-          "guides/external-runtime-transport.md",
           "guides/execution-surface-compatibility.md",
           "guides/raw-transport.md",
           "guides/event-and-payload-model.md",
@@ -137,7 +135,6 @@ defmodule CliSubprocessCore.MixProject do
   defp deps do
     [
       {:execution_plane, path: "../execution_plane"},
-      {:external_runtime_transport, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},

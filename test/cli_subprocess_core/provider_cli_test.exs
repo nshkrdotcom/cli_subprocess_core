@@ -6,7 +6,7 @@ defmodule CliSubprocessCore.ProviderCLITest do
   alias CliSubprocessCore.ProviderCLI.Error
   alias CliSubprocessCore.ProviderCLI.ErrorRuntimeFailure
   alias CliSubprocessCore.TestSupport
-  alias ExternalRuntimeTransport.ProcessExit
+  alias ExecutionPlane.ProcessExit
 
   defp isolated_env(overrides \\ %{}) do
     Map.merge(

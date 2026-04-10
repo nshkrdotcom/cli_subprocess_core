@@ -55,7 +55,7 @@ defmodule MyApp.ProviderProfiles.Example do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.{Command, Event, Payload}
-  alias ExternalRuntimeTransport.ProcessExit
+  alias ExecutionPlane.ProcessExit
 
   @impl true
   def id, do: :example

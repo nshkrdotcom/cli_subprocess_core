@@ -461,7 +461,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
       {events_after_exit, _state} =
         Claude.handle_exit(
-          %ExternalRuntimeTransport.ProcessExit{status: :success, code: 0},
+          %ExecutionPlane.ProcessExit{status: :success, code: 0},
           state
         )
 

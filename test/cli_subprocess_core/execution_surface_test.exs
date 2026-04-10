@@ -6,7 +6,6 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
   alias CliSubprocessCore.Session.Options, as: SessionOptions
   alias CliSubprocessCore.TestSupport.ProviderProfiles.{CommandRunner, Echo}
   alias ExecutionPlane.Process.Transport.Surface, as: RuntimeExecutionSurface
-  alias ExternalRuntimeTransport.ExecutionSurface, as: TransportExecutionSurface
 
   test "builds a compatibility struct from keyword input" do
     assert {:ok, %ExecutionSurface{} = surface} =
@@ -133,10 +132,10 @@ defmodule CliSubprocessCore.ExecutionSurfaceTest do
     assert surface.contract_version == "execution_surface.v1"
     assert surface.boundary_class == "remote_cli"
 
-    assert %TransportExecutionSurface{} =
-             transport_surface = ExecutionSurface.to_external(surface)
+    assert %RuntimeExecutionSurface{} =
+             runtime_surface = ExecutionSurface.to_runtime_surface(surface)
 
-    assert transport_surface.contract_version == "execution_surface.v1"
-    assert transport_surface.boundary_class == "remote_cli"
+    assert runtime_surface.contract_version == "execution_surface.v1"
+    assert runtime_surface.boundary_class == "remote_cli"
   end
 end

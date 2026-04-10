@@ -3,10 +3,9 @@ defmodule CliSubprocessCore.Command.RunResult do
   Core-owned result for provider-aware one-shot command execution.
   """
 
-  alias CliSubprocessCore.{Command, TransportCompat}
+  alias CliSubprocessCore.Command
   alias ExecutionPlane.Process.Transport.RunResult, as: RuntimeRunResult
-  alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport.RunResult, as: TransportRunResult
+  alias ExecutionPlane.ProcessExit
 
   @enforce_keys [:invocation, :exit]
   defstruct invocation: nil,
@@ -32,11 +31,7 @@ defmodule CliSubprocessCore.Command.RunResult do
     ProcessExit.successful?(exit)
   end
 
-  @spec from_transport(term(), Command.t()) :: t()
-  def from_transport(%TransportRunResult{} = result, %Command{} = invocation) do
-    build_run_result(result, invocation)
-  end
-
+  @spec from_transport(RuntimeRunResult.t(), Command.t()) :: t()
   def from_transport(%RuntimeRunResult{} = result, %Command{} = invocation) do
     build_run_result(result, invocation)
   end
@@ -47,7 +42,7 @@ defmodule CliSubprocessCore.Command.RunResult do
       output: result.output,
       stdout: result.stdout,
       stderr: result.stderr,
-      exit: TransportCompat.to_process_exit(result.exit),
+      exit: result.exit,
       stderr_mode: result.stderr_mode
     }
   end

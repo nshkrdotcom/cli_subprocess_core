@@ -4,7 +4,7 @@ defmodule CliSubprocessCore.ChannelTest do
   alias CliSubprocessCore.Channel
   alias CliSubprocessCore.TestSupport
   alias CliSubprocessCore.TestSupport.FakeSSH
-  alias ExternalRuntimeTransport.ProcessExit
+  alias ExecutionPlane.ProcessExit
 
   test "channel streams local framed IO and exposes stable delivery metadata" do
     ref = make_ref()

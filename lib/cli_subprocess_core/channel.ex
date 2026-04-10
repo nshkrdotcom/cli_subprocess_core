@@ -11,9 +11,9 @@ defmodule CliSubprocessCore.Channel do
 
   import Kernel, except: [send: 2]
 
-  alias CliSubprocessCore.{Channel.Delivery, Command, RawSession, TransportCompat}
+  alias CliSubprocessCore.{Channel.Delivery, Command, RawSession}
   alias ExecutionPlane.Process.Transport
-  alias ExternalRuntimeTransport.ProcessExit
+  alias ExecutionPlane.ProcessExit
 
   @default_channel_event_tag :cli_subprocess_core_channel
   @raw_session_event_tag :cli_subprocess_core_channel_transport
@@ -380,11 +380,11 @@ defmodule CliSubprocessCore.Channel do
         {:noreply, state}
 
       {:ok, {:error, reason}} ->
-        dispatch_event(state, {:error, TransportCompat.to_transport_error(reason)})
+        dispatch_event(state, {:error, reason})
         {:stop, :normal, state}
 
       {:ok, {:exit, exit}} ->
-        dispatch_event(state, {:exit, TransportCompat.to_process_exit(exit)})
+        dispatch_event(state, {:exit, exit})
         {:stop, :normal, state}
 
       :error ->

@@ -7,13 +7,12 @@ defmodule CliSubprocessCore.Command do
   """
 
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
-  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry, TransportCompat}
+  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
   alias ExecutionPlane.Command, as: RuntimeCommand
   alias ExecutionPlane.Process, as: ExecutionPlaneProcess
   alias ExecutionPlane.Process.Transport, as: RuntimeTransport
-  alias ExternalRuntimeTransport.Command, as: TransportCommand
-  alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
+  alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
+  alias ExecutionPlane.ProcessExit
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
@@ -77,24 +76,11 @@ defmodule CliSubprocessCore.Command do
   end
 
   @doc """
-  Projects a CLI-domain invocation onto the generic transport substrate.
-  """
-  @spec to_transport_command(t()) :: TransportCommand.t()
-  def to_transport_command(%__MODULE__{} = command) do
-    TransportCommand.new(command.command, command.args,
-      cwd: command.cwd,
-      env: command.env,
-      clear_env?: command.clear_env?,
-      user: command.user
-    )
-  end
-
-  @doc """
-  Projects a CLI-domain invocation onto either the Execution Plane or legacy
-  compatibility transport command shape.
+  Projects a CLI-domain invocation onto the shared execution-plane command
+  shape.
   """
   @spec to_runtime_command(t(), module()) :: term()
-  def to_runtime_command(%__MODULE__{} = command, ExecutionPlane.Process.Transport) do
+  def to_runtime_command(%__MODULE__{} = command, _transport_api) do
     %RuntimeCommand{
       command: command.command,
       args: command.args,
@@ -103,10 +89,6 @@ defmodule CliSubprocessCore.Command do
       clear_env?: command.clear_env?,
       user: command.user
     }
-  end
-
-  def to_runtime_command(%__MODULE__{} = command, _transport_api) do
-    to_transport_command(command)
   end
 
   @doc """
@@ -269,8 +251,7 @@ defmodule CliSubprocessCore.Command do
         {:ok, RunResult.from_transport(result, invocation)}
 
       {:error, {:transport, error}} ->
-        transport_error = TransportCompat.to_transport_error(error)
-        {:error, Error.transport_error(transport_error, %{invocation: invocation})}
+        {:error, Error.transport_error(error, %{invocation: invocation})}
     end
   end
 
@@ -350,19 +331,19 @@ defmodule CliSubprocessCore.Command do
 
     case {failure.failure_class, raw_payload} do
       {:timeout, _payload} ->
-        TransportError.transport_error(:timeout, context)
+        RuntimeTransportError.transport_error(:timeout, context)
 
       {_, %{send_failed: reason}} ->
-        TransportError.transport_error({:send_failed, reason}, context)
+        RuntimeTransportError.transport_error({:send_failed, reason}, context)
 
       {_, %{command: command}} when is_binary(command) ->
-        TransportError.transport_error({:command_not_found, command}, context)
+        RuntimeTransportError.transport_error({:command_not_found, command}, context)
 
       {_, %{cwd: cwd}} when is_binary(cwd) ->
-        TransportError.transport_error({:cwd_not_found, cwd}, context)
+        RuntimeTransportError.transport_error({:cwd_not_found, cwd}, context)
 
       _other ->
-        TransportError.transport_error(
+        RuntimeTransportError.transport_error(
           {:startup_failed, failure.reason || failure.failure_class},
           context
         )

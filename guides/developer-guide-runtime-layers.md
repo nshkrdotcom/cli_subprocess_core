@@ -83,8 +83,6 @@ Owned by the lower owner for the selected lane:
 - `ExecutionPlane.Process` for the covered local one-shot command lane
 - `ExecutionPlane.Process.Transport` for the shared session-bearing lane and
   non-local command/session placement
-- compatibility projections in `external_runtime_transport` only where older
-  public struct identities are still surfaced upward
 
 This layer starts the external process, manages stdin/stdout/stderr, and
 captures process exit information through the shared substrate.

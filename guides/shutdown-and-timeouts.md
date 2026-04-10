@@ -26,13 +26,11 @@ If the underlying transport cannot complete the call within the bounded wait
 window, callers see:
 
 ```elixir
-{:error, {:transport, %ExternalRuntimeTransport.Transport.Error{reason: :timeout}}}
+{:error, {:transport, %ExecutionPlane.Process.Transport.Error{reason: :timeout}}}
 ```
 
 That timeout protects the caller from hanging forever while still leaving the
-underlying transport free to complete later if it can recover. The surfaced
-error struct remains compatibility-shaped even though the active owner is the
-Execution Plane transport seam.
+underlying transport free to complete later if it can recover.
 
 ## Interrupt
 
@@ -41,7 +39,7 @@ forward an interrupt request to the substrate according to the configured
 transport contract.
 
 The resulting subprocess exit is surfaced as an
-`ExternalRuntimeTransport.ProcessExit`.
+`ExecutionPlane.ProcessExit`.
 
 ## EOF
 
@@ -83,7 +81,7 @@ Transport-facing lifecycle APIs use bounded waits so callers do not hang
 forever when the underlying transport is blocked, dead, or mid-shutdown.
 
 Normalized call-time failures still surface as
-`ExternalRuntimeTransport.Transport.Error` reasons such as:
+`ExecutionPlane.Process.Transport.Error` reasons such as:
 
 - `:not_connected`
 - `:timeout`
@@ -92,4 +90,4 @@ Normalized call-time failures still surface as
 - `{:send_failed, reason}`
 
 Those are transport-owned errors carried upward through the core handles as
-compatibility projections.
+the shared runtime transport contract.

@@ -26,15 +26,7 @@ ALL_TASKS=(
 
 workspace_deps_for_repo() {
   case "$1" in
-    cli_subprocess_core)
-      printf '%s\n' "external_runtime_transport"
-      ;;
-    agent_session_manager)
-      printf '%s\n' "external_runtime_transport"
-      printf '%s\n' "cli_subprocess_core"
-      ;;
-    codex_sdk|gemini_cli_sdk|claude_agent_sdk|amp_sdk)
-      printf '%s\n' "external_runtime_transport"
+    agent_session_manager|codex_sdk|gemini_cli_sdk|claude_agent_sdk|amp_sdk)
       printf '%s\n' "cli_subprocess_core"
       ;;
     *)

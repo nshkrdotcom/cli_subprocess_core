@@ -74,13 +74,12 @@ The returned core-owned result contains:
 - `stderr_mode`
 - `exit`
 
-`exit` is an `ExternalRuntimeTransport.ProcessExit`.
+`exit` is an `ExecutionPlane.ProcessExit`.
 
 ## Error Shape
 
 Command-lane failures are wrapped as `CliSubprocessCore.Command.Error`.
 
 That wrapper preserves core-facing context such as the invocation or provider
-while carrying the underlying lower-lane failure from `execution_plane`. Where
-the public error shape still uses `ExternalRuntimeTransport.Transport.Error`,
-that value is now a compatibility projection rather than an active lower owner.
+while carrying the underlying lower-lane failure from `execution_plane`.
+Transport failures surface as `ExecutionPlane.Process.Transport.Error`.

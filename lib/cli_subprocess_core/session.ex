@@ -15,13 +15,11 @@ defmodule CliSubprocessCore.Session do
     ProviderRegistry,
     Runtime,
     Session.Delivery,
-    Session.Options,
-    TransportCompat
+    Session.Options
   }
 
   alias ExecutionPlane.Process.Transport
   alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
-  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
 
   @session_start_timeout_ms 5_000
   @transport_event_tag :cli_subprocess_core_session_transport
@@ -297,8 +295,6 @@ defmodule CliSubprocessCore.Session do
         {@transport_event_tag, ref, {:error, transport_error}},
         %{transport_ref: ref} = state
       ) do
-    transport_error = TransportCompat.to_transport_error(transport_error)
-
     payload =
       Payload.Error.new(
         message: transport_error.message,
@@ -316,7 +312,6 @@ defmodule CliSubprocessCore.Session do
         {@transport_event_tag, ref, {:exit, process_exit}},
         %{transport_ref: ref} = state
       ) do
-    process_exit = TransportCompat.to_process_exit(process_exit)
     {events, parser_state} = state.profile.handle_exit(process_exit, state.parser_state)
     state = %{state | parser_state: parser_state}
     state = normalize_and_dispatch(state, events)
@@ -589,39 +584,26 @@ defmodule CliSubprocessCore.Session do
     end
   end
 
-  defp normalize_transport_start_exit({:transport, %TransportError{} = error}),
-    do: {:error, {:transport, error}}
-
   defp normalize_transport_start_exit({:transport, %RuntimeTransportError{} = error}),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
-
-  defp normalize_transport_start_exit(%TransportError{} = error),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(%RuntimeTransportError{} = error),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
-
-  defp normalize_transport_start_exit({:shutdown, %TransportError{} = error}),
     do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit({:shutdown, %RuntimeTransportError{} = error}),
-    do: {:error, {:transport, TransportCompat.to_transport_error(error)}}
+    do: {:error, {:transport, error}}
 
   defp normalize_transport_start_exit(:normal), do: :ok
   defp normalize_transport_start_exit(reason), do: {:error, reason}
 
-  defp normalize_transport_start_reason({:transport, %TransportError{} = error}),
-    do: {:transport, error}
-
   defp normalize_transport_start_reason({:transport, %RuntimeTransportError{} = error}),
-    do: {:transport, TransportCompat.to_transport_error(error)}
+    do: {:transport, error}
 
   defp normalize_transport_start_reason(reason), do: reason
 
   defp maybe_transport_info(module, transport_pid) do
     if function_exported?(module, :info, 1) do
       module.info(transport_pid)
-      |> TransportCompat.to_transport_info()
     else
       nil
     end

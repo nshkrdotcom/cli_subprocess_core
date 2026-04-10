@@ -7,8 +7,8 @@ defmodule CliSubprocessCore.ProviderCLI do
   """
 
   alias CliSubprocessCore.{CommandSpec, ExecutionSurface}
-  alias ExternalRuntimeTransport.ProcessExit
-  alias ExternalRuntimeTransport.Transport.Error, as: TransportError
+  alias ExecutionPlane.Process.Transport.Error, as: TransportError
+  alias ExecutionPlane.ProcessExit
 
   defmodule Error do
     @moduledoc """
