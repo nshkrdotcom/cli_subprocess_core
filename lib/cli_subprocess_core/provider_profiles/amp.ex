@@ -267,7 +267,11 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
   defp cancelled(raw, state) do
     Shared.emit_single(
       :error,
-      Payload.Error.new(message: "Run cancelled", code: "user_cancelled", severity: :warning),
+      Shared.error_payload(:amp,
+        message: "Run cancelled",
+        code: "user_cancelled",
+        severity: :warning
+      ),
       raw,
       state
     )
@@ -275,7 +279,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
 
   defp error_event(raw, state) do
     payload =
-      Payload.Error.new(
+      Shared.error_payload(:amp,
         message:
           Shared.fetch_any(raw, [:error_message, "error_message", :message, "message"]) ||
             "Amp parser error",

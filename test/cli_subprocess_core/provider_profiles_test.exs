@@ -458,6 +458,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Error{} = event.payload
       assert event.payload.code == "auth_error"
       assert event.payload.message =~ "organization does not have access"
+      assert event.payload.metadata["recovery"]["class"] == "provider_auth_claim"
+      assert event.payload.metadata["recovery"]["retryable?"] == true
 
       {events_after_exit, _state} =
         Claude.handle_exit(
@@ -558,6 +560,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert payload.severity == :fatal
       assert payload.code == "unknown"
       assert payload.metadata["severity"] == "fatal"
+      assert payload.metadata["recovery"]["class"] == "provider_runtime_claim"
+      assert payload.metadata["recovery"]["retryable?"] == true
     end
 
     test "Amp decodes its JSONL fixture into normalized events" do

@@ -205,6 +205,17 @@ defmodule CliSubprocessCore.SessionTest do
     assert %Payload.Error{message: message} = error_event.payload
     assert message =~ "CLI exited with code"
 
+    runtime_failure =
+      error_event.payload.metadata[:runtime_failure] ||
+        error_event.payload.metadata["runtime_failure"]
+
+    recovery = runtime_failure[:recovery] || runtime_failure["recovery"]
+
+    assert recovery["class"] ==
+             "provider_runtime_claim"
+
+    assert recovery["retryable?"] == true
+
     monitor = Process.monitor(session)
     assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 5_000
     assert reason in [:normal, :noproc]
@@ -238,6 +249,17 @@ defmodule CliSubprocessCore.SessionTest do
     assert error_event.kind == :error
     assert %Payload.Error{message: message} = error_event.payload
     assert message =~ "CLI exited with code 42"
+
+    runtime_failure =
+      error_event.payload.metadata[:runtime_failure] ||
+        error_event.payload.metadata["runtime_failure"]
+
+    recovery = runtime_failure[:recovery] || runtime_failure["recovery"]
+
+    assert recovery["class"] ==
+             "provider_runtime_claim"
+
+    assert recovery["retryable?"] == true
 
     monitor = Process.monitor(session)
     assert_receive {:DOWN, ^monitor, :process, ^session, reason}, 2_000

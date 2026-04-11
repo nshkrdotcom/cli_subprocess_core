@@ -328,7 +328,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   defp error_event(raw, state) do
     payload =
-      Payload.Error.new(
+      Shared.error_payload(:codex,
         code:
           raw
           |> Shared.fetch_any([:error_code, "error_code"])

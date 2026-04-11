@@ -168,6 +168,8 @@ session-bearing APIs resolve through `ExecutionPlane.Process.Transport`.
 - `guides/getting-started.md` for the main public entrypoints.
 - `guides/execution-surface-compatibility.md` for the compatibility facade
   exported for downstream packages.
+- `guides/recovery-envelope.md` for the shared failure-normalization contract
+  consumed by higher runtimes.
 - `guides/command-api.md`, `guides/channel-api.md`, and `guides/session-api.md`
   for the primary runtime APIs.
 - `guides/raw-transport.md` and `guides/shutdown-and-timeouts.md` for the

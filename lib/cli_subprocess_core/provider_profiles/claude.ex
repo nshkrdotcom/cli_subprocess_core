@@ -230,7 +230,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   defp result(raw, state) do
     if result_error?(raw) do
       payload =
-        Payload.Error.new(
+        Shared.error_payload(:claude,
           message: result_error_message(raw),
           code:
             raw
@@ -268,7 +268,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
 
   defp error_event(raw, state) do
     payload =
-      Payload.Error.new(
+      Shared.error_payload(:claude,
         message: Shared.fetch_any(raw, [:message, "message"]) || "Claude parser error",
         code:
           raw

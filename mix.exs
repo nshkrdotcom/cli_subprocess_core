@@ -41,6 +41,7 @@ defmodule CliSubprocessCore.MixProject do
         "guides/getting-started.md": [title: "Getting Started"],
         "guides/execution-surface-compatibility.md": [title: "Execution Surface Compatibility"],
         "guides/event-and-payload-model.md": [title: "Event And Payload Model"],
+        "guides/recovery-envelope.md": [title: "Recovery Envelope"],
         "guides/provider-profile-contract.md": [title: "Provider Profile Contract"],
         "guides/custom-provider-profiles.md": [title: "Custom Provider Profiles"],
         "guides/built-in-provider-profiles.md": [title: "Built-In Provider Profiles"],
@@ -84,6 +85,7 @@ defmodule CliSubprocessCore.MixProject do
         "Runtime & APIs": [
           "guides/getting-started.md",
           "guides/execution-surface-compatibility.md",
+          "guides/recovery-envelope.md",
           "guides/raw-transport.md",
           "guides/event-and-payload-model.md",
           "guides/command-api.md",

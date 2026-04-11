@@ -1,7 +1,7 @@
 defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @moduledoc false
 
-  alias CliSubprocessCore.{Command, CommandSpec, Event, Payload, ProviderCLI}
+  alias CliSubprocessCore.{Command, CommandSpec, Event, Payload, ProviderCLI, RecoveryEnvelope}
   alias ExecutionPlane.ProcessExit
 
   @transport_option_keys [
@@ -283,7 +283,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
                   provider: failure.provider,
                   exit_code: failure.exit_code,
                   stderr: failure.stderr,
-                  context: failure.context
+                  context: failure.context,
+                  recovery: RecoveryEnvelope.from_runtime_failure(failure)
                 }
               }
               |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -342,6 +343,34 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   def normalize_severity(value) when value in [:warning, "warning", "warn"], do: :warning
   def normalize_severity(_value), do: :error
 
+  @spec error_payload(atom(), keyword()) :: Payload.Error.t()
+  def error_payload(provider, opts) when is_atom(provider) and is_list(opts) do
+    message = Keyword.fetch!(opts, :message)
+    code = normalize_payload_code(Keyword.get(opts, :code, "unknown"))
+    severity = normalize_severity(Keyword.get(opts, :severity, :error))
+
+    metadata =
+      opts
+      |> Keyword.get(:metadata, %{})
+      |> normalize_map()
+      |> Map.put_new(
+        "recovery",
+        RecoveryEnvelope.from_payload_error(provider, %Payload.Error{
+          message: message,
+          code: code,
+          severity: severity,
+          metadata: %{}
+        })
+      )
+
+    Payload.Error.new(
+      message: message,
+      code: code,
+      severity: severity,
+      metadata: metadata
+    )
+  end
+
   @spec normalize_kind(term()) :: atom()
   def normalize_kind(nil), do: :unknown
   def normalize_kind(kind) when is_atom(kind), do: kind
@@ -355,6 +384,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @spec truthy?(term()) :: boolean()
   def truthy?(value) when value in [true, "true", 1, "1", "yes", "on"], do: true
   def truthy?(_value), do: false
+
+  defp normalize_payload_code(value) when is_atom(value), do: Atom.to_string(value)
+  defp normalize_payload_code(value) when is_binary(value) and value != "", do: value
+  defp normalize_payload_code(_value), do: "unknown"
 
   @spec int_value(map(), [atom() | String.t()], non_neg_integer()) :: non_neg_integer()
   def int_value(raw, keys, default \\ 0) when is_map(raw) and is_list(keys) do

@@ -177,7 +177,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Gemini do
 
   defp error_event(raw, state) do
     payload =
-      Payload.Error.new(
+      Shared.error_payload(:gemini,
         message: Shared.fetch_any(raw, [:message, "message"]) || "Gemini parser error",
         code:
           raw

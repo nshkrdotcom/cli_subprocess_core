@@ -13,6 +13,7 @@ defmodule CliSubprocessCore.Session do
     Payload,
     ProviderProfile,
     ProviderRegistry,
+    RecoveryEnvelope,
     Runtime,
     Session.Delivery,
     Session.Options
@@ -299,7 +300,9 @@ defmodule CliSubprocessCore.Session do
       Payload.Error.new(
         message: transport_error.message,
         code: "transport_error",
-        metadata: transport_error.context
+        metadata:
+          transport_error.context
+          |> Map.put(:recovery, RecoveryEnvelope.from_transport_error(transport_error))
       )
 
     {event, runtime} = Runtime.next_event(state.runtime, :error, payload, raw: transport_error)
