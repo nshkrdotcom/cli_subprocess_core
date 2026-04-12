@@ -3,7 +3,7 @@ defmodule CliSubprocessCore do
   Public entrypoints for the shared CLI subprocess runtime foundation.
   """
 
-  alias CliSubprocessCore.{Event, ProviderRegistry}
+  alias CliSubprocessCore.{Event, LineageFact, ProviderRegistry}
 
   @type first_party_profile_module ::
           CliSubprocessCore.ProviderProfiles.Claude
@@ -52,6 +52,14 @@ defmodule CliSubprocessCore do
   @spec normalized_event_kinds() :: [Event.kind()]
   def normalized_event_kinds do
     Event.kinds()
+  end
+
+  @doc """
+  Returns the normalized lineage fact kinds exposed by the core vocabulary.
+  """
+  @spec lineage_fact_kinds() :: [LineageFact.kind(), ...]
+  def lineage_fact_kinds do
+    LineageFact.kinds()
   end
 
   @doc """

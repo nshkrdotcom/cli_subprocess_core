@@ -15,6 +15,7 @@ defmodule CliSubprocessCore.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       homepage_url: @homepage_url,
       source_url: @source_url,
       docs: docs(),
@@ -134,6 +135,10 @@ defmodule CliSubprocessCore.MixProject do
     ]
   end
 
+  def cli do
+    []
+  end
+
   defp deps do
     [
       {:execution_plane, path: "../execution_plane"},
@@ -151,6 +156,18 @@ defmodule CliSubprocessCore.MixProject do
       plt_core_path: "priv/plts/core",
       plt_local_path: "priv/plts",
       flags: [:error_handling, :underspecs]
+    ]
+  end
+
+  defp aliases do
+    [
+      ci: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "credo",
+        "cmd env MIX_ENV=test mix test",
+        "dialyzer"
+      ]
     ]
   end
 end
