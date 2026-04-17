@@ -20,7 +20,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:codex, nil, model: "gpt-5.3-codex")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-5-codex"
+      assert payload.resolved_model == "gpt-5.4"
       assert payload.requested_model == nil
     end
 
@@ -69,9 +69,10 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:amp, "amp-1", reasoning_effort: :unsupported)
     end
 
-    test "rejects unsupported low reasoning for gpt-5.4-mini" do
-      assert {:error, {:invalid_reasoning_effort, :low, ["high", "medium"], :codex}} =
-               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :low)
+    test "rejects unsupported minimal reasoning for gpt-5.4-mini" do
+      assert {:error,
+              {:invalid_reasoning_effort, :minimal, ["high", "low", "medium", "xhigh"], :codex}} =
+               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :minimal)
     end
 
     test "resolves Claude Ollama backend models through the core payload" do
@@ -179,7 +180,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.list_visible/2" do
     test "returns visible models by default" do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
-      assert "gpt-5-codex" in models
+
+      assert models == [
+               "gpt-5.4",
+               "gpt-5.2-codex",
+               "gpt-5.1-codex-max",
+               "gpt-5.4-mini",
+               "gpt-5.3-codex",
+               "gpt-5.3-codex-spark",
+               "gpt-5.2",
+               "gpt-5.1-codex-mini"
+             ]
+
+      refute "gpt-5-codex" in models
       refute "gpt-5-codex-internal" in models
     end
 
@@ -215,7 +228,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-5-codex"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-5.4"} = ModelRegistry.default_model(:codex)
     end
 
     test "hard fails when Claude Ollama backend has no explicit external default" do
@@ -339,8 +352,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.normalize_reasoning_effort/3" do
     test "normalizes symbolic reasoning effort" do
-      assert {:ok,
-              %{reasoning: "medium", reasoning_effort: 1.0, normalized_reasoning_effort: 1.0}} =
+      assert {:ok, %{reasoning: "medium", reasoning_effort: 1, normalized_reasoning_effort: 1}} =
                ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5-codex", :medium)
     end
 

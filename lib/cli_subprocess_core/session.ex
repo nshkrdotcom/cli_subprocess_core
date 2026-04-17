@@ -208,9 +208,11 @@ defmodule CliSubprocessCore.Session do
     with {:ok, options} <- Options.new(opts),
          {:ok, profile} <- resolve_profile(options),
          provider_profile_options = Options.provider_profile_options(options),
+         transport_profile_options = profile.transport_options(provider_profile_options),
          {:ok, invocation} <- profile.build_invocation(provider_profile_options),
          :ok <- ProviderProfile.validate_invocation(invocation),
-         {:ok, transport_pid, transport_ref} <- start_transport(options, profile, invocation) do
+         {:ok, transport_pid, transport_ref} <-
+           start_transport(options, transport_profile_options, invocation) do
       state =
         %__MODULE__{
           provider: options.provider,
@@ -226,9 +228,15 @@ defmodule CliSubprocessCore.Session do
         }
         |> maybe_put_subscriber(options.subscriber)
 
-      maybe_send_started(state)
+      case maybe_bootstrap_stdin(state, options.stdin, transport_profile_options) do
+        :ok ->
+          maybe_send_started(state)
+          {:ok, state, {:continue, :emit_run_started}}
 
-      {:ok, state, {:continue, :emit_run_started}}
+        {:error, reason} ->
+          _ = Transport.close(state.transport_pid)
+          {:stop, reason}
+      end
     else
       :error ->
         {:stop, {:provider_not_found, Keyword.get(opts, :provider)}}
@@ -386,14 +394,13 @@ defmodule CliSubprocessCore.Session do
     end
   end
 
-  defp start_transport(options, profile, invocation) do
+  defp start_transport(options, transport_profile_options, invocation) do
     transport_ref = make_ref()
     execution_surface = Options.execution_surface(options)
-    provider_profile_options = Options.provider_profile_options(options)
 
     transport_runtime_opts =
-      provider_profile_options
-      |> profile.transport_options()
+      transport_profile_options
+      |> maybe_defer_close_stdin_on_start(options.stdin)
       |> Keyword.drop([
         :command,
         :args,
@@ -416,7 +423,8 @@ defmodule CliSubprocessCore.Session do
         command: invocation,
         subscriber: {self(), transport_ref},
         event_tag: @transport_event_tag,
-        execution_surface: execution_surface
+        execution_surface: execution_surface,
+        stdin: options.stdin
       ] ++ transport_runtime_opts
 
     case Transport.start(
@@ -439,6 +447,30 @@ defmodule CliSubprocessCore.Session do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp maybe_bootstrap_stdin(_state, nil, _transport_profile_options), do: :ok
+
+  defp maybe_bootstrap_stdin(state, stdin, transport_profile_options) do
+    with :ok <- Transport.send(state.transport_pid, stdin),
+         :ok <- maybe_end_bootstrap_input(state.transport_pid, transport_profile_options) do
+      :ok
+    end
+  end
+
+  defp maybe_end_bootstrap_input(transport_pid, transport_profile_options) do
+    if Keyword.get(transport_profile_options, :close_stdin_on_start?, false) do
+      Transport.end_input(transport_pid)
+    else
+      :ok
+    end
+  end
+
+  defp maybe_defer_close_stdin_on_start(transport_profile_options, nil),
+    do: transport_profile_options
+
+  defp maybe_defer_close_stdin_on_start(transport_profile_options, _stdin) do
+    Keyword.put(transport_profile_options, :close_stdin_on_start?, false)
   end
 
   defp normalize_and_dispatch(state, events) do

@@ -7,8 +7,9 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-03-25"
-      assert is_binary(codex_catalog.remote_default)
+      assert codex_catalog.catalog_version == "2026-04-16"
+      assert codex_catalog.remote_default == "gpt-5.4"
+      assert Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.4"))
       assert Enum.any?(codex_catalog.models, &(&1.id == "gpt-5-codex"))
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)

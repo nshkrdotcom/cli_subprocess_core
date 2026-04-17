@@ -173,6 +173,35 @@ defmodule CliSubprocessCore.SessionTest do
     assert File.read!(stdin_path) == ""
   end
 
+  test "session startup forwards initial stdin payloads to the transport" do
+    stdin_path = temp_path!("startup_session_stdin")
+    ref = make_ref()
+
+    script =
+      create_test_script("""
+      cat > "#{stdin_path}"
+      printf '{"type":"result","result":"ok"}\\n'
+      """)
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :amp,
+               prompt: "ship it",
+               command: script,
+               subscriber: {self(), ref},
+               stdin: "payload-without-newline"
+             )
+
+    assert_receive {@session_event_tag, ^ref, {:event, run_started}}, 2_000
+    assert run_started.kind == :run_started
+    result_event = receive_session_event(ref, 2_000, &(&1.kind == :result))
+    assert result_event.kind == :result
+
+    monitor = Process.monitor(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
+    assert File.read!(stdin_path) == "payload-without-newline\n"
+  end
+
   test "interrupt requests propagate through the session and surface a terminal error" do
     ref = make_ref()
 
