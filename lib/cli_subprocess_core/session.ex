@@ -452,9 +452,9 @@ defmodule CliSubprocessCore.Session do
   defp maybe_bootstrap_stdin(_state, nil, _transport_profile_options), do: :ok
 
   defp maybe_bootstrap_stdin(state, stdin, transport_profile_options) do
-    with :ok <- Transport.send(state.transport_pid, stdin),
-         :ok <- maybe_end_bootstrap_input(state.transport_pid, transport_profile_options) do
-      :ok
+    case Transport.send(state.transport_pid, stdin) do
+      :ok -> maybe_end_bootstrap_input(state.transport_pid, transport_profile_options)
+      {:error, _reason} = error -> error
     end
   end
 

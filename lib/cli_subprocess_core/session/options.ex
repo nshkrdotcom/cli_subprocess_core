@@ -3,7 +3,12 @@ defmodule CliSubprocessCore.Session.Options do
   Validated startup options for the common session engine.
   """
 
-  alias CliSubprocessCore.{ExecutionSurface, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{
+    ExecutionSurface,
+    ProviderProfile,
+    ProviderRegistry,
+    ProviderRuntimeProfile
+  }
 
   @default_registry ProviderRegistry
   @default_session_event_tag :cli_subprocess_core_session
@@ -82,6 +87,7 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_boundary_class, term()}
           | {:invalid_observability, term()}
           | {:invalid_starter, term()}
+          | ProviderRuntimeProfile.resolve_error()
 
   @doc """
   Builds a validated session options struct.
@@ -99,6 +105,8 @@ defmodule CliSubprocessCore.Session.Options do
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
+         {:ok, {provider_options, execution_surface}} <-
+           ProviderRuntimeProfile.resolve(provider, provider_options, execution_surface),
          :ok <- validate_subscriber(Keyword.get(opts, :subscriber)),
          :ok <- validate_metadata(Keyword.get(opts, :metadata, %{})),
          :ok <-
@@ -107,15 +115,15 @@ defmodule CliSubprocessCore.Session.Options do
            ),
          :ok <- validate_starter(Keyword.get(opts, :starter)) do
       {:ok,
-         %__MODULE__{
-           provider: provider,
-           profile: profile,
-           registry: Keyword.get(opts, :registry, @default_registry),
-           subscriber: Keyword.get(opts, :subscriber),
-           stdin: Keyword.get(opts, :stdin),
-           metadata: Keyword.get(opts, :metadata, %{}),
-           session_event_tag: Keyword.get(opts, :session_event_tag, @default_session_event_tag),
-           surface_kind: execution_surface.surface_kind,
+       %__MODULE__{
+         provider: provider,
+         profile: profile,
+         registry: Keyword.get(opts, :registry, @default_registry),
+         subscriber: Keyword.get(opts, :subscriber),
+         stdin: Keyword.get(opts, :stdin),
+         metadata: Keyword.get(opts, :metadata, %{}),
+         session_event_tag: Keyword.get(opts, :session_event_tag, @default_session_event_tag),
+         surface_kind: execution_surface.surface_kind,
          transport_options: execution_surface.transport_options,
          target_id: execution_surface.target_id,
          lease_ref: execution_surface.lease_ref,

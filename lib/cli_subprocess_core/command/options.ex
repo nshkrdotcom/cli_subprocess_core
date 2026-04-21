@@ -3,7 +3,13 @@ defmodule CliSubprocessCore.Command.Options do
   Validated command-lane options for provider-aware one-shot execution.
   """
 
-  alias CliSubprocessCore.{Command, ExecutionSurface, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{
+    Command,
+    ExecutionSurface,
+    ProviderProfile,
+    ProviderRegistry,
+    ProviderRuntimeProfile
+  }
 
   @default_registry ProviderRegistry
   @default_timeout_ms 30_000
@@ -86,6 +92,7 @@ defmodule CliSubprocessCore.Command.Options do
           | {:invalid_surface_ref, term()}
           | {:invalid_boundary_class, term()}
           | {:invalid_observability, term()}
+          | ProviderRuntimeProfile.resolve_error()
 
   @doc """
   Builds validated command-lane options around a normalized invocation.
@@ -132,6 +139,8 @@ defmodule CliSubprocessCore.Command.Options do
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
+         {:ok, {provider_options, execution_surface}} <-
+           ProviderRuntimeProfile.resolve(provider, provider_options, execution_surface),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, @default_timeout_ms)),
          :ok <- validate_stderr(Keyword.get(opts, :stderr, :separate)),
          :ok <- validate_close_stdin(Keyword.get(opts, :close_stdin, true)) do
