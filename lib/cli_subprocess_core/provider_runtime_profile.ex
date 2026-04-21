@@ -54,7 +54,7 @@ defmodule CliSubprocessCore.ProviderRuntimeProfile do
   def resolve(_provider, provider_options, execution_surface),
     do: {:ok, {provider_options, execution_surface}}
 
-  defp apply_profile(provider, provider_options, execution_surface, profile) do
+  defp apply_profile(provider, provider_options, %ExecutionSurface{} = execution_surface, profile) do
     with {:ok, @lower_simulation} <- mode(provider, profile),
          {:ok, command} <- command(provider, profile),
          {:ok, scenario_ref} <- required_profile_string(provider, profile, :scenario_ref),
