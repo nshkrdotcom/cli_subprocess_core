@@ -225,7 +225,7 @@ defmodule CliSubprocessCore.Command do
 
     invocation
     |> execution_plane_request(options, execution_surface)
-    |> ExecutionPlaneProcess.run()
+    |> ExecutionPlaneProcess.run(lineage: execution_plane_lineage(execution_surface))
     |> normalize_execution_plane_run(invocation, options, execution_surface)
   end
 
@@ -269,6 +269,18 @@ defmodule CliSubprocessCore.Command do
       timeout_ms: options.timeout,
       execution_surface: %{surface_kind: Atom.to_string(execution_surface.surface_kind)},
       target_id: execution_surface.target_id
+    }
+  end
+
+  defp execution_plane_lineage(execution_surface) do
+    token = System.unique_integer([:positive, :monotonic])
+
+    %{
+      idempotency_key: "cli-subprocess-core-command-#{token}",
+      extensions: %{
+        owner_repo: "cli_subprocess_core",
+        surface_kind: Atom.to_string(execution_surface.surface_kind)
+      }
     }
   end
 

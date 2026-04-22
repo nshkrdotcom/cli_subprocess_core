@@ -8,7 +8,7 @@ defmodule CliSubprocessCore.ProviderRuntimeProfile do
   callbacks run.
   """
 
-  alias CliSubprocessCore.ExecutionSurface
+  alias CliSubprocessCore.{AdapterSelectionPolicy, ExecutionSurface, LowerSimulationScenario}
 
   @app :cli_subprocess_core
   @config_key :provider_runtime_profiles
@@ -22,6 +22,63 @@ defmodule CliSubprocessCore.ProviderRuntimeProfile do
           {:provider_runtime_profile_required, provider()}
           | {:invalid_provider_runtime_profile, provider(), term()}
           | {:unsupported_provider_runtime_profile_mode, provider(), term()}
+          | {:public_simulation_selector_forbidden, provider()}
+
+  @doc """
+  Declares the Phase 6 adapter selection policy for CLI runtime profiles.
+  """
+  @spec adapter_selection_policy() :: AdapterSelectionPolicy.t()
+  def adapter_selection_policy do
+    AdapterSelectionPolicy.new!(%{
+      selection_surface: "application_config",
+      owner_repo: "cli_subprocess_core",
+      config_key: "cli_subprocess_core.provider_runtime_profiles",
+      default_value_when_unset: "normal_provider_cli",
+      fail_closed_action_when_misconfigured: "reject_required_or_invalid_profile"
+    })
+  end
+
+  @doc """
+  Builds the owner-local Phase 6 lower scenario declaration for a runtime profile.
+  """
+  @spec lower_simulation_scenario!(provider(), String.t(), map() | keyword()) ::
+          LowerSimulationScenario.t()
+  def lower_simulation_scenario!(provider, scenario_ref, overrides \\ %{})
+      when is_atom(provider) and is_binary(scenario_ref) do
+    overrides = normalize_overrides!(overrides)
+    provider_ref = Atom.to_string(provider)
+
+    %{
+      scenario_id: scenario_ref,
+      version: "1.0.0",
+      owner_repo: "cli_subprocess_core",
+      route_kind: "provider_runtime_profile",
+      protocol_surface: "process",
+      matcher_class: "deterministic_over_input",
+      status_or_exit_or_response_or_stream_or_chunk_or_fault_shape: %{
+        "exit" => "configured",
+        "stream" => "provider_native_stdout_stderr_frames"
+      },
+      no_egress_assertion: %{
+        "external_egress" => "deny",
+        "process_spawn" => "deny",
+        "side_effect_result" => "not_attempted"
+      },
+      bounded_evidence_projection: %{
+        "contract_version" => "ExecutionPlane.LowerSimulationEvidence.v1",
+        "raw_payload_persistence" => "shape_only",
+        "fingerprints" => ["input", "stdout_shape", "stderr_shape"]
+      },
+      input_fingerprint_ref:
+        "fingerprint://cli-subprocess-core/#{provider_ref}/provider-runtime-profile/input",
+      cleanup_behavior: %{
+        "runtime_artifacts" => "delete",
+        "durable_payload" => "deny_raw"
+      }
+    }
+    |> Map.merge(overrides)
+    |> LowerSimulationScenario.new!()
+  end
 
   @doc """
   Applies an application-configured runtime profile for a provider.
@@ -36,7 +93,8 @@ defmodule CliSubprocessCore.ProviderRuntimeProfile do
       when is_atom(provider) and is_list(provider_options) do
     config = Application.get_env(@app, @config_key)
 
-    with {:ok, required?} <- required?(config, provider),
+    with :ok <- reject_public_simulation_selector(provider_options, provider),
+         {:ok, required?} <- required?(config, provider),
          {:ok, profile} <- configured_profile(config, provider) do
       case profile do
         nil when required? ->
@@ -53,6 +111,31 @@ defmodule CliSubprocessCore.ProviderRuntimeProfile do
 
   def resolve(_provider, provider_options, execution_surface),
     do: {:ok, {provider_options, execution_surface}}
+
+  defp normalize_overrides!(overrides) when is_map(overrides), do: overrides
+
+  defp normalize_overrides!(overrides) when is_list(overrides) do
+    if Keyword.keyword?(overrides) do
+      Map.new(overrides)
+    else
+      raise ArgumentError, "expected keyword overrides, got: #{inspect(overrides)}"
+    end
+  end
+
+  defp normalize_overrides!(overrides) do
+    raise ArgumentError, "expected map or keyword overrides, got: #{inspect(overrides)}"
+  end
+
+  defp reject_public_simulation_selector(provider_options, provider) do
+    if Enum.any?(provider_options, &public_simulation_entry?/1) do
+      {:error, {:public_simulation_selector_forbidden, provider}}
+    else
+      :ok
+    end
+  end
+
+  defp public_simulation_entry?({key, _value}), do: key in [:simulation, "simulation"]
+  defp public_simulation_entry?(_entry), do: false
 
   defp apply_profile(provider, provider_options, %ExecutionSurface{} = execution_surface, profile) do
     with {:ok, @lower_simulation} <- mode(provider, profile),

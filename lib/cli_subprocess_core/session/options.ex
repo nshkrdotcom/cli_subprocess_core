@@ -76,6 +76,7 @@ defmodule CliSubprocessCore.Session.Options do
           | {:provider_profile_mismatch, atom(), atom()}
           | {:invalid_registry, term()}
           | {:unsupported_option, :transport_selector}
+          | {:unsupported_option, :simulation_selector}
           | {:invalid_subscriber, term()}
           | {:invalid_metadata, term()}
           | {:invalid_session_event_tag, term()}
@@ -104,6 +105,7 @@ defmodule CliSubprocessCore.Session.Options do
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
+         :ok <- reject_public_simulation_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
          {:ok, {provider_options, execution_surface}} <-
            ProviderRuntimeProfile.resolve(provider, provider_options, execution_surface),
@@ -227,4 +229,15 @@ defmodule CliSubprocessCore.Session.Options do
       :ok
     end
   end
+
+  defp reject_public_simulation_selector(opts) when is_list(opts) do
+    if Enum.any?(opts, &public_simulation_entry?/1) do
+      {:error, {:unsupported_option, :simulation_selector}}
+    else
+      :ok
+    end
+  end
+
+  defp public_simulation_entry?({key, _value}), do: key in [:simulation, "simulation"]
+  defp public_simulation_entry?(_entry), do: false
 end
