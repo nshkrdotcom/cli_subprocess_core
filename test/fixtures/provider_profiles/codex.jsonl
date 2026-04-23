@@ -1,5 +1,5 @@
 {"type":"response.output_text.delta","delta":"Hel","session_id":"codex-session-1"}
-{"type":"item.completed","item":{"type":"agent_message","content":"Hello","model":"gpt-5-codex"}}
+{"type":"item.completed","item":{"type":"agent_message","content":"Hello","model":"gpt-5.3-codex"}}
 {"type":"item.completed","item":{"type":"reasoning","thinking":"Need tool","signature":"sig-2"}}
 {"type":"item.completed","item":{"type":"tool_call","tool_name":"shell","tool_id":"tool-2","input":{"cmd":"pwd"}}}
 {"type":"item.completed","item":{"type":"tool_result","tool_id":"tool-2","content":"/tmp","is_error":false}}

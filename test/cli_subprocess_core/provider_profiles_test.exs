@@ -84,8 +84,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  cwd: "/tmp/codex",
                  model_payload: %{
                    provider: :codex,
-                   requested_model: "gpt-5-codex",
-                   resolved_model: "gpt-5-codex",
+                   requested_model: "gpt-5.3-codex",
+                   resolved_model: "gpt-5.3-codex",
                    resolution_source: :explicit,
                    reasoning: "high",
                    reasoning_effort: 1.2,
@@ -106,7 +106,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                "exec",
                "--json",
                "--model",
-               "gpt-5-codex",
+               "gpt-5.3-codex",
                "--config",
                ~s(model_reasoning_effort="high"),
                "--skip-git-repo-check",
@@ -282,7 +282,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                Codex.build_invocation(
                  command: "codex-bin",
                  prompt: "review this diff",
-                 model: "gpt-5-codex",
+                 model: "gpt-5.3-codex",
                  reasoning_effort: :high
                )
 
@@ -485,7 +485,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.AssistantDelta{content: "Hel"} = Enum.at(events, 0).payload
       assert Enum.at(events, 0).provider_session_id == "codex-session-1"
 
-      assert %Payload.AssistantMessage{content: ["Hello"], model: "gpt-5-codex"} =
+      assert %Payload.AssistantMessage{content: ["Hello"], model: "gpt-5.3-codex"} =
                Enum.at(events, 1).payload
 
       assert %Payload.Thinking{content: "Need tool", signature: "sig-2"} =
