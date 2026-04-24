@@ -5,7 +5,9 @@ defmodule CliSubprocessCore.MixProject do
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
-  @execution_plane_version "~> 0.1.0"
+  @execution_plane_contracts_version "~> 0.1.0"
+  @execution_plane_jsonrpc_version "~> 0.1.0"
+  @execution_plane_process_version "~> 0.1.0"
 
   def project do
     [
@@ -142,7 +144,9 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
-      execution_plane_dep(),
+      execution_plane_contracts_dep(),
+      execution_plane_jsonrpc_dep(),
+      execution_plane_process_dep(),
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
@@ -151,10 +155,33 @@ defmodule CliSubprocessCore.MixProject do
     ]
   end
 
-  defp execution_plane_dep do
-    case workspace_dep_path("../execution_plane", "CLI_SUBPROCESS_CORE_HEX_DEPS") do
-      nil -> {:execution_plane, @execution_plane_version}
-      path -> {:execution_plane, path: path}
+  defp execution_plane_contracts_dep do
+    case workspace_dep_path(
+           "../execution_plane/core/execution_plane_contracts",
+           "CLI_SUBPROCESS_CORE_HEX_DEPS"
+         ) do
+      nil -> {:execution_plane_contracts, @execution_plane_contracts_version}
+      path -> {:execution_plane_contracts, path: path}
+    end
+  end
+
+  defp execution_plane_jsonrpc_dep do
+    case workspace_dep_path(
+           "../execution_plane/protocols/execution_plane_jsonrpc",
+           "CLI_SUBPROCESS_CORE_HEX_DEPS"
+         ) do
+      nil -> {:execution_plane_jsonrpc, @execution_plane_jsonrpc_version}
+      path -> {:execution_plane_jsonrpc, path: path}
+    end
+  end
+
+  defp execution_plane_process_dep do
+    case workspace_dep_path(
+           "../execution_plane/runtimes/execution_plane_process",
+           "CLI_SUBPROCESS_CORE_HEX_DEPS"
+         ) do
+      nil -> {:execution_plane_process, @execution_plane_process_version}
+      path -> {:execution_plane_process, path: path}
     end
   end
 
