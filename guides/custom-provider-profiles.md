@@ -55,7 +55,7 @@ defmodule MyApp.ProviderProfiles.Example do
   @behaviour CliSubprocessCore.ProviderProfile
 
   alias CliSubprocessCore.{Command, Event, Payload}
-  alias ExecutionPlane.ProcessExit
+  alias CliSubprocessCore, as: Core
 
   @impl true
   def id, do: :example
@@ -97,10 +97,10 @@ defmodule MyApp.ProviderProfiles.Example do
 
   @impl true
   def handle_exit(reason, state) do
-    exit = ProcessExit.from_reason(reason)
+    exit = Core.ProcessExit.from_reason(reason)
 
     {kind, payload} =
-      if ProcessExit.successful?(exit) do
+      if Core.ProcessExit.successful?(exit) do
         {:result,
          Payload.Result.new(
            status: :completed,

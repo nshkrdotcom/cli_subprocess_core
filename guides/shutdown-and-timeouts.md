@@ -26,7 +26,7 @@ If the underlying transport cannot complete the call within the bounded wait
 window, callers see:
 
 ```elixir
-{:error, {:transport, %ExecutionPlane.Process.Transport.Error{reason: :timeout}}}
+{:error, {:transport, error}}
 ```
 
 That timeout protects the caller from hanging forever while still leaving the
@@ -39,7 +39,7 @@ forward an interrupt request to the substrate according to the configured
 transport contract.
 
 The resulting subprocess exit is surfaced as an
-`ExecutionPlane.ProcessExit`.
+the core-owned `ProcessExit` facade.
 
 ## EOF
 
@@ -81,7 +81,7 @@ Transport-facing lifecycle APIs use bounded waits so callers do not hang
 forever when the underlying transport is blocked, dead, or mid-shutdown.
 
 Normalized call-time failures still surface as
-`ExecutionPlane.Process.Transport.Error` reasons such as:
+`TransportError` reasons such as:
 
 - `:not_connected`
 - `:timeout`

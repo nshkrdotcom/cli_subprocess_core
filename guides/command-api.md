@@ -74,7 +74,7 @@ The returned core-owned result contains:
 - `stderr_mode`
 - `exit`
 
-`exit` is an `ExecutionPlane.ProcessExit`.
+`exit` is the core-owned `ProcessExit` facade.
 
 ## Error Shape
 
@@ -82,4 +82,4 @@ Command-lane failures are wrapped as `CliSubprocessCore.Command.Error`.
 
 That wrapper preserves core-facing context such as the invocation or provider
 while carrying the underlying lower-lane failure from `execution_plane`.
-Transport failures surface as `ExecutionPlane.Process.Transport.Error`.
+Transport failures surface through the core-owned `TransportError` facade.

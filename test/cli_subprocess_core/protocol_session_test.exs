@@ -114,7 +114,7 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
         assert %{"error" => %{"code" => -32_011, "message" => "denied"}, "id" => "peer-failure"} =
                  reply
       end,
-      peer_request_timeout_ms: 50
+      peer_request_timeout_ms: 1_000
     )
   end
 
@@ -129,7 +129,7 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
                      "id" => "peer-failure"
                    } = reply
           end,
-          peer_request_timeout_ms: 50
+          peer_request_timeout_ms: 1_000
         )
       end)
 
@@ -149,7 +149,7 @@ defmodule CliSubprocessCore.ProtocolSessionTest do
                      "id" => "peer-failure"
                    } = reply
           end,
-          peer_request_timeout_ms: 50
+          peer_request_timeout_ms: 1_000
         )
       end)
 

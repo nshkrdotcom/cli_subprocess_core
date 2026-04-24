@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.MixProject do
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
+  @execution_plane_version "~> 0.1.0"
 
   def project do
     [
@@ -141,13 +142,46 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
-      {:execution_plane, path: "../execution_plane"},
+      execution_plane_dep(),
       {:jason, "~> 1.4"},
       {:zoi, "~> 0.17"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
+  end
+
+  defp execution_plane_dep do
+    case workspace_dep_path("../execution_plane", "CLI_SUBPROCESS_CORE_HEX_DEPS") do
+      nil -> {:execution_plane, @execution_plane_version}
+      path -> {:execution_plane, path: path}
+    end
+  end
+
+  defp workspace_dep_path(relative_path, force_hex_env) do
+    if prefer_workspace_paths?(force_hex_env) do
+      path = Path.expand(relative_path, __DIR__)
+      if File.dir?(path), do: path
+    end
+  end
+
+  defp prefer_workspace_paths?(force_hex_env) do
+    workspace_paths_forced?(force_hex_env) or
+      (not release_deps_forced?(force_hex_env) and not Enum.member?(Path.split(__DIR__), "deps"))
+  end
+
+  defp release_deps_forced?(force_hex_env) do
+    force_hex_deps?(force_hex_env) or
+      Enum.any?(System.argv(), &(&1 in ["hex.build", "hex.publish"]))
+  end
+
+  defp workspace_paths_forced?(force_hex_env) do
+    not force_hex_deps?(force_hex_env) and
+      System.get_env("FORCE_WORKSPACE_PATH_DEPS") in ["1", "true", "TRUE", "yes", "YES"]
+  end
+
+  defp force_hex_deps?(force_hex_env) do
+    System.get_env(force_hex_env) in ["1", "true", "TRUE", "yes", "YES"]
   end
 
   defp dialyzer do

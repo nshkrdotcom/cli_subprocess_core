@@ -33,7 +33,7 @@ outer mailbox shape.
 `Session.info/1` exposes transport data through the extracted substrate:
 
 - `info.transport.module` is `ExecutionPlane.Process.Transport`
-- `info.transport.info` is `ExecutionPlane.Process.Transport.Info`
+- `info.transport.info` is recognized by `TransportInfo`
   from the shared Execution Plane transport snapshot
 - `info.transport.status` reflects the normalized transport status
 

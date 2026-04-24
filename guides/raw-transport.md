@@ -18,9 +18,9 @@ when you want exact-byte stdin/stdout defaults without provider parsing.
   execution options
 - `ExecutionPlane.Process.Transport.RunResult` for captured direct transport
   execution results
-- `ExecutionPlane.Process.Transport.Error` for direct transport failures
-- `ExecutionPlane.Process.Transport.Info` for transport metadata snapshots
-- `ExecutionPlane.ProcessExit` for normalized process exits
+- `TransportError` for direct transport failures
+- `TransportInfo` for transport metadata snapshots
+- `ProcessExit` for normalized process exits
 
 ## Start A Raw Session
 
@@ -124,17 +124,17 @@ Legacy subscribers receive:
 
 - `{:transport_message, line}`
 - `{:transport_data, chunk}`
-- `{:transport_error, %ExecutionPlane.Process.Transport.Error{}}`
+- `{:transport_error, error}` where `TransportError.match?(error)` is true
 - `{:transport_stderr, chunk}`
-- `{:transport_exit, %ExecutionPlane.ProcessExit{}}`
+- `{:transport_exit, exit}` where `ProcessExit.match?(exit)` is true
 
 Tagged subscribers receive:
 
 - `{event_tag, ref, {:message, line}}`
 - `{event_tag, ref, {:data, chunk}}`
-- `{event_tag, ref, {:error, %ExecutionPlane.Process.Transport.Error{}}}`
+- `{event_tag, ref, {:error, error}}` where `TransportError.match?(error)` is true
 - `{event_tag, ref, {:stderr, chunk}}`
-- `{event_tag, ref, {:exit, %ExecutionPlane.ProcessExit{}}}`
+- `{event_tag, ref, {:exit, exit}}` where `ProcessExit.match?(exit)` is true
 
 Use `ExecutionPlane.Process.Transport.extract_event/2` instead of
 hard-coding the outer event atom:
@@ -168,12 +168,13 @@ active stdin mode:
 
 `end_input/1` sends EOF through the active stdin contract. `interrupt/1`
 follows the transport-owned interrupt contract and surfaces the resulting exit
-as an `ExecutionPlane.ProcessExit`.
+as a `ProcessExit` facade value.
 
 ## Metadata
 
 `CliSubprocessCore.RawSession.info/1` includes a `transport` entry containing
-`%ExecutionPlane.Process.Transport.Info{}` from the shared Execution Plane
+transport metadata recognized by `TransportInfo.match?/1`
+from the shared Execution Plane
 transport snapshot.
 
 That transport snapshot carries:

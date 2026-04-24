@@ -57,7 +57,7 @@ Legacy subscribers receive:
 {:channel_message, line}
 {:channel_data, chunk}
 {:channel_stderr, chunk}
-{:channel_exit, %ExecutionPlane.ProcessExit{}}
+{:channel_exit, exit}
 {:channel_error, reason}
 ```
 
@@ -67,7 +67,7 @@ Tagged subscribers receive:
 {:cli_subprocess_core_channel, ref, {:message, line}}
 {:cli_subprocess_core_channel, ref, {:data, chunk}}
 {:cli_subprocess_core_channel, ref, {:stderr, chunk}}
-{:cli_subprocess_core_channel, ref, {:exit, %ExecutionPlane.ProcessExit{}}}
+{:cli_subprocess_core_channel, ref, {:exit, exit}}
 {:cli_subprocess_core_channel, ref, {:error, reason}}
 ```
 
