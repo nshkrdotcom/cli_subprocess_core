@@ -156,59 +156,39 @@ defmodule CliSubprocessCore.MixProject do
   end
 
   defp execution_plane_contracts_dep do
-    case workspace_dep_path(
-           "../execution_plane/core/execution_plane_contracts",
-           "CLI_SUBPROCESS_CORE_HEX_DEPS"
-         ) do
+    case local_dep_path("../execution_plane/core/execution_plane_contracts") do
       nil -> {:execution_plane_contracts, @execution_plane_contracts_version}
       path -> {:execution_plane_contracts, path: path}
     end
   end
 
   defp execution_plane_jsonrpc_dep do
-    case workspace_dep_path(
-           "../execution_plane/protocols/execution_plane_jsonrpc",
-           "CLI_SUBPROCESS_CORE_HEX_DEPS"
-         ) do
+    case local_dep_path("../execution_plane/protocols/execution_plane_jsonrpc") do
       nil -> {:execution_plane_jsonrpc, @execution_plane_jsonrpc_version}
       path -> {:execution_plane_jsonrpc, path: path}
     end
   end
 
   defp execution_plane_process_dep do
-    case workspace_dep_path(
-           "../execution_plane/runtimes/execution_plane_process",
-           "CLI_SUBPROCESS_CORE_HEX_DEPS"
-         ) do
+    case local_dep_path("../execution_plane/runtimes/execution_plane_process") do
       nil -> {:execution_plane_process, @execution_plane_process_version}
       path -> {:execution_plane_process, path: path}
     end
   end
 
-  defp workspace_dep_path(relative_path, force_hex_env) do
-    if prefer_workspace_paths?(force_hex_env) do
+  defp local_dep_path(relative_path) do
+    if local_workspace_deps?() do
       path = Path.expand(relative_path, __DIR__)
       if File.dir?(path), do: path
     end
   end
 
-  defp prefer_workspace_paths?(force_hex_env) do
-    workspace_paths_forced?(force_hex_env) or
-      (not release_deps_forced?(force_hex_env) and not Enum.member?(Path.split(__DIR__), "deps"))
+  defp local_workspace_deps? do
+    not hex_packaging_task?() and not Enum.member?(Path.split(__DIR__), "deps")
   end
 
-  defp release_deps_forced?(force_hex_env) do
-    force_hex_deps?(force_hex_env) or
-      Enum.any?(System.argv(), &(&1 in ["hex.build", "hex.publish"]))
-  end
-
-  defp workspace_paths_forced?(force_hex_env) do
-    not force_hex_deps?(force_hex_env) and
-      System.get_env("FORCE_WORKSPACE_PATH_DEPS") in ["1", "true", "TRUE", "yes", "YES"]
-  end
-
-  defp force_hex_deps?(force_hex_env) do
-    System.get_env(force_hex_env) in ["1", "true", "TRUE", "yes", "YES"]
+  defp hex_packaging_task? do
+    Enum.any?(System.argv(), &(&1 in ["hex.build", "hex.publish"]))
   end
 
   defp dialyzer do
