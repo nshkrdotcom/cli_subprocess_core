@@ -1,52 +1,30 @@
 {
   "provider": "claude",
-  "catalog_version": "2026-03-25",
-  "remote_default": "opus",
+  "catalog_version": "2026-04-23",
+  "remote_default": "sonnet",
   "models": [
-    {
-      "id": "opus",
-      "aliases": [
-        "default",
-        "claude-opus-4-6"
-      ],
-      "visibility": "public",
-      "family": "claude",
-      "default": true,
-      "metadata": {
-        "description": "Default Claude model."
-      }
-    },
     {
       "id": "sonnet",
       "aliases": [
+        "default",
         "claude-sonnet-4-6"
       ],
       "visibility": "public",
       "family": "claude",
-      "metadata": {
-        "description": "Balanced Claude model."
-      }
-    },
-    {
-      "id": "haiku",
-      "aliases": [
-        "claude-haiku-4-5-20251001"
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
       ],
-      "visibility": "public",
-      "family": "claude",
+      "default": true,
       "metadata": {
-        "description": "Fast Claude model."
-      }
-    },
-    {
-      "id": "opus[1m]",
-      "aliases": [
-        "claude-opus-4-6[1m]"
-      ],
-      "visibility": "public",
-      "family": "claude",
-      "metadata": {
-        "description": "Extended Opus context window."
+        "display_name": "Sonnet 4.6",
+        "description": "Default recommended Claude model. Best for everyday tasks.",
+        "context_window_tokens": 200000,
+        "max_output_tokens": 64000,
+        "input_price_per_mtok_usd": 3,
+        "output_price_per_mtok_usd": 15
       }
     },
     {
@@ -56,8 +34,82 @@
       ],
       "visibility": "public",
       "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
       "metadata": {
-        "description": "Extended Sonnet context window."
+        "display_name": "Sonnet 4.6 (1M context)",
+        "description": "Sonnet 4.6 with 1M context.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 64000,
+        "input_price_per_mtok_usd": 3,
+        "output_price_per_mtok_usd": 15
+      }
+    },
+    {
+      "id": "opus",
+      "aliases": [
+        "claude-opus-4-7"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Opus 4.7",
+        "description": "Most capable Claude model for complex work.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 5,
+        "output_price_per_mtok_usd": 25
+      }
+    },
+    {
+      "id": "opus[1m]",
+      "aliases": [
+        "claude-opus-4-7[1m]"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Opus 4.7 (1M context)",
+        "description": "Opus 4.7 with 1M context.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 5,
+        "output_price_per_mtok_usd": 25
+      }
+    },
+    {
+      "id": "haiku",
+      "aliases": [
+        "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Haiku 4.5",
+        "description": "Fastest Claude model for quick answers.",
+        "context_window_tokens": 200000,
+        "max_output_tokens": 64000,
+        "input_price_per_mtok_usd": 1,
+        "output_price_per_mtok_usd": 5
       }
     },
     {

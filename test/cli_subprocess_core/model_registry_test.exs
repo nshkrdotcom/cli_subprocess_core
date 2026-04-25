@@ -36,6 +36,10 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:gemini, nil)
       assert payload.resolution_source == :default
       assert payload.resolved_model == "gemini-2.5-pro"
+
+      assert {:ok, %Selection{} = claude_payload} = ModelRegistry.resolve(:claude, nil)
+      assert claude_payload.resolution_source == :default
+      assert claude_payload.resolved_model == "sonnet"
     end
 
     test "errors on empty or placeholder model input" do
@@ -62,6 +66,23 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.reasoning == "high"
       assert is_number(payload.reasoning_effort)
       assert payload.normalized_reasoning_effort == payload.reasoning_effort
+    end
+
+    test "normalizes Claude effort support from the catalog" do
+      assert {:ok, %Selection{} = sonnet_payload} =
+               ModelRegistry.resolve(:claude, "sonnet", reasoning_effort: :max)
+
+      assert sonnet_payload.reasoning == "max"
+
+      assert {:ok, %Selection{} = opus_payload} =
+               ModelRegistry.resolve(:claude, "opus", reasoning_effort: :xhigh)
+
+      assert opus_payload.reasoning == "xhigh"
+
+      assert {:error, {:invalid_reasoning_effort, :xhigh, allowed_efforts, :claude}} =
+               ModelRegistry.resolve(:claude, "sonnet", reasoning_effort: :xhigh)
+
+      assert Enum.sort(allowed_efforts) == ["high", "low", "max", "medium"]
     end
 
     test "errors on invalid reasoning effort" do
@@ -230,6 +251,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
       assert {:ok, "gpt-5.4"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
     end
 
     test "hard fails when Claude Ollama backend has no explicit external default" do

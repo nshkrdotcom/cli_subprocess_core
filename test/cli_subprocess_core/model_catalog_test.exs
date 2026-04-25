@@ -26,7 +26,35 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert Enum.any?(claude_catalog.models, &(&1.id == "sonnet"))
+      assert claude_catalog.catalog_version == "2026-04-23"
+      assert claude_catalog.remote_default == "sonnet"
+
+      assert Enum.map(claude_catalog.models, & &1.id) == [
+               "sonnet",
+               "sonnet[1m]",
+               "opus",
+               "opus[1m]",
+               "haiku",
+               "legacy-sonnet"
+             ]
+
+      assert Enum.any?(claude_catalog.models, fn model ->
+               model.id == "opus" and "claude-opus-4-7" in model.aliases
+             end)
+
+      assert Enum.find(claude_catalog.models, &(&1.id == "sonnet")).reasoning_efforts
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium"]
+
+      assert Enum.find(claude_catalog.models, &(&1.id == "opus")).reasoning_efforts
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
+
+      assert Enum.find(claude_catalog.models, &(&1.id == "haiku")).reasoning_efforts == %{}
+
+      refute Enum.any?(claude_catalog.models, fn model ->
+               "claude-opus-4-6" in model.aliases
+             end)
 
       assert {:ok, gemini_catalog} = ModelCatalog.load(:gemini)
       assert gemini_catalog.provider == :gemini
