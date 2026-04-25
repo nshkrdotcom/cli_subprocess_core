@@ -9,10 +9,15 @@ defmodule CliSubprocessCore.Command do
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
   alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
   alias ExecutionPlane.Command, as: RuntimeCommand
+  alias ExecutionPlane.Contracts.FailureClass
+  alias ExecutionPlane.ExecutionRef
+  alias ExecutionPlane.ExecutionRequest
+  alias ExecutionPlane.ExecutionResult
   alias ExecutionPlane.Process, as: ExecutionPlaneProcess
   alias ExecutionPlane.Process.Transport, as: RuntimeTransport
   alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
   alias ExecutionPlane.ProcessExit
+  alias ExecutionPlane.Provenance
 
   @enforce_keys [:command]
   defstruct command: nil, args: [], cwd: nil, env: %{}, clear_env?: false, user: nil
@@ -224,8 +229,8 @@ defmodule CliSubprocessCore.Command do
     execution_surface = Options.execution_surface(options)
 
     invocation
-    |> execution_plane_request(options, execution_surface)
-    |> ExecutionPlaneProcess.run(lineage: execution_plane_lineage(execution_surface))
+    |> execution_plane_execution_request(options, execution_surface)
+    |> ExecutionPlaneProcess.execute(lineage: execution_plane_lineage(execution_surface))
     |> normalize_execution_plane_run(invocation, options, execution_surface)
   end
 
@@ -255,8 +260,8 @@ defmodule CliSubprocessCore.Command do
     end
   end
 
-  defp execution_plane_request(invocation, %Options{} = options, execution_surface) do
-    %{
+  defp execution_plane_execution_request(invocation, %Options{} = options, execution_surface) do
+    payload = %{
       command: invocation.command,
       argv: invocation.args,
       cwd: invocation.cwd,
@@ -270,6 +275,17 @@ defmodule CliSubprocessCore.Command do
       execution_surface: %{surface_kind: Atom.to_string(execution_surface.surface_kind)},
       target_id: execution_surface.target_id
     }
+
+    ExecutionRequest.new!(
+      execution_ref: ExecutionRef.new!().ref,
+      lane_id: "process",
+      operation: "process.run",
+      payload: payload,
+      provenance:
+        Provenance.direct_lower_lane_owner("cli_subprocess_core", %{
+          "surface_kind" => Atom.to_string(execution_surface.surface_kind)
+        })
+    )
   end
 
   defp execution_plane_lineage(execution_surface) do
@@ -282,6 +298,39 @@ defmodule CliSubprocessCore.Command do
         surface_kind: Atom.to_string(execution_surface.surface_kind)
       }
     }
+  end
+
+  defp normalize_execution_plane_run(
+         {:ok, %ExecutionResult{} = result},
+         invocation,
+         %Options{} = options,
+         _surface
+       ) do
+    {:ok, execution_plane_run_result(result, invocation, options)}
+  end
+
+  defp normalize_execution_plane_run(
+         {:error, %ExecutionResult{} = result},
+         invocation,
+         %Options{} = options,
+         execution_surface
+       ) do
+    outcome = execution_plane_result_outcome(result)
+
+    case outcome_get(outcome, :failure) do
+      nil ->
+        {:ok, execution_plane_run_result(result, invocation, options)}
+
+      failure ->
+        raw_payload = outcome_get(outcome, :raw_payload, %{})
+
+        error =
+          failure
+          |> execution_plane_transport_error(raw_payload, execution_surface)
+          |> Error.transport_error(%{invocation: invocation})
+
+        {:error, error}
+    end
   end
 
   defp normalize_execution_plane_run({:ok, result}, invocation, %Options{} = options, _surface) do
@@ -311,6 +360,23 @@ defmodule CliSubprocessCore.Command do
     {:error, error}
   end
 
+  defp execution_plane_run_result(%ExecutionResult{} = result, invocation, %Options{} = options) do
+    raw_payload =
+      result
+      |> execution_plane_result_outcome()
+      |> outcome_get(:raw_payload, %{})
+
+    %RunResult{
+      invocation: invocation,
+      output: payload_get(raw_payload, :output, ""),
+      stdout: payload_get(raw_payload, :stdout, ""),
+      stderr: payload_get(raw_payload, :stderr, ""),
+      exit: normalize_execution_plane_exit(payload_get(raw_payload, :exit, %{})),
+      stderr_mode: options.stderr,
+      execution_provenance: result.provenance
+    }
+  end
+
   defp execution_plane_run_result(result, invocation, %Options{} = options) do
     raw_payload = result.outcome.raw_payload
 
@@ -324,6 +390,18 @@ defmodule CliSubprocessCore.Command do
     }
   end
 
+  defp execution_plane_result_outcome(%ExecutionResult{output: %{"outcome" => outcome}}),
+    do: outcome
+
+  defp execution_plane_result_outcome(%ExecutionResult{output: %{outcome: outcome}}),
+    do: outcome
+
+  defp outcome_get(outcome, key, default \\ nil) when is_map(outcome),
+    do: Map.get(outcome, key, Map.get(outcome, Atom.to_string(key), default))
+
+  defp payload_get(payload, key, default \\ nil) when is_map(payload),
+    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key), default))
+
   defp normalize_execution_plane_exit(exit) when is_map(exit) do
     %ProcessExit{
       status: Map.get(exit, :status) || Map.get(exit, "status") || :error,
@@ -335,32 +413,62 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp execution_plane_transport_error(failure, raw_payload, execution_surface) do
+    failure_class = failure_get(failure, :failure_class)
+    raw_payload = normalize_raw_payload(raw_payload)
+
     context = %{
-      failure_class: failure.failure_class,
+      failure_class: normalize_failure_class(failure_class),
       raw_payload: raw_payload,
       surface_kind: execution_surface.surface_kind
     }
 
-    case {failure.failure_class, raw_payload} do
+    case {context.failure_class, raw_payload} do
       {:timeout, _payload} ->
         RuntimeTransportError.transport_error(:timeout, context)
 
-      {_, %{send_failed: reason}} ->
+      {_failure_class, payload} when is_map(payload) ->
+        transport_error_from_payload(payload, failure, context)
+    end
+  end
+
+  defp transport_error_from_payload(payload, failure, context) do
+    cond do
+      reason = payload_get(payload, :send_failed) ->
         RuntimeTransportError.transport_error({:send_failed, reason}, context)
 
-      {_, %{command: command}} when is_binary(command) ->
+      command = payload_get(payload, :command) ->
         RuntimeTransportError.transport_error({:command_not_found, command}, context)
 
-      {_, %{cwd: cwd}} when is_binary(cwd) ->
+      cwd = payload_get(payload, :cwd) ->
         RuntimeTransportError.transport_error({:cwd_not_found, cwd}, context)
 
-      _other ->
+      true ->
         RuntimeTransportError.transport_error(
-          {:startup_failed, failure.reason || failure.failure_class},
+          {:startup_failed, failure_get(failure, :reason) || context.failure_class},
           context
         )
     end
   end
+
+  defp failure_get(failure, key) when is_map(failure),
+    do: Map.get(failure, key, Map.get(failure, Atom.to_string(key)))
+
+  defp normalize_failure_class(value) when is_binary(value) do
+    FailureClass.normalize!(value)
+  rescue
+    ArgumentError -> value
+  end
+
+  defp normalize_failure_class(value), do: value
+
+  defp normalize_raw_payload(payload) when is_map(payload) do
+    Map.new(payload, fn {key, value} -> {normalize_payload_key(key), value} end)
+  end
+
+  defp normalize_payload_key("command"), do: :command
+  defp normalize_payload_key("cwd"), do: :cwd
+  defp normalize_payload_key("send_failed"), do: :send_failed
+  defp normalize_payload_key(key), do: key
 
   defp normalize_env(env) when is_map(env) do
     Map.new(env, fn {key, value} ->

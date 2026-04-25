@@ -5,7 +5,7 @@ defmodule CliSubprocessCore.MixProject do
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
-  @execution_plane_contracts_version "~> 0.1.0"
+  @execution_plane_version "~> 0.1.0"
   @execution_plane_jsonrpc_version "~> 0.1.0"
   @execution_plane_process_version "~> 0.1.0"
 
@@ -144,7 +144,7 @@ defmodule CliSubprocessCore.MixProject do
 
   defp deps do
     [
-      execution_plane_contracts_dep(),
+      execution_plane_dep(),
       execution_plane_jsonrpc_dep(),
       execution_plane_process_dep(),
       {:jason, "~> 1.4"},
@@ -155,10 +155,10 @@ defmodule CliSubprocessCore.MixProject do
     ]
   end
 
-  defp execution_plane_contracts_dep do
-    case local_dep_path("../execution_plane/core/execution_plane_contracts") do
-      nil -> {:execution_plane_contracts, @execution_plane_contracts_version}
-      path -> {:execution_plane_contracts, path: path}
+  defp execution_plane_dep do
+    case local_dep_path("../execution_plane") do
+      nil -> {:execution_plane, @execution_plane_version}
+      path -> {:execution_plane, path: path}
     end
   end
 

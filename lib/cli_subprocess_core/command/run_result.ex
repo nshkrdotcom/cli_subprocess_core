@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.Command.RunResult do
   alias CliSubprocessCore.Command
   alias ExecutionPlane.Process.Transport.RunResult, as: RuntimeRunResult
   alias ExecutionPlane.ProcessExit
+  alias ExecutionPlane.Provenance
 
   @enforce_keys [:invocation, :exit]
   defstruct invocation: nil,
@@ -13,7 +14,8 @@ defmodule CliSubprocessCore.Command.RunResult do
             stdout: "",
             stderr: "",
             exit: nil,
-            stderr_mode: :separate
+            stderr_mode: :separate,
+            execution_provenance: nil
 
   @type stderr_mode :: :separate | :stdout
 
@@ -23,7 +25,8 @@ defmodule CliSubprocessCore.Command.RunResult do
           stdout: binary(),
           stderr: binary(),
           exit: ProcessExit.t(),
-          stderr_mode: stderr_mode()
+          stderr_mode: stderr_mode(),
+          execution_provenance: Provenance.t() | nil
         }
 
   @spec success?(t()) :: boolean()

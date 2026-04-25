@@ -26,6 +26,10 @@ lane now run on `execution_plane`. `cli_subprocess_core` keeps one public
 placement seam, `execution_surface`, while the shared lower substrate for
 local and non-local runtime execution now lives in `execution_plane`.
 
+Downstream provider SDKs get this default local CLI execution path by depending
+on `cli_subprocess_core`; they do not need to declare Execution Plane packages
+manually for ordinary subprocess use.
+
 For downstream packages that still type against the historical module name,
 `CliSubprocessCore.ExecutionSurface` remains available as a compatibility
 facade over `ExecutionPlane.Process.Transport.Surface`.
@@ -160,7 +164,9 @@ form.
 
 For `CliSubprocessCore.Command.run/1,2`, `surface_kind: :local_subprocess`
 now emits `ProcessExecutionIntent.v1` and delegates the covered minimal one-shot
-lane to `ExecutionPlane.Process.run/2`. Non-local command placement and the
+lane to `ExecutionPlane.Process.run/2` with direct lower-lane-owner
+provenance. That provenance is an honest standalone lane-owner claim; it is not
+node-admitted Citadel governance. Non-local command placement and the
 session-bearing APIs resolve through `ExecutionPlane.Process.Transport`.
 
 ## Documentation

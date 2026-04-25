@@ -78,6 +78,9 @@ defmodule CliSubprocessCore.ExecutionPlaneIntegrationTest do
 
     assert result.invocation.command == script
     assert result.output == "runner-ok"
+    assert result.execution_provenance.kind == "direct_lower_lane_owner"
+    assert result.execution_provenance.owner == "cli_subprocess_core"
+    assert result.execution_provenance.details == %{"surface_kind" => "local_subprocess"}
   end
 
   defp create_test_script(body) do
