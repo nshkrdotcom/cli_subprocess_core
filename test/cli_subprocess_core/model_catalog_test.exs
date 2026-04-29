@@ -58,7 +58,26 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, gemini_catalog} = ModelCatalog.load(:gemini)
       assert gemini_catalog.provider == :gemini
-      assert Enum.any?(gemini_catalog.models, &(&1.id == "gemini-2.5-pro"))
+      assert gemini_catalog.catalog_version == "2026-04-28"
+      assert gemini_catalog.remote_default == "auto-gemini-3"
+
+      assert Enum.map(gemini_catalog.models, & &1.id) == [
+               "auto-gemini-3",
+               "auto-gemini-2.5",
+               "pro",
+               "flash",
+               "flash-lite",
+               "gemini-3.1-pro-preview",
+               "gemini-3-flash-preview",
+               "gemini-3.1-flash-lite-preview",
+               "gemini-2.5-pro",
+               "gemini-2.5-flash",
+               "gemini-2.5-flash-lite"
+             ]
+
+      assert Enum.find(gemini_catalog.models, &(&1.id == "auto-gemini-3")).metadata[
+               "cli_virtual_model"
+             ] == true
 
       assert {:ok, amp_catalog} = ModelCatalog.load(:amp)
       assert amp_catalog.provider == :amp

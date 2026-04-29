@@ -1,30 +1,124 @@
 {
   "provider": "gemini",
-  "catalog_version": "2026-03-25",
-  "remote_default": "gemini-2.5-pro",
+  "catalog_version": "2026-04-28",
+  "remote_default": "auto-gemini-3",
   "models": [
     {
-      "id": "gemini-2.5-pro",
+      "id": "auto-gemini-3",
       "aliases": [
-        "pro",
         "default"
       ],
       "visibility": "public",
-      "family": "gemini",
+      "family": "gemini-auto",
       "default": true,
       "metadata": {
-        "description": "Default Gemini model."
+        "display_name": "Auto (Gemini 3)",
+        "description": "Gemini CLI automatic routing for Gemini 3 models.",
+        "cli_virtual_model": true
+      }
+    },
+    {
+      "id": "auto-gemini-2.5",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini-auto",
+      "metadata": {
+        "display_name": "Auto (Gemini 2.5)",
+        "description": "Gemini CLI automatic routing for Gemini 2.5 models.",
+        "cli_virtual_model": true
+      }
+    },
+    {
+      "id": "pro",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini-cli-alias",
+      "metadata": {
+        "display_name": "Pro",
+        "description": "Gemini CLI pro model alias.",
+        "cli_virtual_model": true
+      }
+    },
+    {
+      "id": "flash",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini-cli-alias",
+      "metadata": {
+        "display_name": "Flash",
+        "description": "Gemini CLI flash model alias.",
+        "cli_virtual_model": true
+      }
+    },
+    {
+      "id": "flash-lite",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini-cli-alias",
+      "metadata": {
+        "display_name": "Flash-Lite",
+        "description": "Gemini CLI flash-lite model alias.",
+        "cli_virtual_model": true
+      }
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3.1 Pro Preview",
+        "description": "Gemini 3.1 preview pro model."
+      }
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3 Flash Preview",
+        "description": "Gemini 3 preview flash model."
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3.1 Flash-Lite Preview",
+        "description": "Gemini 3.1 preview flash-lite model."
+      }
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 2.5 Pro",
+        "description": "Gemini 2.5 pro model."
       }
     },
     {
       "id": "gemini-2.5-flash",
-      "aliases": [
-        "flash"
-      ],
-      "visibility": "restricted",
+      "aliases": [],
+      "visibility": "public",
       "family": "gemini",
       "metadata": {
-        "description": "Restricted fast-mode model."
+        "display_name": "Gemini 2.5 Flash",
+        "description": "Gemini 2.5 flash model."
+      }
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 2.5 Flash-Lite",
+        "description": "Gemini 2.5 flash-lite model."
       }
     }
   ]

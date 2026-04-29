@@ -35,7 +35,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     test "falls back to provider default when no request or env model" do
       assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:gemini, nil)
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gemini-2.5-pro"
+      assert payload.resolved_model == "auto-gemini-3"
 
       assert {:ok, %Selection{} = claude_payload} = ModelRegistry.resolve(:claude, nil)
       assert claude_payload.resolution_source == :default
@@ -252,6 +252,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     test "returns the default model id for provider defaults" do
       assert {:ok, "gpt-5.4"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
+      assert {:ok, "auto-gemini-3"} = ModelRegistry.default_model(:gemini)
     end
 
     test "hard fails when Claude Ollama backend has no explicit external default" do
@@ -270,8 +271,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.validate/2" do
     test "returns model metadata for a known model" do
-      assert {:ok, model} = ModelRegistry.validate(:gemini, "gemini-2.5-pro")
-      assert model.id == "gemini-2.5-pro"
+      assert {:ok, model} = ModelRegistry.validate(:gemini, "gemini-3.1-flash-lite-preview")
+      assert model.id == "gemini-3.1-flash-lite-preview"
+    end
+
+    test "returns model metadata for Gemini CLI virtual model ids" do
+      assert {:ok, model} = ModelRegistry.validate(:gemini, "auto-gemini-3")
+      assert model.id == "auto-gemini-3"
+
+      assert {:ok, alias_model} = ModelRegistry.validate(:gemini, "default")
+      assert alias_model.id == "auto-gemini-3"
+
+      assert {:ok, pro_alias} = ModelRegistry.validate(:gemini, "pro")
+      assert pro_alias.id == "pro"
     end
 
     test "returns hard error for invalid or unknown model" do
