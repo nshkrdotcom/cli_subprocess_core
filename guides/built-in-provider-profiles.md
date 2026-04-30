@@ -180,6 +180,21 @@ Examples:
 - Gemini advertises sandbox and extension support.
 - Amp advertises approval, MCP config, thinking, and tool use.
 
+The coarse `:tools` profile capability means the profile can normalize observed
+provider tool events. It is not a common host-tool admission signal. Use
+`CliSubprocessCore.ProviderFeatures.tool_capabilities!/1` for the decomposed
+tool contract:
+
+- `:tool_events` and `:tool_results` are normalized observation support.
+- `:host_tools` is currently `false` for every built-in profile.
+- provider tool allowlists, denylists, MCP servers, built-ins, and no-tool modes
+  are `:unknown` at the common core contract until provider SDK evidence proves
+  a narrower native behavior.
+
+Provider SDKs own any provider-specific tool rendering or settings. Core
+profiles must not turn Gemini settings, Claude hooks/MCP, Codex app-server
+payloads, or Amp tool configuration into shared semantics.
+
 ## Example
 
 ```elixir

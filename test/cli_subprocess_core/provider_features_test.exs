@@ -51,4 +51,41 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert gemini.supported? == false
     assert amp.supported? == false
   end
+
+  test "tool capability metadata separates observation from host execution" do
+    for provider <- [:amp, :claude, :codex, :gemini] do
+      tool_capabilities = ProviderFeatures.tool_capabilities!(provider)
+
+      assert Map.take(tool_capabilities, ProviderFeatures.tool_capability_keys()) ==
+               %{
+                 tool_events: true,
+                 tool_results: true,
+                 host_tools: false,
+                 tool_allowlist: :unknown,
+                 tool_denylist: :unknown,
+                 mcp_servers: :unknown,
+                 provider_builtin_tools: :unknown,
+                 no_tool_mode: :unknown
+               }
+
+      assert is_list(tool_capabilities.notes)
+      assert ProviderFeatures.tool_capability!(provider, :tool_events) == true
+      assert ProviderFeatures.tool_capability!(provider, :tool_results) == true
+      assert ProviderFeatures.tool_capability!(provider, :host_tools) == false
+    end
+  end
+
+  test "coarse provider profile tools hints are not host tool admission" do
+    profile_modules = [
+      CliSubprocessCore.ProviderProfiles.Amp,
+      CliSubprocessCore.ProviderProfiles.Claude,
+      CliSubprocessCore.ProviderProfiles.Codex,
+      CliSubprocessCore.ProviderProfiles.Gemini
+    ]
+
+    for profile_module <- profile_modules do
+      assert :tools in profile_module.capabilities()
+      assert ProviderFeatures.tool_capability!(profile_module.id(), :host_tools) == false
+    end
+  end
 end

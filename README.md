@@ -46,6 +46,8 @@ facade over `ExecutionPlane.Process.Transport.Surface`.
   planning and parsing.
 - `CliSubprocessCore.Event`, `CliSubprocessCore.Payload.*`, and
   `CliSubprocessCore.Runtime` for the shared runtime vocabulary.
+- `CliSubprocessCore.Tool.*` for serializable tool descriptors, requests, and
+  responses that contain no executable host callbacks.
 - `CliSubprocessCore.ModelRegistry`, `CliSubprocessCore.ModelInput`, and
   related catalog helpers for centralized model policy.
 
@@ -193,6 +195,8 @@ instead of flattening them away inside provider defaults.
   `buffer_overflow_mode`
 - the common capability vocabulary now has a stable place for session-history, resume, pause, and
   intervention support
+- tool capability metadata separates normalized `tool_use`/`tool_result` observation from
+  host-executable tools and provider-native tool controls
 - higher layers can reason about fatal data-loss boundaries without re-inventing transport-specific
   heuristics
 

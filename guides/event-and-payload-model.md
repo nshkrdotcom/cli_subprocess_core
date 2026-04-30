@@ -111,6 +111,19 @@ Common examples:
 - `CliSubprocessCore.Payload.Raw` retains unnormalized material when a provider
   event does not map cleanly to a richer normalized struct yet.
 
+Tool payloads are observation data only. They are serializable normalized facts
+about provider CLI output and do not carry BEAM callbacks, MFA tuples, PIDs,
+ports, registries, MCP routes, app-server routes, or any host-executable tool
+handler. Host tool execution belongs above this core payload layer and remains
+provider-native or explicitly unsupported until all-provider semantics are
+proven.
+
+For neutral tool contract data outside an event envelope, use
+`CliSubprocessCore.Tool.Descriptor`, `CliSubprocessCore.Tool.Request`, and
+`CliSubprocessCore.Tool.Response`. These modules validate JSON-like values and
+reject executable BEAM terms such as functions, MFA tuples, PIDs, ports,
+references, and atoms in provider metadata.
+
 ## Example
 
 ```elixir

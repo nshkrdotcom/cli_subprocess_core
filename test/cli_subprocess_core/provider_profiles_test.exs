@@ -648,6 +648,23 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
       assert Enum.at(events, 2).provider_session_id == "amp-session-2"
     end
+
+    test "normalized fixture events preserve raw provider payloads" do
+      for {profile, fixture_name} <- [
+            {Claude, "claude"},
+            {Codex, "codex"},
+            {Gemini, "gemini"},
+            {Amp, "amp"}
+          ] do
+        events = decode_fixture(profile, fixture_name)
+
+        assert events != []
+
+        for event <- events do
+          assert is_map(event.raw) or is_binary(event.raw)
+        end
+      end
+    end
   end
 
   defp decode_fixture(profile, fixture_name) do

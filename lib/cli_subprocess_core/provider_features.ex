@@ -6,6 +6,8 @@ defmodule CliSubprocessCore.ProviderFeatures do
 
   - provider-native permission mode terminology and CLI flag rendering
   - provider-local partial features such as Ollama-backed model routing
+  - decomposed tool capability metadata for normalized observation versus
+    unadmitted host execution
   """
 
   @type permission_manifest :: %{
@@ -23,11 +25,51 @@ defmodule CliSubprocessCore.ProviderFeatures do
           notes: [String.t()]
         }
 
+  @type tool_capability_key ::
+          :tool_events
+          | :tool_results
+          | :host_tools
+          | :tool_allowlist
+          | :tool_denylist
+          | :mcp_servers
+          | :provider_builtin_tools
+          | :no_tool_mode
+
+  @type tool_capability_value :: boolean() | :unknown
+
+  @type tool_capability_manifest :: %{
+          required(tool_capability_key()) => tool_capability_value(),
+          optional(:notes) => [String.t()]
+        }
+
   @type manifest :: %{
           provider: atom(),
           permission_modes: %{optional(atom()) => permission_manifest()},
-          partial_features: %{optional(atom()) => partial_feature_manifest()}
+          partial_features: %{optional(atom()) => partial_feature_manifest()},
+          tool_capabilities: tool_capability_manifest()
         }
+
+  @tool_capability_keys [
+    :tool_events,
+    :tool_results,
+    :host_tools,
+    :tool_allowlist,
+    :tool_denylist,
+    :mcp_servers,
+    :provider_builtin_tools,
+    :no_tool_mode
+  ]
+
+  @observed_tool_capabilities %{
+    tool_events: true,
+    tool_results: true,
+    host_tools: false,
+    tool_allowlist: :unknown,
+    tool_denylist: :unknown,
+    mcp_servers: :unknown,
+    provider_builtin_tools: :unknown,
+    no_tool_mode: :unknown
+  }
 
   @manifests %{
     amp: %{
@@ -51,7 +93,12 @@ defmodule CliSubprocessCore.ProviderFeatures do
           compatibility: nil,
           notes: ["Amp does not expose an Ollama backend through the common CLI surface."]
         }
-      }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Amp profile normalizes observed tool_use/tool_result events from JSONL.",
+          "Amp host tool execution, MCP configuration, explicit tool lists, and tool suppression remain provider-native or unproven at the core contract."
+        ])
     },
     claude: %{
       provider: :claude,
@@ -104,7 +151,12 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "Claude/Ollama has no silent default model; callers must provide model intent."
           ]
         }
-      }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Claude profile normalizes observed tool_use/tool_result events from stream-json output.",
+          "Claude tool allow/deny lists, MCP, built-ins, and host execution remain provider-native or unproven at the core contract."
+        ])
     },
     codex: %{
       provider: :codex,
@@ -142,7 +194,12 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "Non-catalog models may run with upstream fallback metadata, which can degrade behavior."
           ]
         }
-      }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Codex profile normalizes observed tool_use/tool_result events from JSONL output.",
+          "Codex app-server, dynamic tools, MCP, built-ins, and host execution remain provider-native or unproven at the core contract."
+        ])
     },
     gemini: %{
       provider: :gemini,
@@ -170,7 +227,12 @@ defmodule CliSubprocessCore.ProviderFeatures do
           compatibility: nil,
           notes: ["Gemini does not expose an Ollama backend through the common CLI surface."]
         }
-      }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Gemini profile normalizes observed tool_use/tool_result events from stream-json output.",
+          "Gemini extensions, settings, tool allowlists, and no-tool/plain-response behavior remain provider-native or unproven at the core contract."
+        ])
     }
   }
 
@@ -243,6 +305,64 @@ defmodule CliSubprocessCore.ProviderFeatures do
               "unknown partial feature #{inspect(feature)} for #{inspect(provider)}"
     end
   end
+
+  @doc """
+  Returns decomposed tool capability metadata for a built-in provider.
+
+  `:tool_events` and `:tool_results` describe normalized observation payloads
+  emitted by the core provider profiles. They do not imply host-executable tool
+  registration, provider-native tool configuration, or tool suppression.
+  """
+  @spec tool_capabilities(atom()) :: {:ok, tool_capability_manifest()} | :error
+  def tool_capabilities(provider) when is_atom(provider) do
+    provider
+    |> manifest()
+    |> case do
+      {:ok, %{tool_capabilities: tool_capabilities}} -> {:ok, tool_capabilities}
+      :error -> :error
+    end
+  end
+
+  @spec tool_capabilities!(atom()) :: tool_capability_manifest()
+  def tool_capabilities!(provider) when is_atom(provider) do
+    case tool_capabilities(provider) do
+      {:ok, tool_capabilities} ->
+        tool_capabilities
+
+      :error ->
+        raise ArgumentError, "unknown tool capabilities for #{inspect(provider)}"
+    end
+  end
+
+  @spec tool_capability(atom(), tool_capability_key()) ::
+          {:ok, tool_capability_value()} | :error
+  def tool_capability(provider, capability)
+      when is_atom(provider) and capability in @tool_capability_keys do
+    provider
+    |> tool_capabilities()
+    |> case do
+      {:ok, tool_capabilities} -> Map.fetch(tool_capabilities, capability)
+      :error -> :error
+    end
+  end
+
+  @spec tool_capability!(atom(), tool_capability_key()) :: tool_capability_value()
+  def tool_capability!(provider, capability) do
+    case tool_capability(provider, capability) do
+      {:ok, value} ->
+        value
+
+      :error ->
+        raise ArgumentError,
+              "unknown tool capability #{inspect(capability)} for #{inspect(provider)}"
+    end
+  end
+
+  @doc """
+  Returns the required decomposed tool capability keys.
+  """
+  @spec tool_capability_keys() :: nonempty_list(tool_capability_key())
+  def tool_capability_keys, do: @tool_capability_keys
 
   defp canonical_provider(:codex_exec), do: :codex
   defp canonical_provider(provider), do: provider
