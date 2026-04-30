@@ -49,6 +49,9 @@ defmodule CliSubprocessCore.RawSessionTest do
              transport: %{pty?: true, interrupt_mode: {:stdin, <<3>>}}
            } = RawSession.info(session)
 
+    refute Map.has_key?(RawSession.info(session).transport, :pid)
+    refute Map.has_key?(RawSession.info(session).transport, :os_pid)
+
     transport = session.transport
     monitor = Process.monitor(transport)
 

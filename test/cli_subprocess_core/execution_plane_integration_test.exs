@@ -10,7 +10,6 @@ defmodule CliSubprocessCore.ExecutionPlaneIntegrationTest do
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
   alias CliSubprocessCore.TestSupport.ProviderProfiles.Echo
   alias ExecutionPlane.Process.Transport
-  alias ExecutionPlane.Process.Transport.Info
   alias ExecutionPlane.Process.Transport.RunResult
 
   test "command options build the compatibility execution-surface contract" do
@@ -60,7 +59,7 @@ defmodule CliSubprocessCore.ExecutionPlaneIntegrationTest do
 
     assert {:ok, session} = RawSession.start(script, [], stdin?: false)
     assert session.transport_api == Transport
-    assert %{transport: %Info{surface_kind: :local_subprocess}} = RawSession.info(session)
+    assert %{transport: %{surface_kind: :local_subprocess}} = RawSession.info(session)
 
     assert {:ok, %RunResult{} = result} = RawSession.collect(session, 2_000)
     assert result.output =~ "ready"

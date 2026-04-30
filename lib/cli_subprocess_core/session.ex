@@ -16,7 +16,8 @@ defmodule CliSubprocessCore.Session do
     RecoveryEnvelope,
     Runtime,
     Session.Delivery,
-    Session.Options
+    Session.Options,
+    TransportInfo
   }
 
   alias ExecutionPlane.Process.Transport
@@ -650,25 +651,22 @@ defmodule CliSubprocessCore.Session do
   defp transport_stderr(_module, _transport_pid, %{stderr: stderr}), do: stderr
   defp transport_stderr(module, transport_pid, nil), do: module.stderr(transport_pid)
 
-  defp build_transport_snapshot(module, transport_pid, status, stderr, nil) do
+  defp build_transport_snapshot(_module, _transport_pid, status, stderr, nil) do
     %{
       delivery: nil,
-      module: module,
-      pid: transport_pid,
       status: status,
-      stderr: stderr
+      stderr: stderr,
+      info: %{}
     }
   end
 
   defp build_transport_snapshot(
-         module,
-         transport_pid,
+         _module,
+         _transport_pid,
          status,
          stderr,
          %{
            delivery: delivery,
-           pid: subprocess_pid,
-           os_pid: os_pid,
            stdout_mode: stdout_mode,
            stdin_mode: stdin_mode,
            pty?: pty?,
@@ -677,13 +675,9 @@ defmodule CliSubprocessCore.Session do
        ) do
     %{
       delivery: delivery,
-      module: module,
-      pid: transport_pid,
       status: status,
       stderr: stderr,
-      info: info,
-      subprocess_pid: subprocess_pid,
-      os_pid: os_pid,
+      info: TransportInfo.to_map(info),
       stdout_mode: stdout_mode,
       stdin_mode: stdin_mode,
       pty?: pty?,

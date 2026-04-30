@@ -6,7 +6,6 @@ defmodule CliSubprocessCore.SessionTest do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
   alias CliSubprocessCore.Session
-  alias ExecutionPlane.Process.Transport.Info
 
   @session_event_tag :cli_subprocess_core_session
 
@@ -56,11 +55,13 @@ defmodule CliSubprocessCore.SessionTest do
     ref = make_ref()
 
     info = Session.info(session)
-    assert %Info{} = info.transport.info
+    assert is_map(info.transport.info)
     assert info.transport.status == :connected
-    assert is_pid(info.transport.subprocess_pid)
-    assert is_integer(info.transport.os_pid)
-    assert info.transport.os_pid > 0
+    refute Map.has_key?(info.transport, :pid)
+    refute Map.has_key?(info.transport, :subprocess_pid)
+    refute Map.has_key?(info.transport, :os_pid)
+    refute Map.has_key?(info.transport.info, :pid)
+    refute Map.has_key?(info.transport.info, :os_pid)
     assert info.transport.stdout_mode == :line
     assert info.transport.stdin_mode == :line
     assert info.transport.pty? == false
@@ -127,7 +128,7 @@ defmodule CliSubprocessCore.SessionTest do
                startup_mode: :lazy
              )
 
-    assert %Info{} = info.transport.info
+    assert is_map(info.transport.info)
     assert info.transport.info.surface_kind == :local_subprocess
     assert info.transport.info.target_id == "target-1"
     assert info.transport.info.lease_ref == "lease-1"
@@ -139,6 +140,57 @@ defmodule CliSubprocessCore.SessionTest do
     assert %{headless_timeout_ms: 321} = :sys.get_state(transport_pid)
 
     assert :ok = Session.close(session)
+  end
+
+  test "session startup forwards public buffer-limit aliases to the bounded transport" do
+    script = create_test_script("sleep 60")
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "buffer aliases",
+               command: script,
+               max_stdout_buffer_bytes: 2_048,
+               max_stderr_buffer_bytes: 512,
+               startup_mode: :lazy
+             )
+
+    %{transport_pid: transport_pid} = :sys.get_state(session)
+    transport_state = :sys.get_state(transport_pid)
+    assert transport_state.max_buffer_size == 2_048
+    assert transport_state.max_stderr_buffer_size == 512
+
+    assert :ok = Session.close(session)
+  end
+
+  test "oversize partial stdout is normalized as a transport error event" do
+    ref = make_ref()
+    long_fragment = String.duplicate("x", 128)
+    script = create_test_script("printf '#{long_fragment}'; sleep 1")
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :claude,
+               prompt: "overflow",
+               command: script,
+               subscriber: {self(), ref},
+               max_stdout_buffer_bytes: 16,
+               oversize_line_chunk_bytes: 8,
+               max_recoverable_line_bytes: 32,
+               oversize_line_mode: :chunk_then_fail,
+               buffer_overflow_mode: :fatal,
+               startup_mode: :lazy
+             )
+
+    assert_receive {@session_event_tag, ^ref, {:event, run_started}}, 2_000
+    assert run_started.kind == :run_started
+
+    error_event = receive_session_event(ref, 5_000, &(&1.kind == :error))
+    assert %Payload.Error{code: "transport_error", message: message} = error_event.payload
+    assert message =~ "buffer"
+
+    monitor = Process.monitor(session)
+    assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 5_000
   end
 
   test "provider transport tuning stays top-level when the execution surface is canonical" do

@@ -15,19 +15,26 @@ defmodule CliSubprocessCore.TransportInfoTest do
       assert TransportInfo.pid(info) == nil
       assert TransportInfo.os_pid(info) == nil
       assert TransportInfo.to_map(info).status == :disconnected
+      refute Map.has_key?(TransportInfo.to_map(info), :pid)
+      refute Map.has_key?(TransportInfo.to_map(info), :os_pid)
     end
 
-    test "also handles core transport maps" do
+    test "also sanitizes core transport maps" do
       pid = self()
       info = %{status: :connected, surface_kind: :ssh_exec, stderr: "tail", pid: pid, os_pid: 123}
 
-      refute TransportInfo.match?(info)
+      assert TransportInfo.match?(info)
       assert TransportInfo.status(info) == :connected
       assert TransportInfo.surface_kind(info) == :ssh_exec
       assert TransportInfo.stderr(info) == "tail"
-      assert TransportInfo.pid(info) == pid
-      assert TransportInfo.os_pid(info) == 123
-      assert TransportInfo.to_map(info) == info
+      assert TransportInfo.pid(info) == nil
+      assert TransportInfo.os_pid(info) == nil
+
+      assert TransportInfo.to_map(info) == %{
+               status: :connected,
+               surface_kind: :ssh_exec,
+               stderr: "tail"
+             }
     end
   end
 end

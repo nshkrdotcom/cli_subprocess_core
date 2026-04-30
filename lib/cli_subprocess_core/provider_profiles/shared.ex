@@ -17,6 +17,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :stderr_callback,
     :close_stdin_on_start?
   ]
+  @transport_option_aliases %{
+    max_stdout_buffer_bytes: :max_buffer_size,
+    max_stderr_buffer_bytes: :max_stderr_buffer_size
+  }
 
   @normalized_kinds %{
     "approval_denied" => :approval_denied,
@@ -102,7 +106,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
 
   @spec transport_options(keyword()) :: keyword()
   def transport_options(opts) when is_list(opts) do
-    Keyword.take(opts, @transport_option_keys)
+    direct_options = Keyword.take(opts, @transport_option_keys)
+
+    Enum.reduce(@transport_option_aliases, direct_options, fn {public_key, runtime_key}, acc ->
+      case Keyword.fetch(opts, public_key) do
+        {:ok, value} -> Keyword.put_new(acc, runtime_key, value)
+        :error -> acc
+      end
+    end)
   end
 
   @spec permission_mode(keyword(), atom()) :: term()

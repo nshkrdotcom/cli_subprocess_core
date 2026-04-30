@@ -179,11 +179,14 @@ transport snapshot.
 
 That transport snapshot carries:
 
-- the normalized invocation
 - generic execution-surface metadata
 - retained stderr tail
 - delivery metadata
 - the active `stdout_mode`, `stdin_mode`, `pty?`, and `interrupt_mode`
+
+It intentionally omits lower runtime handles such as BEAM pids, OS pids,
+ports, process-owned invocation data, and transport modules. Those details stay
+inside the lower runtime boundary.
 
 The generic placement metadata remains:
 

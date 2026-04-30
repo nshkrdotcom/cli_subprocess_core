@@ -30,11 +30,11 @@ outer mailbox shape.
 
 ## Transport Snapshot
 
-`Session.info/1` exposes transport data through the extracted substrate:
+`Session.info/1` exposes transport data through a sanitized public snapshot:
 
-- `info.transport.module` is `ExecutionPlane.Process.Transport`
 - `info.transport.info` is recognized by `TransportInfo`
-  from the shared Execution Plane transport snapshot
+- `info.transport.info` omits lower runtime handles such as BEAM pids, OS
+  pids, ports, and transport modules
 - `info.transport.status` reflects the normalized transport status
 
 That keeps the core session API stable while the local session-bearing lane now

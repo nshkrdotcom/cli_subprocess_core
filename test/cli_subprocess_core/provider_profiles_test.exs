@@ -374,6 +374,31 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert opts[:buffer_overflow_mode] == :fatal
       refute Keyword.has_key?(opts, :ignored)
     end
+
+    test "shared transport options map public stdout and stderr byte limits" do
+      opts =
+        Shared.transport_options(
+          max_stdout_buffer_bytes: 2_048,
+          max_stderr_buffer_bytes: 512
+        )
+
+      assert opts[:max_buffer_size] == 2_048
+      assert opts[:max_stderr_buffer_size] == 512
+      refute Keyword.has_key?(opts, :max_stdout_buffer_bytes)
+      refute Keyword.has_key?(opts, :max_stderr_buffer_bytes)
+    end
+
+    test "malformed JSONL emits a bounded parse error event" do
+      malformed = String.duplicate("{", 128)
+
+      {[event], state} = Claude.decode_stdout(malformed, Claude.init_parser_state([]))
+
+      assert event.kind == :error
+      assert %Payload.Error{code: "parse_error"} = event.payload
+      assert event.payload.metadata.line == malformed
+      refute Map.has_key?(state, :stdout_buffer)
+      refute Map.has_key?(state, :stderr_buffer)
+    end
   end
 
   describe "parser fixtures" do

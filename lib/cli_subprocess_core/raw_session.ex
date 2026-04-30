@@ -11,6 +11,7 @@ defmodule CliSubprocessCore.RawSession do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.RawSession.Delivery
+  alias CliSubprocessCore.TransportInfo
   alias ExecutionPlane.Process.Transport
   alias ExecutionPlane.Process.Transport.Error, as: RuntimeTransportError
   alias ExecutionPlane.Process.Transport.RunResult
@@ -228,6 +229,7 @@ defmodule CliSubprocessCore.RawSession do
   def info(%__MODULE__{} = session) do
     transport_info =
       session.transport_api.info(session.transport)
+      |> TransportInfo.to_map()
 
     %{
       delivery: delivery_info(session),

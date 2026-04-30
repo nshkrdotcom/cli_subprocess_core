@@ -9,12 +9,38 @@ defmodule CliSubprocessCore.TransportInfo do
   alias ExecutionPlane.Process.Transport.Info, as: RuntimeTransportInfo
 
   @opaque t :: RuntimeTransportInfo.t()
+  @public_keys [
+    :surface_kind,
+    :target_id,
+    :lease_ref,
+    :surface_ref,
+    :boundary_class,
+    :observability,
+    :adapter_capabilities,
+    :effective_capabilities,
+    :bridge_profile,
+    :protocol_version,
+    :extensions,
+    :adapter_metadata,
+    :status,
+    :stdout_mode,
+    :stdin_mode,
+    :pty?,
+    :interrupt_mode,
+    :stderr,
+    :delivery
+  ]
 
   @doc """
   Returns true when `term` is the transport-info representation used by the core.
   """
   @spec match?(term()) :: boolean()
   def match?(%RuntimeTransportInfo{}), do: true
+
+  def match?(%{status: status, surface_kind: surface_kind})
+      when status in [:connected, :disconnected, :error] and is_atom(surface_kind),
+      do: true
+
   def match?(_term), do: false
 
   @doc """
@@ -42,26 +68,33 @@ defmodule CliSubprocessCore.TransportInfo do
   def stderr(_term), do: ""
 
   @doc """
-  Returns the transport owner pid, when present.
+  Transport owner pids are not part of the public core metadata contract.
   """
-  @spec pid(term()) :: pid() | nil
-  def pid(%RuntimeTransportInfo{pid: pid}), do: pid
-  def pid(%{pid: pid}), do: pid
+  @spec pid(term()) :: nil
   def pid(_term), do: nil
 
   @doc """
-  Returns the OS process pid, when present.
+  OS process pids are not part of the public core metadata contract.
   """
-  @spec os_pid(term()) :: pos_integer() | nil
-  def os_pid(%RuntimeTransportInfo{os_pid: os_pid}), do: os_pid
-  def os_pid(%{os_pid: os_pid}), do: os_pid
+  @spec os_pid(term()) :: nil
   def os_pid(_term), do: nil
 
   @doc """
-  Projects transport metadata to a map without exposing the lower module name.
+  Projects transport metadata to a public map without lower runtime handles.
+
+  Raw transport pids, OS pids, ports, and process-owned invocation details stay
+  behind the lower runtime boundary. Callers that need observability should use
+  the stable surface/status/capability fields returned here.
   """
   @spec to_map(term()) :: map()
-  def to_map(%RuntimeTransportInfo{} = info), do: Map.from_struct(info)
-  def to_map(%{} = info), do: info
+  def to_map(%RuntimeTransportInfo{} = info), do: info |> Map.from_struct() |> public_map()
+  def to_map(%{} = info), do: public_map(info)
   def to_map(_term), do: %{}
+
+  defp public_map(info) when is_map(info) do
+    info
+    |> Map.take(@public_keys)
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
 end
