@@ -119,6 +119,34 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.cwd == "/tmp/codex"
     end
 
+    test "Codex invocation preserves materializer-owned clear_env flag" do
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 command: "codex-bin",
+                 prompt: "review this diff",
+                 cwd: "/workspace",
+                 env: %{"CODEX_HOME" => "/materialized/codex-home"},
+                 clear_env?: true,
+                 model_payload: %{
+                   provider: :codex,
+                   requested_model: "gpt-5.3-codex",
+                   resolved_model: "gpt-5.3-codex",
+                   resolution_source: :explicit,
+                   reasoning: "high",
+                   reasoning_effort: nil,
+                   normalized_reasoning_effort: nil,
+                   model_family: "gpt-5",
+                   catalog_version: nil,
+                   visibility: :public,
+                   errors: []
+                 }
+               )
+
+      assert command.cwd == "/workspace"
+      assert command.env == %{"CODEX_HOME" => "/materialized/codex-home"}
+      assert command.clear_env? == true
+    end
+
     test "Codex builds the expected CLI invocation for the Ollama OSS backend" do
       assert {:ok, %Command{} = command} =
                Codex.build_invocation(

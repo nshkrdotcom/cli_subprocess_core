@@ -100,7 +100,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
       env:
         Keyword.get(opts, :env, %{})
         |> normalize_env()
-        |> Map.merge(payload_env)
+        |> Map.merge(payload_env),
+      clear_env?: Keyword.get(opts, :clear_env?, false)
     )
   end
 
