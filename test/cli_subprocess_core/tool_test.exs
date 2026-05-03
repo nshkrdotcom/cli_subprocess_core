@@ -83,9 +83,12 @@ defmodule CliSubprocessCore.ToolTest do
   end
 
   test "parse bang raises a stable invalid tool error" do
-    assert_raise ArgumentError, ~r/invalid CliSubprocessCore.Tool.Response/, fn ->
-      Response.parse!(tool_call_id: "tool-1", content: %{pid: self()})
-    end
+    error =
+      assert_raise ArgumentError, fn ->
+        Response.parse!(tool_call_id: "tool-1", content: %{pid: self()})
+      end
+
+    assert error.message =~ "invalid CliSubprocessCore.Tool.Response"
   end
 
   test "shared serializable validator accepts JSON-like data" do

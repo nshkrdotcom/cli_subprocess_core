@@ -486,6 +486,48 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert ProviderCLI.runtime_failure_code(failure) == "config_invalid"
     end
 
+    test "classifies cwd misses from stderr when cwd was not supplied" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 1},
+          stderr: "bash: line 1: CD: /guest/worktree: No such file or directory\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :codex,
+                 exit,
+                 execution_surface: [surface_kind: :guest_bridge]
+               )
+
+      assert failure.kind == :cwd_not_found
+      assert failure.message =~ "/guest/worktree"
+      assert ProviderCLI.runtime_failure_code(failure) == "config_invalid"
+    end
+
+    test "classifies auth failures through fixed literal text" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 1},
+          stderr: "Please run claude login before using this command\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(
+                 :claude,
+                 exit,
+                 execution_surface: [
+                   surface_kind: :ssh_exec,
+                   transport_options: [destination: "auth.example"]
+                 ]
+               )
+
+      assert failure.kind == :auth_error
+      assert failure.message =~ "Claude CLI requires authentication"
+      assert failure.message =~ "remote target auth.example"
+      assert ProviderCLI.runtime_failure_code(failure) == "auth_error"
+    end
+
     test "classifies guest-path command misses without pretending they are remote targets" do
       exit =
         ProcessExit.from_reason({:exit_status, 127},

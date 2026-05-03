@@ -229,7 +229,10 @@ defmodule CliSubprocessCore.ExecutionSurface do
     [
       contract_version: Map.get(attrs, :contract_version, Map.get(attrs, "contract_version")),
       surface_kind: Map.get(attrs, :surface_kind, Map.get(attrs, "surface_kind")),
-      transport_options: Map.get(attrs, :transport_options, Map.get(attrs, "transport_options")),
+      transport_options:
+        attrs
+        |> Map.get(:transport_options, Map.get(attrs, "transport_options"))
+        |> normalize_compat_transport_options(),
       target_id: Map.get(attrs, :target_id, Map.get(attrs, "target_id")),
       lease_ref: Map.get(attrs, :lease_ref, Map.get(attrs, "lease_ref")),
       surface_ref: Map.get(attrs, :surface_ref, Map.get(attrs, "surface_ref")),
@@ -237,6 +240,15 @@ defmodule CliSubprocessCore.ExecutionSurface do
       observability: Map.get(attrs, :observability, Map.get(attrs, "observability", %{}))
     ]
   end
+
+  defp normalize_compat_transport_options(%{} = options) do
+    Map.new(options, fn
+      {"startup_mode", value} -> {:startup_mode, value}
+      other -> other
+    end)
+  end
+
+  defp normalize_compat_transport_options(options), do: options
 
   defp runtime_surface_apply(function_name, args) do
     apply(@runtime_surface, function_name, args)

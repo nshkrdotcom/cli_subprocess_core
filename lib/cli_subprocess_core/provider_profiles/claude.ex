@@ -314,11 +314,22 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   end
 
   defp auth_error_text?(text) when is_binary(text) do
-    Regex.match?(
-      ~r/(does not have access|authentication failed|not authenticated|please log in|please login|login again|contact your administrator)/i,
-      text
-    )
+    text
+    |> String.downcase()
+    |> contains_any?([
+      "does not have access",
+      "authentication failed",
+      "not authenticated",
+      "please log in",
+      "please login",
+      "login again",
+      "contact your administrator"
+    ])
   end
 
   defp auth_error_text?(_text), do: false
+
+  defp contains_any?(text, phrases) when is_binary(text) and is_list(phrases) do
+    Enum.any?(phrases, &String.contains?(text, &1))
+  end
 end

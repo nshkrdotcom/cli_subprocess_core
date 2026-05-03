@@ -196,6 +196,22 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.resolved_model == "gpt-5.5"
       assert payload.backend_metadata["model_provider"] == "gateway"
     end
+
+    test "rejects unknown provider backend strings without creating atoms" do
+      assert {:error, {:model_unavailable, :claude, {:unsupported_provider_backend, "rogue"}}} =
+               ModelRegistry.resolve(:claude, nil, provider_backend: "rogue")
+
+      assert {:error, {:model_unavailable, :codex, {:unsupported_provider_backend, "rogue"}}} =
+               ModelRegistry.validate(:codex, model: "gpt-5.5", provider_backend: "rogue")
+    end
+
+    test "bounds provider name strings to the built-in catalog set" do
+      assert {:ok, %Selection{} = payload} = ModelRegistry.resolve("CODEX", "gpt-5.5")
+      assert payload.provider == :codex
+
+      assert {:error, {:model_unavailable, :unknown, {:not_found, _reason}}} =
+               ModelRegistry.resolve("third-party-profile", nil)
+    end
   end
 
   describe "ModelRegistry.list_visible/2" do

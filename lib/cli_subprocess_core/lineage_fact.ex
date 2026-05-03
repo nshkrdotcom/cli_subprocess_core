@@ -4,6 +4,12 @@ defmodule CliSubprocessCore.LineageFact do
   """
 
   @kinds [:pressure, :reconnect, :subprocess]
+  @providers %{
+    "amp" => :amp,
+    "claude" => :claude,
+    "codex" => :codex,
+    "gemini" => :gemini
+  }
 
   @type kind :: :pressure | :reconnect | :subprocess
   @type t :: %{
@@ -71,7 +77,22 @@ defmodule CliSubprocessCore.LineageFact do
 
   defp normalize_provider(nil), do: nil
   defp normalize_provider(provider) when is_atom(provider), do: provider
-  defp normalize_provider(provider) when is_binary(provider), do: String.to_atom(provider)
+
+  defp normalize_provider(provider) when is_binary(provider) do
+    normalized =
+      provider
+      |> String.trim()
+      |> String.downcase()
+
+    case Map.fetch(@providers, normalized) do
+      {:ok, provider_atom} ->
+        provider_atom
+
+      :error ->
+        raise ArgumentError,
+              "provider must be one of amp, claude, codex, gemini, got: #{inspect(provider)}"
+    end
+  end
 
   defp normalize_map(value) when is_map(value), do: value
   defp normalize_map(_value), do: %{}

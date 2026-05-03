@@ -33,29 +33,29 @@ defmodule CliSubprocessCore.Phase6ContractsTest do
   end
 
   test "CLI lower scenarios reject bad owner, unsupported enums, egress, and raw evidence" do
-    assert_raise ArgumentError, ~r/owner_repo.*cli_subprocess_core/, fn ->
+    assert_raise_message(["owner_repo", "cli_subprocess_core"], fn ->
       LowerSimulationScenario.new!(scenario_attrs(%{owner_repo: "execution_plane"}))
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/protocol_surface.*unsupported/, fn ->
+    assert_raise_message(["protocol_surface", "unsupported"], fn ->
       LowerSimulationScenario.new!(scenario_attrs(%{protocol_surface: "http"}))
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/matcher_class.*unsupported/, fn ->
+    assert_raise_message(["matcher_class", "unsupported"], fn ->
       LowerSimulationScenario.new!(scenario_attrs(%{matcher_class: "semantic_provider"}))
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/semantic provider policy/i, fn ->
+    assert_raise_message(["semantic provider policy"], fn ->
       LowerSimulationScenario.new!(Map.put(scenario_attrs(), :provider_refs, ["codex"]))
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/no_egress_assertion.*external_egress.*deny/, fn ->
+    assert_raise_message(["no_egress_assertion", "external_egress", "deny"], fn ->
       LowerSimulationScenario.new!(
         scenario_attrs(%{no_egress_assertion: %{"external_egress" => "allow"}})
       )
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/raw_payload_persistence.*shape_only/, fn ->
+    assert_raise_message(["raw_payload_persistence", "shape_only"], fn ->
       LowerSimulationScenario.new!(
         scenario_attrs(%{
           bounded_evidence_projection: %{
@@ -64,9 +64,9 @@ defmodule CliSubprocessCore.Phase6ContractsTest do
           }
         })
       )
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/ExecutionOutcome.v1.raw_payload.*must not be narrowed/, fn ->
+    assert_raise_message(["ExecutionOutcome.v1.raw_payload", "must not be narrowed"], fn ->
       LowerSimulationScenario.new!(
         scenario_attrs(%{
           bounded_evidence_projection: %{
@@ -76,7 +76,7 @@ defmodule CliSubprocessCore.Phase6ContractsTest do
           }
         })
       )
-    end
+    end)
   end
 
   test "runtime profile declares adapter selection through application config only" do
@@ -92,13 +92,13 @@ defmodule CliSubprocessCore.Phase6ContractsTest do
     assert_json_safe(dump)
     assert AdapterSelectionPolicy.new!(dump) == policy
 
-    assert_raise ArgumentError, ~r/public simulation selector/i, fn ->
+    assert_raise_message(["public simulation selector"], fn ->
       AdapterSelectionPolicy.new!(Map.put(adapter_policy_attrs(), :simulation, "service_mode"))
-    end
+    end)
 
-    assert_raise ArgumentError, ~r/config_key.*public simulation selector/i, fn ->
+    assert_raise_message(["config_key", "public simulation selector"], fn ->
       AdapterSelectionPolicy.new!(adapter_policy_attrs(%{config_key: "request.simulation"}))
-    end
+    end)
   end
 
   test "public request simulation options are rejected before runtime profile selection" do
@@ -166,5 +166,16 @@ defmodule CliSubprocessCore.Phase6ContractsTest do
   defp assert_json_safe(value) when is_map(value) do
     assert Enum.all?(Map.keys(value), &is_binary/1)
     Enum.each(value, fn {_key, nested} -> assert_json_safe(nested) end)
+  end
+
+  defp assert_raise_message(expected_parts, fun)
+       when is_list(expected_parts) and is_function(fun, 0) do
+    error = assert_raise(ArgumentError, fun)
+
+    message = String.downcase(error.message)
+
+    Enum.each(expected_parts, fn expected ->
+      assert message =~ String.downcase(expected)
+    end)
   end
 end

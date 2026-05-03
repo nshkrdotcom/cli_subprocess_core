@@ -1229,7 +1229,7 @@ defmodule CliSubprocessCore.ProviderCLI do
       is_binary(cwd) and stderr =~ "cd: #{cwd}: No such file or directory" ->
         true
 
-      is_binary(stderr) and Regex.match?(~r/\bcd:\s+.+No such file or directory/i, stderr) ->
+      is_binary(parse_missing_cwd(stderr)) ->
         true
 
       true ->
@@ -1240,11 +1240,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp auth_error_exit?(%ProcessExit{} = exit) do
     stderr = normalize_stderr(exit.stderr)
 
-    is_binary(stderr) and
-      Regex.match?(
-        ~r/(not authenticated|authentication required|please log in|please login|run .* login|requires login)/i,
-        stderr
-      )
+    is_binary(stderr) and auth_error_text?(stderr)
   end
 
   defp command_not_found_stderr?(settings, stderr) when is_binary(stderr) do
@@ -1257,8 +1253,7 @@ defmodule CliSubprocessCore.ProviderCLI do
       |> Enum.filter(&(is_binary(&1) and &1 != ""))
       |> Enum.uniq()
 
-    missing_phrase? =
-      Regex.match?(~r/(command not found|not found|No such file or directory)/i, stderr)
+    missing_phrase? = command_not_found_text?(stderr)
 
     cond do
       not missing_phrase? ->
@@ -1283,13 +1278,80 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp parse_missing_cwd(stderr) when is_binary(stderr) do
-    case Regex.run(~r/\bcd:\s+(.+?):\s+No such file or directory/i, stderr) do
-      [_, cwd] -> cwd
-      _ -> nil
-    end
+    stderr
+    |> case_insensitive_between("cd:", ": no such file or directory")
+    |> normalize_optional_text()
   end
 
   defp parse_missing_cwd(_stderr), do: nil
+
+  defp auth_error_text?(text) when is_binary(text) do
+    lower = String.downcase(text)
+
+    contains_any?(lower, [
+      "not authenticated",
+      "authentication required",
+      "please log in",
+      "please login",
+      "requires login"
+    ]) or contains_ordered?(lower, ["run ", " login"])
+  end
+
+  defp command_not_found_text?(text) when is_binary(text) do
+    text
+    |> String.downcase()
+    |> contains_any?(["command not found", "not found", "no such file or directory"])
+  end
+
+  defp case_insensitive_between(text, prefix, suffix)
+       when is_binary(text) and is_binary(prefix) and is_binary(suffix) do
+    lower = String.downcase(text)
+
+    case :binary.match(lower, prefix) do
+      {prefix_start, prefix_size} ->
+        search_start = prefix_start + prefix_size
+        search_size = byte_size(lower) - search_start
+        lower_after_prefix = binary_part(lower, search_start, search_size)
+
+        case :binary.match(lower_after_prefix, suffix) do
+          {suffix_start, _suffix_size} -> binary_part(text, search_start, suffix_start)
+          :nomatch -> nil
+        end
+
+      :nomatch ->
+        nil
+    end
+  end
+
+  defp normalize_optional_text(nil), do: nil
+
+  defp normalize_optional_text(text) when is_binary(text) do
+    case String.trim(text) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp contains_any?(text, phrases) when is_binary(text) and is_list(phrases) do
+    Enum.any?(phrases, &String.contains?(text, &1))
+  end
+
+  defp contains_ordered?(text, phrases) when is_binary(text) and is_list(phrases) do
+    {_position, matched?} =
+      Enum.reduce_while(phrases, {0, true}, fn phrase, {position, true} ->
+        remainder = binary_part(text, position, byte_size(text) - position)
+
+        case :binary.match(remainder, phrase) do
+          {match_position, phrase_size} ->
+            {:cont, {position + match_position + phrase_size, true}}
+
+          :nomatch ->
+            {:halt, {position, false}}
+        end
+      end)
+
+    matched?
+  end
 
   defp cli_not_found_message(settings, context) do
     base = cli_not_found(settings.provider, settings).message
