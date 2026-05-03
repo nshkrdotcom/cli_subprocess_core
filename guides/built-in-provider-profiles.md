@@ -35,6 +35,12 @@ All built-in profiles own:
 All provider-specific options live on the session startup keyword list and are
 passed through to the selected profile.
 
+When `:governed_authority` is present, built-in profiles use only the
+authority-materialized command, cwd, env, config root, auth root, base URL,
+target refs, and `clear_env?: true` posture. Provider CLI env discovery, local
+`PATH`, npx fallback, known home locations, and version-manager env remain
+standalone compatibility behavior only.
+
 One important distinction:
 
 - `permission_mode`

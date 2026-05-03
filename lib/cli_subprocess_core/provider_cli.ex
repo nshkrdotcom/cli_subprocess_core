@@ -6,7 +6,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   module instead of duplicating discovery logic in downstream adapters.
   """
 
-  alias CliSubprocessCore.{CommandSpec, ExecutionSurface}
+  alias CliSubprocessCore.{CommandSpec, ExecutionSurface, GovernedAuthority}
   alias ExecutionPlane.Process.Transport.Error, as: TransportError
   alias ExecutionPlane.ProcessExit
 
@@ -257,6 +257,19 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp resolve_spec(provider_opts, settings) do
+    case governed_override(provider_opts, settings) do
+      {:ok, %CommandSpec{} = spec} ->
+        {:ok, spec}
+
+      {:error, %Error{} = error} ->
+        {:error, error}
+
+      :miss ->
+        resolve_standalone_spec(provider_opts, settings)
+    end
+  end
+
+  defp resolve_standalone_spec(provider_opts, settings) do
     if nonlocal_path_resolution?(settings) do
       with :miss <- explicit_override(provider_opts, settings) do
         {:ok, CommandSpec.new(remote_default_command(settings))}
@@ -276,6 +289,28 @@ defmodule CliSubprocessCore.ProviderCLI do
            :miss <- npx_lookup(settings) do
         {:error, cli_not_found(settings.provider, settings)}
       end
+    end
+  end
+
+  defp governed_override(provider_opts, settings) do
+    authority_input =
+      Keyword.get(provider_opts, :governed_authority) || Map.get(settings, :governed_authority)
+
+    case GovernedAuthority.new(authority_input) do
+      {:ok, nil} ->
+        :miss
+
+      {:ok, %GovernedAuthority{} = authority} ->
+        {:ok, GovernedAuthority.command_spec(authority)}
+
+      {:error, reason} ->
+        {:error,
+         %Error{
+           kind: :cli_not_found,
+           provider: settings.provider,
+           message: "governed CLI launch authority is invalid: #{inspect(reason)}",
+           cause: reason
+         }}
     end
   end
 

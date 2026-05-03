@@ -147,6 +147,77 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.clear_env? == true
     end
 
+    test "Codex governed invocation uses only authority materialized launch fields" do
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 prompt: "review this diff",
+                 governed_authority: [
+                   authority_ref: "authority://cli/codex",
+                   credential_lease_ref: "lease://codex/1",
+                   target_ref: "target://local/1",
+                   command: "/authority/bin/codex",
+                   cwd: "/workspace",
+                   env: %{
+                     "CODEX_HOME" => "/authority/codex-home",
+                     "CODEX_BASE_URL" => "https://authority.example/v1"
+                   },
+                   clear_env?: true,
+                   config_root: "/authority/config",
+                   auth_root: "/authority/auth",
+                   base_url: "https://authority.example/v1"
+                 ],
+                 model_payload: %{
+                   provider: :codex,
+                   requested_model: "gpt-5.3-codex",
+                   resolved_model: "gpt-5.3-codex",
+                   resolution_source: :explicit,
+                   errors: []
+                 }
+               )
+
+      assert command.command == "/authority/bin/codex"
+      assert command.cwd == "/workspace"
+
+      assert command.env == %{
+               "CODEX_HOME" => "/authority/codex-home",
+               "CODEX_BASE_URL" => "https://authority.example/v1"
+             }
+
+      assert command.clear_env? == true
+    end
+
+    test "governed provider profile rejects caller env and cwd overrides" do
+      authority = [
+        authority_ref: "authority://cli/codex",
+        credential_lease_ref: "lease://codex/1",
+        target_ref: "target://local/1",
+        command: "/authority/bin/codex",
+        cwd: "/workspace",
+        env: %{"CODEX_HOME" => "/authority/codex-home"},
+        clear_env?: true
+      ]
+
+      assert_raise ArgumentError,
+                   "governed launch env must come from materialized authority",
+                   fn ->
+                     Codex.build_invocation(
+                       prompt: "review",
+                       governed_authority: authority,
+                       env: %{"CODEX_HOME" => "/ambient"}
+                     )
+                   end
+
+      assert_raise ArgumentError,
+                   "governed launch cwd must come from materialized authority",
+                   fn ->
+                     Codex.build_invocation(
+                       prompt: "review",
+                       governed_authority: authority,
+                       cwd: "/ambient"
+                     )
+                   end
+    end
+
     test "Codex builds the expected CLI invocation for the Ollama OSS backend" do
       assert {:ok, %Command{} = command} =
                Codex.build_invocation(

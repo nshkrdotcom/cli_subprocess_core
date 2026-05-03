@@ -46,6 +46,13 @@ managing the external process.
 
 These stages should stay distinct.
 
+Governed launch adds one more boundary rule: if `:governed_authority` is
+present, provider profiles must not accept command, cwd, env, config-root,
+auth-root, base-URL, or model env override values from ordinary caller options.
+Those values must already be materialized by the authority and must run with
+`clear_env?: true`. The standalone path keeps the normal provider CLI env and
+local discovery behavior when no governed authority is supplied.
+
 ## What Profiles Should Do
 
 Profiles should:

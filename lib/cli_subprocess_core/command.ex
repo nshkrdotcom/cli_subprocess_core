@@ -7,7 +7,7 @@ defmodule CliSubprocessCore.Command do
   """
 
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
-  alias CliSubprocessCore.{CommandSpec, ProviderProfile, ProviderRegistry}
+  alias CliSubprocessCore.{CommandSpec, GovernedAuthority, ProviderProfile, ProviderRegistry}
   alias ExecutionPlane.Command, as: RuntimeCommand
   alias ExecutionPlane.Contracts.FailureClass
   alias ExecutionPlane.ExecutionRef
@@ -199,13 +199,18 @@ defmodule CliSubprocessCore.Command do
 
   defp resolve_invocation(%Options{profile: profile} = options)
        when is_atom(profile) and not is_nil(profile) do
-    build_invocation(profile, Options.provider_profile_options(options), options.provider)
+    build_invocation(
+      profile,
+      Options.provider_profile_options(options),
+      options.provider,
+      options
+    )
   end
 
   defp resolve_invocation(%Options{provider: provider, registry: registry} = options) do
     case ProviderRegistry.fetch(provider, registry) do
       {:ok, profile} ->
-        build_invocation(profile, Options.provider_profile_options(options), provider)
+        build_invocation(profile, Options.provider_profile_options(options), provider, options)
 
       :error ->
         {:error, Error.provider_not_found(provider)}
@@ -215,9 +220,10 @@ defmodule CliSubprocessCore.Command do
       {:error, Error.command_plan_failed(reason, %{provider: provider, registry: registry})}
   end
 
-  defp build_invocation(profile, provider_options, provider) do
+  defp build_invocation(profile, provider_options, provider, %Options{} = options) do
     with {:ok, invocation} <- profile.build_invocation(provider_options),
-         :ok <- ProviderProfile.validate_invocation(invocation) do
+         :ok <- ProviderProfile.validate_invocation(invocation),
+         :ok <- GovernedAuthority.enforce_invocation(invocation, options.governed_authority) do
       {:ok, invocation}
     else
       {:error, reason} ->
@@ -261,20 +267,22 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp execution_plane_execution_request(invocation, %Options{} = options, execution_surface) do
-    payload = %{
-      command: invocation.command,
-      argv: invocation.args,
-      cwd: invocation.cwd,
-      env: invocation.env,
-      clear_env: invocation.clear_env?,
-      user: invocation.user,
-      stdin: options.stdin,
-      stderr_mode: Atom.to_string(options.stderr),
-      close_stdin: options.close_stdin,
-      timeout_ms: options.timeout,
-      execution_surface: %{surface_kind: Atom.to_string(execution_surface.surface_kind)},
-      target_id: execution_surface.target_id
-    }
+    payload =
+      %{
+        command: invocation.command,
+        argv: invocation.args,
+        cwd: invocation.cwd,
+        env: invocation.env,
+        clear_env: invocation.clear_env?,
+        user: invocation.user,
+        stdin: options.stdin,
+        stderr_mode: Atom.to_string(options.stderr),
+        close_stdin: options.close_stdin,
+        timeout_ms: options.timeout,
+        execution_surface: %{surface_kind: Atom.to_string(execution_surface.surface_kind)},
+        target_id: execution_surface.target_id
+      }
+      |> maybe_put(:governed_authority, GovernedAuthority.redacted(options.governed_authority))
 
     ExecutionRequest.new!(
       execution_ref: ExecutionRef.new!().ref,
@@ -287,6 +295,9 @@ defmodule CliSubprocessCore.Command do
         })
     )
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp execution_plane_lineage(execution_surface) do
     token = System.unique_integer([:positive, :monotonic])

@@ -64,6 +64,38 @@ emits `ProcessExecutionIntent.v1` and runs through `ExecutionPlane.Process.run/2
 Other surfaces resolve through `ExecutionPlane.Process.Transport.run/2` using
 the same `execution_surface` contract.
 
+## Governed Launch
+
+Use `:governed_authority` only after a higher authority materializer has
+selected the launch inputs for one effect. The authority must provide
+authority, lease, and target refs plus a materialized command. Optional cwd,
+env, config root, auth root, and base URL also belong in that authority value.
+
+```elixir
+{:ok, result} =
+  CliSubprocessCore.Command.run(
+    provider: :codex,
+    prompt: "Review this diff",
+    governed_authority: [
+      authority_ref: "authority://cli/run",
+      credential_lease_ref: "lease://codex/run",
+      target_ref: "target://local/run",
+      command: "/materialized/bin/codex",
+      cwd: "/workspace",
+      env: %{"CODEX_HOME" => "/materialized/codex-home"},
+      clear_env?: true,
+      config_root: "/materialized/config",
+      auth_root: "/materialized/auth",
+      base_url: "https://authority.example/v1"
+    ]
+  )
+```
+
+Governed launch fails closed when the caller also supplies command, cwd, env,
+config-root, auth-root, base-URL, or model env override fields outside the
+authority value. Standalone calls remain unchanged when
+`:governed_authority` is absent.
+
 ## Result Shape
 
 The returned core-owned result contains:

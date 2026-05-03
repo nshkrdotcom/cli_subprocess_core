@@ -1,7 +1,16 @@
 defmodule CliSubprocessCore.ProviderProfiles.Shared do
   @moduledoc false
 
-  alias CliSubprocessCore.{Command, CommandSpec, Event, Payload, ProviderCLI, RecoveryEnvelope}
+  alias CliSubprocessCore.{
+    Command,
+    CommandSpec,
+    Event,
+    GovernedAuthority,
+    Payload,
+    ProviderCLI,
+    RecoveryEnvelope
+  }
+
   alias ExecutionPlane.ProcessExit
 
   @transport_option_keys [
@@ -35,6 +44,24 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     "transport_error" => :transport_error,
     "user_cancelled" => :user_cancelled
   }
+  @governed_launch_override_keys [
+    :command,
+    :executable,
+    :command_spec,
+    :cli_path,
+    :path_to_claude_code_executable,
+    :cwd,
+    :env,
+    :clear_env?,
+    :clear_env,
+    :config_root,
+    :auth_root,
+    :base_url,
+    :ollama_base_url,
+    :anthropic_base_url,
+    :codex_oss_base_url,
+    :config_values
+  ]
 
   @type parser_state :: %{
           required(:provider) => atom(),
@@ -89,6 +116,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   def command(binary_or_spec, args, opts)
       when (is_binary(binary_or_spec) or is_struct(binary_or_spec, CommandSpec)) and is_list(args) and
              is_list(opts) do
+    case Keyword.get(opts, :governed_authority) do
+      nil ->
+        standalone_command(binary_or_spec, args, opts)
+
+      authority ->
+        governed_command(binary_or_spec, args, opts, authority)
+    end
+  end
+
+  defp standalone_command(binary_or_spec, args, opts) do
     payload_env =
       opts
       |> Keyword.get(:model_payload, %{})
@@ -104,6 +141,44 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
       clear_env?: Keyword.get(opts, :clear_env?, false)
     )
   end
+
+  defp governed_command(_binary_or_spec, args, opts, authority) do
+    authority = GovernedAuthority.fetch!(authority)
+    reject_governed_launch_overrides!(opts)
+
+    Command.new(
+      GovernedAuthority.command_spec(authority),
+      args,
+      GovernedAuthority.launch_options(authority)
+    )
+  end
+
+  defp reject_governed_launch_overrides!(opts) do
+    cond do
+      key = first_present_key(opts, @governed_launch_override_keys) ->
+        raise ArgumentError, "governed launch #{key} must come from materialized authority"
+
+      payload_env_overrides?(Keyword.get(opts, :model_payload)) ->
+        raise ArgumentError,
+              "governed launch model payload env overrides must come from materialized authority"
+
+      true ->
+        :ok
+    end
+  end
+
+  defp first_present_key(opts, keys) do
+    Enum.find(keys, fn key -> Keyword.has_key?(opts, key) end)
+  end
+
+  defp payload_env_overrides?(payload) when is_map(payload) do
+    case payload_value(payload, :env_overrides) do
+      value when is_map(value) -> map_size(value) > 0
+      _other -> false
+    end
+  end
+
+  defp payload_env_overrides?(_payload), do: false
 
   @spec transport_options(keyword()) :: keyword()
   def transport_options(opts) when is_list(opts) do

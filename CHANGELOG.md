@@ -10,3 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial release.
+- Governed CLI launch authority for command, cwd, env, config-root, auth-root,
+  base-URL, target, and clear-env materialization without ambient provider CLI
+  env discovery.

@@ -237,6 +237,54 @@ defmodule CliSubprocessCore.CommandTest do
     assert error.context == %{invocation: invocation}
   end
 
+  test "run/2 rejects prebuilt governed launches that do not match authority" do
+    invocation =
+      Command.new("codex", ["exec"],
+        env: %{"CODEX_HOME" => "/authority/codex-home"},
+        clear_env?: true
+      )
+
+    assert {:error, %Error{} = error} =
+             Command.run(invocation,
+               governed_authority: [
+                 authority_ref: "authority://cli/run",
+                 credential_lease_ref: "lease://codex/run",
+                 target_ref: "target://local/run",
+                 command: "/authority/bin/codex",
+                 env: %{"CODEX_HOME" => "/authority/codex-home"},
+                 clear_env?: true
+               ]
+             )
+
+    assert error.reason ==
+             {:invalid_options, {:governed_launch_mismatch, :command, "[redacted:5]"}}
+  end
+
+  test "run/2 uses only materialized env for governed prebuilt launches" do
+    invocation =
+      Command.new("/bin/sh", ["-c", "printf '%s|%s' \"$MARKER\" \"${HOME-unset}\""],
+        env: %{"MARKER" => "from-authority"},
+        clear_env?: true
+      )
+
+    assert {:ok, result} =
+             Command.run(invocation,
+               governed_authority: [
+                 authority_ref: "authority://cli/run",
+                 credential_lease_ref: "lease://shell/run",
+                 target_ref: "target://local/run",
+                 command: "/bin/sh",
+                 env: %{"MARKER" => "from-authority"},
+                 clear_env?: true,
+                 redaction_ref: "redaction://cli/run"
+               ]
+             )
+
+    assert result.stdout == "from-authority|unset"
+    assert result.invocation.clear_env? == true
+    assert result.invocation.env == %{"MARKER" => "from-authority"}
+  end
+
   test "run/2 rejects public transport-selector overrides" do
     invocation = Command.new("sh", ["-c", "printf ready"])
 

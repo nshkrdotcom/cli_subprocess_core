@@ -388,6 +388,68 @@ defmodule CliSubprocessCore.ProviderCLITest do
              )
   end
 
+  test "governed authority bypasses ambient CLI env and PATH discovery" do
+    dir = TestSupport.tmp_dir!("core_codex_governed_env")
+    codex_path = TestSupport.write_executable!(dir, "codex", "#!/bin/bash\nexit 0\n")
+
+    try do
+      TestSupport.with_env(%{"CODEX_PATH" => codex_path, "PATH" => dir}, fn ->
+        assert {:ok, %CommandSpec{program: "/authority/bin/codex", argv_prefix: []}} =
+                 ProviderCLI.resolve(:codex,
+                   governed_authority: [
+                     authority_ref: "authority://cli/provider-cli",
+                     credential_lease_ref: "lease://codex/provider-cli",
+                     target_ref: "target://local/provider-cli",
+                     command: "/authority/bin/codex",
+                     env: %{"CODEX_HOME" => "/authority/codex-home"},
+                     clear_env?: true
+                   ]
+                 )
+      end)
+    after
+      File.rm_rf(dir)
+    end
+  end
+
+  test "governed authority bypasses npx and npx disable env" do
+    dir = TestSupport.tmp_dir!("core_gemini_governed_npx")
+    TestSupport.write_executable!(dir, "npx", "#!/bin/bash\nexit 0\n")
+
+    try do
+      TestSupport.with_env(%{"PATH" => dir, "GEMINI_NO_NPX" => nil}, fn ->
+        assert {:ok, %CommandSpec{program: "/authority/bin/gemini", argv_prefix: []}} =
+                 ProviderCLI.resolve(:gemini,
+                   governed_authority: [
+                     authority_ref: "authority://cli/provider-cli",
+                     credential_lease_ref: "lease://gemini/provider-cli",
+                     target_ref: "target://local/provider-cli",
+                     command: "/authority/bin/gemini",
+                     env: %{"GEMINI_CONFIG_HOME" => "/authority/gemini-home"},
+                     clear_env?: true
+                   ]
+                 )
+      end)
+    after
+      File.rm_rf(dir)
+    end
+  end
+
+  test "governed authority rejects missing materialized command" do
+    assert {:error, %Error{kind: :cli_not_found} = error} =
+             ProviderCLI.resolve(:codex,
+               governed_authority: [
+                 authority_ref: "authority://cli/provider-cli",
+                 credential_lease_ref: "lease://codex/provider-cli",
+                 target_ref: "target://local/provider-cli",
+                 env: %{"CODEX_HOME" => "/authority/codex-home"},
+                 clear_env?: true
+               ]
+             )
+
+    assert error.message =~ "governed CLI launch authority is invalid"
+    assert error.cause == {:missing_governed_authority_field, :command}
+  end
+
   describe "runtime_failure/3" do
     test "classifies remote command-not-found exits as cli_not_found" do
       exit =

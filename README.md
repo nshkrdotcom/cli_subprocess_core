@@ -171,6 +171,24 @@ provenance. That provenance is an honest standalone lane-owner claim; it is not
 node-admitted Citadel governance. Non-local command placement and the
 session-bearing APIs resolve through `ExecutionPlane.Process.Transport`.
 
+## Governed Launch Authority
+
+Standalone provider calls still honor the normal provider CLI path env, local
+`PATH`, known home locations, and provider-local config behavior. Governed
+calls are separate. Pass `:governed_authority` to `CliSubprocessCore.Command`
+when a higher authority materializer has already selected the command, cwd,
+env, target, config root, auth root, base URL, and cleanup posture for one
+effect.
+
+Governed launch requires `clear_env?: true` and rejects unmanaged caller
+smuggling through `:command`, `:executable`, `:command_spec`, provider CLI path
+keys, `:cwd`, `:env`, config roots, auth roots, base URLs, and model payload
+env overrides. Provider CLI resolution also bypasses ambient provider CLI env,
+`PATH`, npx, known home locations, and version-manager env while governed.
+
+Materialized authority values are carried as refs and redacted shape evidence;
+raw env values remain in the bounded child process launch only.
+
 ## Documentation
 
 - `guides/getting-started.md` for the main public entrypoints.
