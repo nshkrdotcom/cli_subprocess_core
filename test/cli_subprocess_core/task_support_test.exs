@@ -4,8 +4,7 @@ defmodule CliSubprocessCore.TaskSupportTest do
   alias CliSubprocessCore.TaskSupport
 
   setup do
-    supervisor = Module.concat(__MODULE__, :"Supervisor#{System.unique_integer([:positive])}")
-    start_supervised!({Task.Supervisor, name: supervisor})
+    supervisor = start_supervised!(Task.Supervisor)
     %{supervisor: supervisor}
   end
 

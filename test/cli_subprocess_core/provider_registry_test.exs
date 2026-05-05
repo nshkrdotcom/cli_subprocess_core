@@ -5,9 +5,7 @@ defmodule CliSubprocessCore.ProviderRegistryTest do
   alias CliSubprocessCore.TestSupport.ProviderProfiles.{Alternate, DuplicateEcho, Echo}
 
   setup do
-    registry = Module.concat(__MODULE__, :"Registry#{System.unique_integer([:positive])}")
-
-    start_supervised!({ProviderRegistry, name: registry, profile_modules: [Echo]})
+    registry = start_supervised!({ProviderRegistry, profile_modules: [Echo]})
 
     %{registry: registry}
   end
