@@ -399,7 +399,12 @@ defmodule CliSubprocessCore.ProviderCLITest do
                    governed_authority: [
                      authority_ref: "authority://cli/provider-cli",
                      credential_lease_ref: "lease://codex/provider-cli",
+                     connector_instance_ref: "connector-instance://codex/provider-cli",
+                     connector_binding_ref: "connector-binding://codex/provider-cli",
+                     provider_account_ref: "provider-account://codex/provider-cli",
+                     native_auth_assertion_ref: "native-auth-assertion://codex/provider-cli",
                      target_ref: "target://local/provider-cli",
+                     operation_policy_ref: "operation-policy://codex/provider-cli",
                      command: "/authority/bin/codex",
                      env: %{"CODEX_HOME" => "/authority/codex-home"},
                      clear_env?: true
@@ -422,7 +427,12 @@ defmodule CliSubprocessCore.ProviderCLITest do
                    governed_authority: [
                      authority_ref: "authority://cli/provider-cli",
                      credential_lease_ref: "lease://gemini/provider-cli",
+                     connector_instance_ref: "connector-instance://gemini/provider-cli",
+                     connector_binding_ref: "connector-binding://gemini/provider-cli",
+                     provider_account_ref: "provider-account://gemini/provider-cli",
+                     native_auth_assertion_ref: "native-auth-assertion://gemini/provider-cli",
                      target_ref: "target://local/provider-cli",
+                     operation_policy_ref: "operation-policy://gemini/provider-cli",
                      command: "/authority/bin/gemini",
                      env: %{"GEMINI_CONFIG_HOME" => "/authority/gemini-home"},
                      clear_env?: true
@@ -440,7 +450,12 @@ defmodule CliSubprocessCore.ProviderCLITest do
                governed_authority: [
                  authority_ref: "authority://cli/provider-cli",
                  credential_lease_ref: "lease://codex/provider-cli",
+                 connector_instance_ref: "connector-instance://codex/provider-cli",
+                 connector_binding_ref: "connector-binding://codex/provider-cli",
+                 provider_account_ref: "provider-account://codex/provider-cli",
+                 native_auth_assertion_ref: "native-auth-assertion://codex/provider-cli",
                  target_ref: "target://local/provider-cli",
+                 operation_policy_ref: "operation-policy://codex/provider-cli",
                  env: %{"CODEX_HOME" => "/authority/codex-home"},
                  clear_env?: true
                ]

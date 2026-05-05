@@ -249,7 +249,12 @@ defmodule CliSubprocessCore.CommandTest do
                governed_authority: [
                  authority_ref: "authority://cli/run",
                  credential_lease_ref: "lease://codex/run",
+                 connector_instance_ref: "connector-instance://codex/run",
+                 connector_binding_ref: "connector-binding://codex/run",
+                 provider_account_ref: "provider-account://codex/run",
+                 native_auth_assertion_ref: "native-auth-assertion://codex/run",
                  target_ref: "target://local/run",
+                 operation_policy_ref: "operation-policy://codex/run",
                  command: "/authority/bin/codex",
                  env: %{"CODEX_HOME" => "/authority/codex-home"},
                  clear_env?: true
@@ -272,7 +277,12 @@ defmodule CliSubprocessCore.CommandTest do
                governed_authority: [
                  authority_ref: "authority://cli/run",
                  credential_lease_ref: "lease://shell/run",
+                 connector_instance_ref: "connector-instance://shell/run",
+                 connector_binding_ref: "connector-binding://shell/run",
+                 provider_account_ref: "provider-account://shell/run",
+                 native_auth_assertion_ref: "native-auth-assertion://shell/run",
                  target_ref: "target://local/run",
+                 operation_policy_ref: "operation-policy://shell/run",
                  command: "/bin/sh",
                  env: %{"MARKER" => "from-authority"},
                  clear_env?: true,

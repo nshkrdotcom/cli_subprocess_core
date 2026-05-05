@@ -10,10 +10,26 @@ defmodule CliSubprocessCore.GovernedAuthority do
 
   alias CliSubprocessCore.{Command, CommandSpec}
 
-  @enforce_keys [:authority_ref, :credential_lease_ref, :target_ref, :command, :clear_env?]
+  @enforce_keys [
+    :authority_ref,
+    :credential_lease_ref,
+    :connector_instance_ref,
+    :connector_binding_ref,
+    :provider_account_ref,
+    :native_auth_assertion_ref,
+    :target_ref,
+    :operation_policy_ref,
+    :command,
+    :clear_env?
+  ]
   defstruct authority_ref: nil,
             credential_lease_ref: nil,
+            connector_instance_ref: nil,
+            connector_binding_ref: nil,
+            provider_account_ref: nil,
+            native_auth_assertion_ref: nil,
             target_ref: nil,
+            operation_policy_ref: nil,
             command: nil,
             cwd: nil,
             env: %{},
@@ -27,7 +43,12 @@ defmodule CliSubprocessCore.GovernedAuthority do
   @type t :: %__MODULE__{
           authority_ref: String.t(),
           credential_lease_ref: String.t(),
+          connector_instance_ref: String.t(),
+          connector_binding_ref: String.t(),
+          provider_account_ref: String.t(),
+          native_auth_assertion_ref: String.t(),
           target_ref: String.t(),
+          operation_policy_ref: String.t(),
           command: String.t(),
           cwd: String.t() | nil,
           env: %{optional(String.t()) => String.t()},
@@ -64,7 +85,12 @@ defmodule CliSubprocessCore.GovernedAuthority do
     authority = %__MODULE__{
       authority_ref: string_field(attrs, :authority_ref),
       credential_lease_ref: string_field(attrs, :credential_lease_ref),
+      connector_instance_ref: string_field(attrs, :connector_instance_ref),
+      connector_binding_ref: string_field(attrs, :connector_binding_ref),
+      provider_account_ref: string_field(attrs, :provider_account_ref),
+      native_auth_assertion_ref: string_field(attrs, :native_auth_assertion_ref),
       target_ref: string_field(attrs, :target_ref),
+      operation_policy_ref: string_field(attrs, :operation_policy_ref),
       command: string_field(attrs, :materialized_command) || string_field(attrs, :command),
       cwd: string_field(attrs, :materialized_cwd) || string_field(attrs, :cwd),
       env: env_field(attrs),
@@ -136,7 +162,12 @@ defmodule CliSubprocessCore.GovernedAuthority do
     %{
       authority_ref: authority.authority_ref,
       credential_lease_ref: authority.credential_lease_ref,
+      connector_instance_ref: authority.connector_instance_ref,
+      connector_binding_ref: authority.connector_binding_ref,
+      provider_account_ref: authority.provider_account_ref,
+      native_auth_assertion_ref: authority.native_auth_assertion_ref,
       target_ref: authority.target_ref,
+      operation_policy_ref: authority.operation_policy_ref,
       command_ref: authority.command_ref,
       redaction_ref: authority.redaction_ref,
       command: redacted_value(authority.command),
@@ -152,7 +183,12 @@ defmodule CliSubprocessCore.GovernedAuthority do
   defp validate(%__MODULE__{} = authority) do
     with :ok <- require_binary(authority.authority_ref, :authority_ref),
          :ok <- require_binary(authority.credential_lease_ref, :credential_lease_ref),
+         :ok <- require_binary(authority.connector_instance_ref, :connector_instance_ref),
+         :ok <- require_binary(authority.connector_binding_ref, :connector_binding_ref),
+         :ok <- require_binary(authority.provider_account_ref, :provider_account_ref),
+         :ok <- require_binary(authority.native_auth_assertion_ref, :native_auth_assertion_ref),
          :ok <- require_binary(authority.target_ref, :target_ref),
+         :ok <- require_binary(authority.operation_policy_ref, :operation_policy_ref),
          :ok <- require_binary(authority.command, :command),
          :ok <- optional_binary(authority.cwd, :cwd),
          :ok <- validate_env(authority.env),

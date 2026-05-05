@@ -154,7 +154,12 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  governed_authority: [
                    authority_ref: "authority://cli/codex",
                    credential_lease_ref: "lease://codex/1",
+                   connector_instance_ref: "connector-instance://codex/1",
+                   connector_binding_ref: "connector-binding://codex/1",
+                   provider_account_ref: "provider-account://codex/1",
+                   native_auth_assertion_ref: "native-auth-assertion://codex/1",
                    target_ref: "target://local/1",
+                   operation_policy_ref: "operation-policy://codex/1",
                    command: "/authority/bin/codex",
                    cwd: "/workspace",
                    env: %{
@@ -190,7 +195,12 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       authority = [
         authority_ref: "authority://cli/codex",
         credential_lease_ref: "lease://codex/1",
+        connector_instance_ref: "connector-instance://codex/1",
+        connector_binding_ref: "connector-binding://codex/1",
+        provider_account_ref: "provider-account://codex/1",
+        native_auth_assertion_ref: "native-auth-assertion://codex/1",
         target_ref: "target://local/1",
+        operation_policy_ref: "operation-policy://codex/1",
         command: "/authority/bin/codex",
         cwd: "/workspace",
         env: %{"CODEX_HOME" => "/authority/codex-home"},

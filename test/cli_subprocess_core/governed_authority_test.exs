@@ -8,7 +8,12 @@ defmodule CliSubprocessCore.GovernedAuthorityTest do
              GovernedAuthority.new(%{
                "authority_ref" => "authority://cli/1",
                "credential_lease_ref" => "lease://codex/1",
+               "connector_instance_ref" => "connector-instance://codex/1",
+               "connector_binding_ref" => "connector-binding://codex/1",
+               "provider_account_ref" => "provider-account://codex/1",
+               "native_auth_assertion_ref" => "native-auth-assertion://codex/1",
                "target_ref" => "target://local/1",
+               "operation_policy_ref" => "operation-policy://codex/1",
                "materialized_command" => "/authority/bin/codex",
                "materialized_cwd" => "/workspace",
                "materialized_env" => %{
@@ -36,7 +41,12 @@ defmodule CliSubprocessCore.GovernedAuthorityTest do
     assert GovernedAuthority.redacted(authority) == %{
              authority_ref: "authority://cli/1",
              credential_lease_ref: "lease://codex/1",
+             connector_instance_ref: "connector-instance://codex/1",
+             connector_binding_ref: "connector-binding://codex/1",
+             provider_account_ref: "provider-account://codex/1",
+             native_auth_assertion_ref: "native-auth-assertion://codex/1",
              target_ref: "target://local/1",
+             operation_policy_ref: "operation-policy://codex/1",
              command_ref: "command://codex/1",
              redaction_ref: "redaction://cli/1",
              command: "[redacted:20]",
@@ -53,7 +63,12 @@ defmodule CliSubprocessCore.GovernedAuthorityTest do
     assert {:error, {:missing_governed_authority_field, :authority_ref}} =
              GovernedAuthority.new(%{
                credential_lease_ref: "lease://codex/1",
+               connector_instance_ref: "connector-instance://codex/1",
+               connector_binding_ref: "connector-binding://codex/1",
+               provider_account_ref: "provider-account://codex/1",
+               native_auth_assertion_ref: "native-auth-assertion://codex/1",
                target_ref: "target://local/1",
+               operation_policy_ref: "operation-policy://codex/1",
                command: "/authority/bin/codex",
                clear_env?: true
              })
@@ -62,9 +77,27 @@ defmodule CliSubprocessCore.GovernedAuthorityTest do
              GovernedAuthority.new(%{
                authority_ref: "authority://cli/1",
                credential_lease_ref: "lease://codex/1",
+               connector_instance_ref: "connector-instance://codex/1",
+               connector_binding_ref: "connector-binding://codex/1",
+               provider_account_ref: "provider-account://codex/1",
+               native_auth_assertion_ref: "native-auth-assertion://codex/1",
                target_ref: "target://local/1",
+               operation_policy_ref: "operation-policy://codex/1",
                command: "/authority/bin/codex",
                clear_env?: false
+             })
+
+    assert {:error, {:missing_governed_authority_field, :native_auth_assertion_ref}} =
+             GovernedAuthority.new(%{
+               authority_ref: "authority://cli/1",
+               credential_lease_ref: "lease://codex/1",
+               connector_instance_ref: "connector-instance://codex/1",
+               connector_binding_ref: "connector-binding://codex/1",
+               provider_account_ref: "provider-account://codex/1",
+               target_ref: "target://local/1",
+               operation_policy_ref: "operation-policy://codex/1",
+               command: "/authority/bin/codex",
+               clear_env?: true
              })
   end
 
@@ -106,7 +139,12 @@ defmodule CliSubprocessCore.GovernedAuthorityTest do
     GovernedAuthority.fetch!(
       authority_ref: "authority://cli/1",
       credential_lease_ref: "lease://codex/1",
+      connector_instance_ref: "connector-instance://codex/1",
+      connector_binding_ref: "connector-binding://codex/1",
+      provider_account_ref: "provider-account://codex/1",
+      native_auth_assertion_ref: "native-auth-assertion://codex/1",
       target_ref: "target://local/1",
+      operation_policy_ref: "operation-policy://codex/1",
       command: "/authority/bin/codex",
       cwd: "/workspace",
       env: %{"CODEX_HOME" => "/authority/codex-home"},

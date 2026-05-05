@@ -79,7 +79,12 @@ env, config root, auth root, and base URL also belong in that authority value.
     governed_authority: [
       authority_ref: "authority://cli/run",
       credential_lease_ref: "lease://codex/run",
+      connector_instance_ref: "connector-instance://codex/run",
+      connector_binding_ref: "connector-binding://codex/run",
+      provider_account_ref: "provider-account://codex/run",
+      native_auth_assertion_ref: "native-auth-assertion://codex/run",
       target_ref: "target://local/run",
+      operation_policy_ref: "operation-policy://codex/run",
       command: "/materialized/bin/codex",
       cwd: "/workspace",
       env: %{"CODEX_HOME" => "/materialized/codex-home"},

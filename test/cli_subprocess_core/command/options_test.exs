@@ -123,7 +123,12 @@ defmodule CliSubprocessCore.Command.OptionsTest do
     [
       authority_ref: "authority://cli/options",
       credential_lease_ref: "lease://codex/options",
+      connector_instance_ref: "connector-instance://codex/options",
+      connector_binding_ref: "connector-binding://codex/options",
+      provider_account_ref: "provider-account://codex/options",
+      native_auth_assertion_ref: "native-auth-assertion://codex/options",
       target_ref: "target://local/options",
+      operation_policy_ref: "operation-policy://codex/options",
       command: "/authority/bin/codex",
       cwd: "/workspace",
       env: %{"CODEX_HOME" => "/authority/codex-home"},
