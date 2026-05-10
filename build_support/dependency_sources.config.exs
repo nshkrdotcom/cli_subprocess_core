@@ -2,9 +2,13 @@
   deps: %{
     execution_plane: %{
       path: "../execution_plane/core/execution_plane",
-      github: %{repo: "nshkrdotcom/execution_plane", branch: "main", subdir: "core/execution_plane"},
+      github: %{
+        repo: "nshkrdotcom/execution_plane",
+        branch: "main",
+        subdir: "core/execution_plane"
+      },
       hex: "~> 0.1.0",
-      default_order: [:path, :github, :hex],
+      default_order: [:github, :hex, :path],
       publish_order: [:hex]
     },
     execution_plane_jsonrpc: %{
@@ -15,7 +19,7 @@
         subdir: "protocols/execution_plane_jsonrpc"
       },
       hex: "~> 0.1.0",
-      default_order: [:path, :github, :hex],
+      default_order: [:github, :hex, :path],
       publish_order: [:hex]
     },
     execution_plane_process: %{
@@ -26,7 +30,7 @@
         subdir: "runtimes/execution_plane_process"
       },
       hex: "~> 0.1.0",
-      default_order: [:path, :github, :hex],
+      default_order: [:github, :hex, :path],
       publish_order: [:hex]
     }
   }
