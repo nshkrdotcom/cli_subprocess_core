@@ -1,8 +1,9 @@
 defmodule CliSubprocessCore.TestSupport.LiveSSH do
   @moduledoc """
-  Shared env-driven helpers for opt-in live SSH execution-surface tests.
+  Shared config-driven helpers for opt-in live SSH execution-surface tests.
 
-  Environment variables:
+  Test wrappers materialize these values into `:cli_subprocess_core,
+  :live_ssh_env`:
 
   - `CLI_SUBPROCESS_CORE_LIVE_SSH=1` enables the helpers
   - `CLI_SUBPROCESS_CORE_LIVE_SSH_DESTINATION=<host>` selects the SSH target
@@ -30,7 +31,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
 
   @spec enabled?() :: boolean()
   def enabled? do
-    System.get_env(@enabled_env)
+    env_value(@enabled_env)
     |> to_string()
     |> String.downcase()
     |> then(&(&1 in ["1", "true", "yes"]))
@@ -44,7 +45,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
 
   @spec destination() :: String.t() | nil
   def destination do
-    case System.get_env(@destination_env) do
+    case env_value(@destination_env) do
       value when is_binary(value) and value != "" -> value
       _other -> nil
     end
@@ -87,7 +88,7 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
 
   @spec provider_command(:amp | :claude | :codex | :gemini) :: String.t() | nil
   def provider_command(provider) when provider in [:amp, :claude, :codex, :gemini] do
-    case System.get_env(provider_command_env(provider)) do
+    case env_value(provider_command_env(provider)) do
       value when is_binary(value) and value != "" -> value
       _other -> nil
     end
@@ -145,11 +146,24 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
   end
 
   defp maybe_put(opts, env_var, key, fun \\ & &1) when is_list(opts) and is_binary(env_var) do
-    case System.get_env(env_var) do
+    case env_value(env_var) do
       value when is_binary(value) and value != "" -> Keyword.put(opts, key, fun.(value))
       _other -> opts
     end
   end
+
+  defp env_value(name) when is_binary(name) do
+    :cli_subprocess_core
+    |> Application.get_env(:live_ssh_env, %{})
+    |> normalize_env()
+    |> Map.get(name)
+  end
+
+  defp normalize_env(env) when is_map(env) do
+    Map.new(env, fn {key, value} -> {to_string(key), to_string(value)} end)
+  end
+
+  defp normalize_env(_env), do: %{}
 
   defp parse_port!(value) when is_binary(value) do
     case Integer.parse(value) do

@@ -65,6 +65,7 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   @type resolve_opt ::
           {:allow_js_entrypoint, boolean()}
+          | {:ambient_env, map()}
           | {:default_command, String.t()}
           | {:display_name, String.t()}
           | {:env_var, String.t() | nil}
@@ -214,13 +215,18 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp build_settings(provider, opts) do
     base_settings = Map.get(@provider_settings, provider, %{})
+    opts_map = Map.new(opts)
+    ambient_env = normalize_env(Map.get(opts_map, :ambient_env, configured_provider_env()))
 
     settings =
       base_settings
-      |> Map.merge(Map.new(opts))
+      |> Map.merge(opts_map)
+      |> Map.put(:ambient_env, ambient_env)
       |> Map.put_new(:extra_keys, [])
       |> Map.put_new_lazy(:path_candidates, fn -> [Map.get(base_settings, :default_command)] end)
-      |> Map.put_new_lazy(:known_locations, fn -> default_known_locations(provider) end)
+      |> Map.put_new_lazy(:known_locations, fn ->
+        default_known_locations(provider, ambient_env)
+      end)
       |> Map.put_new(:known_locations_first?, false)
       |> Map.put_new(:allow_js_entrypoint, false)
       |> Map.put_new_lazy(:remote_default_command, fn ->
@@ -254,6 +260,28 @@ defmodule CliSubprocessCore.ProviderCLI do
       install_hint: Map.get(base_settings, :install_hint),
       path_candidates: Map.get(base_settings, :path_candidates, [Atom.to_string(provider)])
     }
+  end
+
+  defp configured_provider_env do
+    Application.get_env(:cli_subprocess_core, :provider_cli_env, %{})
+  end
+
+  defp normalize_env(env) when is_map(env) do
+    Map.new(env, fn {key, value} -> {to_string(key), to_string(value)} end)
+  end
+
+  defp normalize_env(env) when is_list(env) do
+    env
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn {key, value} -> {to_string(key), to_string(value)} end)
+  end
+
+  defp normalize_env(_env), do: %{}
+
+  defp env_value(settings, key) when is_map(settings) and is_binary(key) do
+    settings
+    |> Map.get(:ambient_env, %{})
+    |> Map.get(key)
   end
 
   defp resolve_spec(provider_opts, settings) do
@@ -351,7 +379,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   end
 
   defp env_override(%{env_var: env_var} = settings) when is_binary(env_var) and env_var != "" do
-    case System.get_env(env_var) do
+    case env_value(settings, env_var) do
       nil ->
         :miss
 
@@ -442,12 +470,13 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp npx_lookup(%{npx_package: nil}), do: :miss
 
   defp npx_lookup(%{
+         ambient_env: ambient_env,
          npx_package: package,
          npx_command: command,
          npx_disable_env: disable_env
        })
        when is_binary(package) and is_binary(command) do
-    if npx_disabled?(disable_env) do
+    if npx_disabled?(disable_env, ambient_env) do
       :miss
     else
       case System.find_executable("npx") do
@@ -508,11 +537,12 @@ defmodule CliSubprocessCore.ProviderCLI do
     _error -> :miss
   end
 
-  defp npx_disabled?(disable_env) when is_binary(disable_env) and disable_env != "" do
-    System.get_env(disable_env) in ["1", "true"]
+  defp npx_disabled?(disable_env, ambient_env)
+       when is_binary(disable_env) and disable_env != "" do
+    Map.get(ambient_env, disable_env) in ["1", "true"]
   end
 
-  defp npx_disabled?(_other), do: false
+  defp npx_disabled?(_other, _ambient_env), do: false
 
   defp maybe_stabilize_command_spec(
          %CommandSpec{program: program, argv_prefix: []} = spec,
@@ -791,7 +821,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp resolve_shim_target(manager, shim_path, settings) do
     command = Path.basename(shim_path)
 
-    with {:ok, manager_executable} <- version_manager_executable(manager, shim_path),
+    with {:ok, manager_executable} <- version_manager_executable(manager, shim_path, settings),
          {:ok, resolved_path} <-
            run_version_manager_which(manager, manager_executable, command, settings),
          true <-
@@ -829,28 +859,28 @@ defmodule CliSubprocessCore.ProviderCLI do
     end
   end
 
-  defp version_manager_executable(:asdf, shim_path) do
+  defp version_manager_executable(:asdf, shim_path, settings) do
     shim_root = shim_path |> Path.expand() |> Path.dirname() |> Path.dirname()
 
     [
-      System.get_env("ASDF_BIN"),
+      env_value(settings, "ASDF_BIN"),
       Path.join(shim_root, "bin/asdf"),
-      asdf_dir_candidate(),
+      asdf_dir_candidate(settings),
       System.find_executable("asdf")
     ]
     |> first_executable()
   end
 
-  defp version_manager_executable(:mise, _shim_path) do
+  defp version_manager_executable(:mise, _shim_path, settings) do
     [
-      System.get_env("MISE_BIN"),
+      env_value(settings, "MISE_BIN"),
       System.find_executable("mise"),
       Path.join(System.user_home!(), ".local/bin/mise")
     ]
     |> first_executable()
   end
 
-  defp version_manager_executable(:rtx, _shim_path) do
+  defp version_manager_executable(:rtx, _shim_path, _settings) do
     [
       System.find_executable("rtx"),
       Path.join(System.user_home!(), ".local/bin/rtx")
@@ -891,8 +921,8 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp maybe_put_cd(opts, cwd) when is_binary(cwd) and cwd != "", do: Keyword.put(opts, :cd, cwd)
   defp maybe_put_cd(opts, _cwd), do: opts
 
-  defp asdf_dir_candidate do
-    case System.get_env("ASDF_DIR") do
+  defp asdf_dir_candidate(settings) do
+    case env_value(settings, "ASDF_DIR") do
       value when is_binary(value) and value != "" ->
         Path.join(value, "bin/asdf")
 
@@ -1018,8 +1048,8 @@ defmodule CliSubprocessCore.ProviderCLI do
       String.contains?(value, "/")
   end
 
-  defp default_known_locations(:amp) do
-    home = System.get_env("HOME") || System.user_home!()
+  defp default_known_locations(:amp, ambient_env) do
+    home = Map.get(ambient_env, "HOME") || System.user_home!()
 
     [
       Path.join([home, ".amp", "bin", "amp"]),
@@ -1027,7 +1057,7 @@ defmodule CliSubprocessCore.ProviderCLI do
     ]
   end
 
-  defp default_known_locations(:claude) do
+  defp default_known_locations(:claude, _ambient_env) do
     home = System.user_home!()
 
     [
@@ -1040,7 +1070,7 @@ defmodule CliSubprocessCore.ProviderCLI do
     ]
   end
 
-  defp default_known_locations(_provider), do: []
+  defp default_known_locations(_provider, _ambient_env), do: []
 
   defp run_lookup_steps(steps, settings) when is_list(steps) do
     Enum.reduce_while(steps, :miss, fn step, :miss ->

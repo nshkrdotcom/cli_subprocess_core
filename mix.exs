@@ -1,3 +1,5 @@
+Code.require_file("build_support/dependency_sources.exs", __DIR__)
+
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
@@ -5,9 +7,6 @@ defmodule CliSubprocessCore.MixProject do
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
-  @execution_plane_version "~> 0.1.0"
-  @execution_plane_jsonrpc_version "~> 0.1.0"
-  @execution_plane_process_version "~> 0.1.0"
 
   def project do
     [
@@ -113,7 +112,7 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       description: description(),
       files:
-        ~w(lib priv/models scripts .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
+        ~w(lib priv/models scripts build_support .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -156,39 +155,15 @@ defmodule CliSubprocessCore.MixProject do
   end
 
   defp execution_plane_dep do
-    case local_dep_path("../execution_plane/core/execution_plane") do
-      nil -> {:execution_plane, @execution_plane_version}
-      path -> {:execution_plane, path: path}
-    end
+    DependencySources.dep(:execution_plane, __DIR__)
   end
 
   defp execution_plane_jsonrpc_dep do
-    case local_dep_path("../execution_plane/protocols/execution_plane_jsonrpc") do
-      nil -> {:execution_plane_jsonrpc, @execution_plane_jsonrpc_version}
-      path -> {:execution_plane_jsonrpc, path: path}
-    end
+    DependencySources.dep(:execution_plane_jsonrpc, __DIR__)
   end
 
   defp execution_plane_process_dep do
-    case local_dep_path("../execution_plane/runtimes/execution_plane_process") do
-      nil -> {:execution_plane_process, @execution_plane_process_version}
-      path -> {:execution_plane_process, path: path}
-    end
-  end
-
-  defp local_dep_path(relative_path) do
-    if local_workspace_deps?() do
-      path = Path.expand(relative_path, __DIR__)
-      if File.dir?(path), do: path
-    end
-  end
-
-  defp local_workspace_deps? do
-    not hex_packaging_task?() and not Enum.member?(Path.split(__DIR__), "deps")
-  end
-
-  defp hex_packaging_task? do
-    Enum.any?(System.argv(), &(&1 in ["hex.build", "hex.publish"]))
+    DependencySources.dep(:execution_plane_process, __DIR__)
   end
 
   defp dialyzer do
