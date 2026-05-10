@@ -14,16 +14,15 @@ Use the local model-selection script for workflow validation:
 - Keep local sibling deps publish-aware. Local development uses
   `build_support/dependency_sources.exs` and
   `build_support/dependency_sources.config.exs`. Committed default dependency
-  priority is `GitHub -> Hex -> path` so clean downstream Git checkouts do not
-  silently bind to sibling `deps/` directories. Local path development uses
-  `.dependency_sources.local.exs` to select
-  `../execution_plane/core/execution_plane` for `:execution_plane`; lane deps
-  still use their package homes such as
+  priority is `path -> GitHub -> Hex` so local sibling checkouts resolve
+  consistently across downstream workspaces while clean standalone clones fall
+  back to GitHub. Local path development uses the package homes such as
+  `../execution_plane/core/execution_plane` for `:execution_plane`,
   `../execution_plane/protocols/execution_plane_jsonrpc` and
   `../execution_plane/runtimes/execution_plane_process`. Hex builds must
   resolve Execution Plane packages by version.
 - Local dependency overrides use `.dependency_sources.local.exs`.
-- Default dependency priority is `GitHub -> Hex -> path`; publish mode is
+- Default dependency priority is `path -> GitHub -> Hex`; publish mode is
   Hex-only and must fail with exact blockers if an internal dep is unavailable
   on Hex.
 - Dependency source selection must not use environment variables.

@@ -8,7 +8,7 @@
         subdir: "core/execution_plane"
       },
       hex: "~> 0.1.0",
-      default_order: [:github, :hex, :path],
+      default_order: [:path, :github, :hex],
       publish_order: [:hex]
     },
     execution_plane_jsonrpc: %{
@@ -19,7 +19,7 @@
         subdir: "protocols/execution_plane_jsonrpc"
       },
       hex: "~> 0.1.0",
-      default_order: [:github, :hex, :path],
+      default_order: [:path, :github, :hex],
       publish_order: [:hex]
     },
     execution_plane_process: %{
@@ -30,7 +30,7 @@
         subdir: "runtimes/execution_plane_process"
       },
       hex: "~> 0.1.0",
-      default_order: [:github, :hex, :path],
+      default_order: [:path, :github, :hex],
       publish_order: [:hex]
     }
   }
