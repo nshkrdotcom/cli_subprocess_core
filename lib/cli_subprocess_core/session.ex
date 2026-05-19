@@ -339,7 +339,7 @@ defmodule CliSubprocessCore.Session do
   @impl GenServer
   def terminate(_reason, state) do
     if is_pid(state.transport_pid) do
-      _ = Transport.close(state.transport_pid)
+      safe_close_transport(Transport, state.transport_pid)
     end
 
     :ok
