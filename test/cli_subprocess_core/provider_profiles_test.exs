@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor, Gemini}
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   describe "build_invocation/1" do
@@ -360,6 +360,117 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert command.cwd == "/tmp/amp"
     end
 
+    test "Cursor builds the expected CLI invocation" do
+      assert {:ok, %Command{} = command} =
+               Cursor.build_invocation(
+                 command: "agent-bin",
+                 prompt: "ship cursor",
+                 cwd: "/tmp/cursor",
+                 env: %{"CURSOR_API_KEY" => "redacted"},
+                 model_payload: %{
+                   provider: :cursor,
+                   requested_model: "gpt-5",
+                   resolved_model: "gpt-5",
+                   resolution_source: :explicit,
+                   errors: []
+                 },
+                 permission_mode: :bypass,
+                 mode: :ask,
+                 sandbox: :enabled,
+                 approve_mcps: true,
+                 worktree: "phase-1",
+                 worktree_base: "main",
+                 skip_worktree_setup: true,
+                 plugin_dirs: ["/plugins/a", "/plugins/b"],
+                 headers: [{"X-Trace", "trace-1"}],
+                 resume: "chat-123"
+               )
+
+      assert command.command == "agent-bin"
+
+      assert command.args == [
+               "-p",
+               "--trust",
+               "--output-format",
+               "stream-json",
+               "--stream-partial-output",
+               "--model",
+               "gpt-5",
+               "--workspace",
+               "/tmp/cursor",
+               "--resume",
+               "chat-123",
+               "--mode",
+               "ask",
+               "--sandbox",
+               "enabled",
+               "--approve-mcps",
+               "--worktree",
+               "phase-1",
+               "--worktree-base",
+               "main",
+               "--skip-worktree-setup",
+               "--plugin-dir",
+               "/plugins/a",
+               "--plugin-dir",
+               "/plugins/b",
+               "-H",
+               "X-Trace: trace-1",
+               "--force",
+               "ship cursor"
+             ]
+
+      assert command.cwd == "/tmp/cursor"
+      assert command.env == %{"CURSOR_API_KEY" => "redacted"}
+      refute "--prompt" in command.args
+    end
+
+    test "Cursor governed invocation uses only authority materialized launch fields" do
+      assert {:ok, %Command{} = command} =
+               Cursor.build_invocation(
+                 prompt: "review",
+                 governed_authority: cursor_authority(),
+                 permission_mode: :bypass
+               )
+
+      assert command.command == "/authority/bin/agent"
+      assert command.cwd == "/workspace/cursor"
+      assert command.env == %{"CURSOR_API_KEY" => "authority-key"}
+      assert command.clear_env? == true
+
+      assert command.args == [
+               "-p",
+               "--trust",
+               "--output-format",
+               "stream-json",
+               "--stream-partial-output",
+               "--force",
+               "review"
+             ]
+    end
+
+    test "Cursor governed invocation rejects caller env and cwd overrides" do
+      assert_raise ArgumentError,
+                   "governed launch env must come from materialized authority",
+                   fn ->
+                     Cursor.build_invocation(
+                       prompt: "review",
+                       governed_authority: cursor_authority(),
+                       env: %{"CURSOR_API_KEY" => "ambient"}
+                     )
+                   end
+
+      assert_raise ArgumentError,
+                   "governed launch cwd must come from materialized authority",
+                   fn ->
+                     Cursor.build_invocation(
+                       prompt: "review",
+                       governed_authority: cursor_authority(),
+                       cwd: "/ambient"
+                     )
+                   end
+    end
+
     test "uses resolved model payload when model option is not set" do
       assert {:ok, %Command{} = command} =
                Gemini.build_invocation(
@@ -507,6 +618,11 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert event.payload.metadata.line == malformed
       refute Map.has_key?(state, :stdout_buffer)
       refute Map.has_key?(state, :stderr_buffer)
+    end
+
+    test "Cursor closes stdin on start for headless print runs" do
+      assert Cursor.transport_options([])[:close_stdin_on_start?] == true
+      assert Cursor.transport_options(startup_mode: :eager)[:startup_mode] == :eager
     end
   end
 
@@ -783,12 +899,89 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert Enum.at(events, 2).provider_session_id == "amp-session-2"
     end
 
+    test "Cursor decodes its JSONL fixture into normalized events" do
+      events = decode_fixture(Cursor, "cursor")
+
+      assert Enum.map(events, & &1.kind) == [
+               :raw,
+               :user_message,
+               :thinking,
+               :assistant_delta,
+               :tool_use,
+               :tool_result,
+               :assistant_message,
+               :result
+             ]
+
+      assert %Payload.Raw{content: %{"type" => "system", "subtype" => "init"}} =
+               Enum.at(events, 0).payload
+
+      assert Enum.at(events, 0).provider_session_id == "cursor-session-1"
+
+      assert %Payload.UserMessage{content: [%{"type" => "text", "text" => "Please help"}]} =
+               Enum.at(events, 1).payload
+
+      assert %Payload.Thinking{content: "Need tool"} = Enum.at(events, 2).payload
+      assert %Payload.AssistantDelta{content: "Hel"} = Enum.at(events, 3).payload
+
+      assert %Payload.ToolUse{
+               tool_name: "shell",
+               tool_call_id: "tool-cursor-1",
+               input: %{"command" => "pwd", "toolCallId" => "tool-cursor-1"}
+             } = Enum.at(events, 4).payload
+
+      assert %Payload.ToolResult{
+               tool_call_id: "tool-cursor-1",
+               content: "/tmp\n",
+               is_error: false
+             } = Enum.at(events, 5).payload
+
+      assert %Payload.AssistantMessage{content: [%{"type" => "text", "text" => "Hello"}]} =
+               Enum.at(events, 6).payload
+
+      assert %Payload.Result{
+               status: :completed,
+               stop_reason: "success",
+               output: %{
+                 duration_ms: 250,
+                 result: "Hello",
+                 usage: %{input_tokens: 3, output_tokens: 5}
+               }
+             } = Enum.at(events, 7).payload
+
+      assert [stderr] = decode_stderr(Cursor, "cursor warning")
+      assert %Payload.Stderr{content: "cursor warning"} = stderr.payload
+    end
+
+    test "Cursor force-closes pending tools on reconnect hints" do
+      state = Cursor.init_parser_state([])
+
+      started =
+        ~s({"type":"tool_call","subtype":"started","call_id":"tool-lost","tool_call":{"shellToolCall":{"args":{"command":"sleep 10","toolCallId":"tool-lost"}}},"session_id":"cursor-session-2"})
+
+      reconnect =
+        ~s({"type":"connection","subtype":"reconnecting","session_id":"cursor-session-2"})
+
+      {[started_event], state} = Cursor.decode_stdout(started, state)
+      assert started_event.kind == :tool_use
+
+      {events, _state} = Cursor.decode_stdout(reconnect, state)
+      assert Enum.map(events, & &1.kind) == [:tool_result, :raw]
+
+      assert %Payload.ToolResult{
+               tool_call_id: "tool-lost",
+               is_error: true,
+               metadata: %{reason: :connection_reconnecting}
+             } = hd(events).payload
+    end
+
     test "normalized fixture events preserve raw provider payloads" do
       for {profile, fixture_name} <- [
             {Claude, "claude"},
             {Codex, "codex"},
             {Gemini, "gemini"},
-            {Amp, "amp"}
+            {Amp, "amp"},
+            {Cursor, "cursor"}
           ] do
         events = decode_fixture(profile, fixture_name)
 
@@ -820,5 +1013,24 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
   defp decode_stderr(profile, chunk) do
     {events, _state} = profile.decode_stderr(chunk, profile.init_parser_state([]))
     events
+  end
+
+  defp cursor_authority do
+    [
+      authority_ref: "authority://cli/cursor",
+      credential_lease_ref: "lease://cursor/1",
+      connector_instance_ref: "connector-instance://cursor/1",
+      connector_binding_ref: "connector-binding://cursor/1",
+      provider_account_ref: "provider-account://cursor/1",
+      native_auth_assertion_ref: "native-auth-assertion://cursor/1",
+      target_ref: "target://local/1",
+      operation_policy_ref: "operation-policy://cursor/1",
+      command: "/authority/bin/agent",
+      cwd: "/workspace/cursor",
+      env: %{"CURSOR_API_KEY" => "authority-key"},
+      clear_env?: true,
+      config_root: "/authority/config",
+      auth_root: "/authority/auth"
+    ]
   end
 end

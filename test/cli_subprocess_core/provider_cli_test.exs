@@ -233,6 +233,52 @@ defmodule CliSubprocessCore.ProviderCLITest do
       end
     end
 
+    test "Cursor honors CURSOR_CLI_PATH" do
+      dir = TestSupport.tmp_dir!("core_cursor_cli")
+      agent_path = TestSupport.write_executable!(dir, "agent", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"CURSOR_CLI_PATH" => agent_path}, fn ->
+          assert {:ok, %CommandSpec{program: ^agent_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:cursor)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Cursor falls back to cursor-agent as a path candidate" do
+      dir = TestSupport.tmp_dir!("core_cursor_agent_cli")
+
+      cursor_agent_path =
+        TestSupport.write_executable!(dir, "cursor-agent", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"CURSOR_CLI_PATH" => nil, "PATH" => dir}, fn ->
+          assert {:ok, %CommandSpec{program: ^cursor_agent_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:cursor)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Cursor finds the default local binary location" do
+      home = TestSupport.tmp_dir!("core_cursor_cli_home")
+      bin_dir = Path.join([home, ".local", "bin"])
+      File.mkdir_p!(bin_dir)
+      agent_path = TestSupport.write_executable!(bin_dir, "agent", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"HOME" => home, "PATH" => "/nonexistent_dir_only"}, fn ->
+          assert {:ok, %CommandSpec{program: ^agent_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:cursor)
+        end)
+      after
+        File.rm_rf(home)
+      end
+    end
+
     test "Amp wraps JavaScript launchers from AMP_CLI_PATH with node" do
       dir = TestSupport.tmp_dir!("core_amp_cli_js")
       js_path = TestSupport.write_file!(dir, "amp.js", "console.log('amp');\n")
@@ -602,6 +648,22 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert failure.kind == :auth_error
       assert failure.message =~ "Claude CLI requires authentication"
       assert failure.message =~ "remote target auth.example"
+      assert ProviderCLI.runtime_failure_code(failure) == "auth_error"
+    end
+
+    test "classifies Cursor auth failures with the provider hint" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 1},
+          stderr: "Authentication required. Please login before continuing.\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(:cursor, exit)
+
+      assert failure.kind == :auth_error
+      assert failure.message =~ "Cursor Agent CLI requires authentication"
+      assert failure.message =~ "Set CURSOR_API_KEY or run agent login"
       assert ProviderCLI.runtime_failure_code(failure) == "auth_error"
     end
 

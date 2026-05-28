@@ -391,11 +391,15 @@ defmodule CliSubprocessCore.ModelInput do
   defp maybe_put_reasoning(opts, reasoning), do: Keyword.put(opts, :reasoning_effort, reasoning)
 
   defp normalize_provider(nil), do: nil
-  defp normalize_provider(value) when value in [:claude, :gemini, :amp, :codex], do: value
+
+  defp normalize_provider(value) when value in [:claude, :gemini, :amp, :codex, :cursor],
+    do: value
+
   defp normalize_provider("claude"), do: :claude
   defp normalize_provider("gemini"), do: :gemini
   defp normalize_provider("amp"), do: :amp
   defp normalize_provider("codex"), do: :codex
+  defp normalize_provider("cursor"), do: :cursor
   defp normalize_provider(other), do: other
 
   defp normalize_backend(nil), do: nil

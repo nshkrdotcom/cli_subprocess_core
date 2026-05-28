@@ -3,10 +3,11 @@ defmodule CliSubprocessCoreTest do
 
   alias CliSubprocessCore.ProviderProfiles
 
-  test "first_party_profile_modules/0 exposes the shipped Phase 2B core profiles" do
+  test "first_party_profile_modules/0 exposes the shipped first-party core profiles" do
     assert CliSubprocessCore.first_party_profile_modules() == [
              ProviderProfiles.Claude,
              ProviderProfiles.Codex,
+             ProviderProfiles.Cursor,
              ProviderProfiles.Gemini,
              ProviderProfiles.Amp
            ]
@@ -22,6 +23,7 @@ defmodule CliSubprocessCoreTest do
     assert CliSubprocessCore.built_in_profile_modules() == [
              ProviderProfiles.Claude,
              ProviderProfiles.Codex,
+             ProviderProfiles.Cursor,
              ProviderProfiles.Gemini,
              ProviderProfiles.Amp,
              CliSubprocessCore.TestSupport.ProviderProfiles.Echo

@@ -1,0 +1,71 @@
+{
+  "provider": "cursor",
+  "catalog_version": "2026-05-28",
+  "remote_default": "composer-2.5-fast",
+  "models": [
+    {
+      "id": "composer-2.5-fast",
+      "aliases": ["auto", "default"],
+      "visibility": "public",
+      "family": "composer",
+      "default": true,
+      "metadata": {
+        "description": "Cursor Composer 2.5 Fast model reported by `agent models` on 2026-05-28."
+      }
+    },
+    {
+      "id": "composer-2.5",
+      "aliases": ["composer"],
+      "visibility": "public",
+      "family": "composer",
+      "metadata": {
+        "description": "Cursor Composer 2.5 model reported as current by the local CLI."
+      }
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "aliases": ["codex"],
+      "visibility": "public",
+      "family": "gpt-5-codex",
+      "metadata": {
+        "description": "Cursor listed Codex 5.3 model."
+      }
+    },
+    {
+      "id": "gpt-5.2",
+      "aliases": ["gpt-5"],
+      "visibility": "public",
+      "family": "gpt-5",
+      "metadata": {
+        "description": "Cursor listed GPT-5.2 model."
+      }
+    },
+    {
+      "id": "claude-4-sonnet",
+      "aliases": ["sonnet-4"],
+      "visibility": "public",
+      "family": "claude-sonnet",
+      "metadata": {
+        "description": "Cursor listed Sonnet 4 model."
+      }
+    },
+    {
+      "id": "claude-4-sonnet-thinking",
+      "aliases": ["sonnet-4-thinking"],
+      "visibility": "public",
+      "family": "claude-sonnet",
+      "metadata": {
+        "description": "Cursor listed Sonnet 4 Thinking model."
+      }
+    },
+    {
+      "id": "gemini-3-flash",
+      "aliases": ["gemini-flash"],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "description": "Cursor listed Gemini 3 Flash model."
+      }
+    }
+  ]
+}

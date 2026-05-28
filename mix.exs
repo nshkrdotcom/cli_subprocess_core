@@ -140,7 +140,7 @@ defmodule CliSubprocessCore.MixProject do
   end
 
   def cli do
-    []
+    [preferred_envs: ["test.live": :test]]
   end
 
   defp deps do
@@ -185,7 +185,8 @@ defmodule CliSubprocessCore.MixProject do
         "credo",
         "cmd env MIX_ENV=test mix test",
         "dialyzer"
-      ]
+      ],
+      "test.live": ["test --include live"]
     ]
   end
 end

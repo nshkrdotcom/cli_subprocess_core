@@ -1,0 +1,8 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/tmp/tmp.kBl0EFDh1a","session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","model":"Composer 2.5","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly STREAM_OK and do not edit files."}]},"session_id":"956915c8-68f5-4b96-af95-4d9d1d976051"}
+{"type":"thinking","subtype":"delta","text":"STREAM_OK","session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","timestamp_ms":1780002464220}
+{"type":"thinking","subtype":"completed","session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","timestamp_ms":1780002464471}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"STREAM"}]},"session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","timestamp_ms":1780002464471}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"_OK"}]},"session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","timestamp_ms":1780002464502}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"STREAM_OK"}]},"session_id":"956915c8-68f5-4b96-af95-4d9d1d976051"}
+{"type":"result","subtype":"success","duration_ms":6506,"duration_api_ms":6506,"is_error":false,"result":"STREAM_OK","session_id":"956915c8-68f5-4b96-af95-4d9d1d976051","request_id":"23e2ce59-e2d7-41be-87c6-c434e181f633","usage":{"inputTokens":9677,"outputTokens":53,"cacheReadTokens":1024,"cacheWriteTokens":0}}

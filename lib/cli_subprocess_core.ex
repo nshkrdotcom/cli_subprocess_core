@@ -8,12 +8,14 @@ defmodule CliSubprocessCore do
   @type first_party_profile_module ::
           CliSubprocessCore.ProviderProfiles.Claude
           | CliSubprocessCore.ProviderProfiles.Codex
+          | CliSubprocessCore.ProviderProfiles.Cursor
           | CliSubprocessCore.ProviderProfiles.Gemini
           | CliSubprocessCore.ProviderProfiles.Amp
 
   @first_party_profile_modules [
     CliSubprocessCore.ProviderProfiles.Claude,
     CliSubprocessCore.ProviderProfiles.Codex,
+    CliSubprocessCore.ProviderProfiles.Cursor,
     CliSubprocessCore.ProviderProfiles.Gemini,
     CliSubprocessCore.ProviderProfiles.Amp
   ]

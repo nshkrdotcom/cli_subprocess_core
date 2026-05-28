@@ -1,0 +1,8 @@
+{"type":"system","subtype":"init","session_id":"cursor-session-1","model":"Composer 2.5","cwd":"/tmp/cursor"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Please help"}]},"session_id":"cursor-session-1"}
+{"type":"thinking","subtype":"delta","text":"Need tool","session_id":"cursor-session-1","timestamp_ms":1000}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hel"}]},"session_id":"cursor-session-1","timestamp_ms":1001}
+{"type":"tool_call","subtype":"started","call_id":"tool-cursor-1","tool_call":{"shellToolCall":{"args":{"command":"pwd","toolCallId":"tool-cursor-1"},"description":"Print working directory"}},"session_id":"cursor-session-1","timestamp_ms":1002}
+{"type":"tool_call","subtype":"completed","call_id":"tool-cursor-1","tool_call":{"shellToolCall":{"args":{"command":"pwd","toolCallId":"tool-cursor-1"},"result":{"success":{"stdout":"/tmp\n","stderr":"","exitCode":0}},"description":"Print working directory"}},"session_id":"cursor-session-1","timestamp_ms":1003}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello"}]},"session_id":"cursor-session-1"}
+{"type":"result","subtype":"success","duration_ms":250,"is_error":false,"result":"Hello","session_id":"cursor-session-1","usage":{"inputTokens":3,"outputTokens":5}}

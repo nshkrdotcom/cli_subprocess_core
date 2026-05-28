@@ -4,7 +4,7 @@ defmodule CliSubprocessCore.SessionTest do
   import ExUnit.CaptureLog
 
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Gemini}
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor, Gemini}
   alias CliSubprocessCore.Session
 
   @session_event_tag :cli_subprocess_core_session
@@ -24,6 +24,10 @@ defmodule CliSubprocessCore.SessionTest do
 
     test "Amp session emits normalized events from the built-in profile" do
       assert_fixture_session(:amp, Amp, "amp", "ship it", 9)
+    end
+
+    test "Cursor session emits normalized events from the built-in profile" do
+      assert_fixture_session(:cursor, Cursor, "cursor", "ship cursor", 9)
     end
   end
 

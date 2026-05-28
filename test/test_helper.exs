@@ -1,1 +1,1 @@
-ExUnit.start(exclude: [:live_ssh])
+ExUnit.start(exclude: [:live, :live_ssh])

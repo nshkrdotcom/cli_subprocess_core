@@ -24,6 +24,7 @@ defmodule CliSubprocessCore.ModelRegistry do
     "amp" => :amp,
     "claude" => :claude,
     "codex" => :codex,
+    "cursor" => :cursor,
     "gemini" => :gemini
   }
   @all_visibilities [:public, :private, :internal, :restricted]

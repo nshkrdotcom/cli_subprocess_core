@@ -163,6 +163,19 @@ defmodule CliSubprocessCore.ModelInputTest do
              )
   end
 
+  test "normalizes Cursor model input through the whitelist without dynamic atoms" do
+    assert {:ok, normalized} = ModelInput.normalize(:cursor, model: "composer")
+
+    assert normalized.provider == :cursor
+    assert normalized.selection.provider == :cursor
+    assert normalized.selection.requested_model == "composer"
+    assert normalized.selection.resolved_model == "composer-2.5"
+    assert normalized.attrs[:model_payload] == normalized.selection
+
+    assert {:ok, from_string} = ModelInput.normalize(:cursor, %{"model" => "default"})
+    assert from_string.selection.resolved_model == "composer-2.5-fast"
+  end
+
   defp ollama_http(:get, "/api/version", nil, _opts) do
     {:ok, 200, %{"version" => "0.18.2"}}
   end

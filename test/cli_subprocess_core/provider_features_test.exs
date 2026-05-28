@@ -14,6 +14,9 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
     assert ProviderFeatures.permission_mode!(:amp, :dangerously_allow_all).cli_excerpt ==
              "--dangerously-allow-all"
+
+    assert ProviderFeatures.permission_mode!(:cursor, :bypass).cli_excerpt == "--force"
+    assert ProviderFeatures.permission_mode!(:cursor, :plan).cli_excerpt == "--mode plan"
   end
 
   test "permission_args/2 returns the manifest-backed CLI arguments" do
@@ -29,6 +32,10 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
     assert ProviderFeatures.permission_args(:amp, :dangerously_allow_all) ==
              ["--dangerously-allow-all"]
+
+    assert ProviderFeatures.permission_args(:cursor, :bypass) == ["--force"]
+    assert ProviderFeatures.permission_args(:cursor, :plan) == ["--mode", "plan"]
+    assert ProviderFeatures.permission_args(:cursor, :ask) == []
   end
 
   test "ollama partial feature support is explicit per provider" do
@@ -36,6 +43,7 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     codex = ProviderFeatures.partial_feature!(:codex, :ollama)
     gemini = ProviderFeatures.partial_feature!(:gemini, :ollama)
     amp = ProviderFeatures.partial_feature!(:amp, :ollama)
+    cursor = ProviderFeatures.partial_feature!(:cursor, :ollama)
 
     assert claude.supported? == true
     assert claude.activation == %{provider_backend: :ollama}
@@ -50,10 +58,11 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
     assert gemini.supported? == false
     assert amp.supported? == false
+    assert cursor.supported? == false
   end
 
   test "tool capability metadata separates observation from host execution" do
-    for provider <- [:amp, :claude, :codex, :gemini] do
+    for provider <- [:amp, :claude, :codex, :cursor, :gemini] do
       tool_capabilities = ProviderFeatures.tool_capabilities!(provider)
 
       assert Map.take(tool_capabilities, ProviderFeatures.tool_capability_keys()) ==
@@ -80,6 +89,7 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
       CliSubprocessCore.ProviderProfiles.Amp,
       CliSubprocessCore.ProviderProfiles.Claude,
       CliSubprocessCore.ProviderProfiles.Codex,
+      CliSubprocessCore.ProviderProfiles.Cursor,
       CliSubprocessCore.ProviderProfiles.Gemini
     ]
 

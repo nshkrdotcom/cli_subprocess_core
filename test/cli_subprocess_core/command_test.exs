@@ -132,6 +132,36 @@ defmodule CliSubprocessCore.CommandTest do
     assert File.read!(stdin_path) == "payload-without-newline"
   end
 
+  test "run/1 resolves the Cursor provider profile and preserves its argv contract" do
+    script = create_test_script("printf 'cursor-command-ok'")
+
+    assert {:ok, %RunResult{} = result} =
+             Command.run(
+               provider: :cursor,
+               command: script,
+               prompt: "reply",
+               cwd: System.tmp_dir!(),
+               permission_mode: :bypass,
+               timeout: 2_000
+             )
+
+    assert result.stdout == "cursor-command-ok"
+    assert result.invocation.command == script
+    assert result.invocation.cwd == System.tmp_dir!()
+
+    assert result.invocation.args == [
+             "-p",
+             "--trust",
+             "--output-format",
+             "stream-json",
+             "--stream-partial-output",
+             "--workspace",
+             System.tmp_dir!(),
+             "--force",
+             "reply"
+           ]
+  end
+
   test "run/2 maps execution-plane launch failures into structured transport errors" do
     invocation = Command.new("/definitely/not/a/real/command", [])
 

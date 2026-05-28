@@ -82,6 +82,21 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       assert {:ok, amp_catalog} = ModelCatalog.load(:amp)
       assert amp_catalog.provider == :amp
       assert Enum.any?(amp_catalog.models, &(&1.id == "amp-1"))
+
+      assert {:ok, cursor_catalog} = ModelCatalog.load(:cursor)
+      assert cursor_catalog.provider == :cursor
+      assert cursor_catalog.catalog_version == "2026-05-28"
+      assert cursor_catalog.remote_default == "composer-2.5-fast"
+
+      assert Enum.map(cursor_catalog.models, & &1.id) == [
+               "composer-2.5-fast",
+               "composer-2.5",
+               "gpt-5.3-codex",
+               "gpt-5.2",
+               "claude-4-sonnet",
+               "claude-4-sonnet-thinking",
+               "gemini-3-flash"
+             ]
     end
 
     test "returns model_unavailable for missing provider catalog" do

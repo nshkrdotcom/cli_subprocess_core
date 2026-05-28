@@ -130,6 +130,19 @@ defmodule CliSubprocessCore.ProviderCLI do
       npx_package: nil,
       path_candidates: ["codex"]
     },
+    cursor: %{
+      default_command: "agent",
+      display_name: "Cursor Agent CLI",
+      env_var: "CURSOR_CLI_PATH",
+      install_hint: "https://cursor.com/docs/cli/overview",
+      allow_js_entrypoint: false,
+      node_command: "node",
+      npm_global_bin: nil,
+      npx_command: nil,
+      npx_disable_env: nil,
+      npx_package: nil,
+      path_candidates: ["agent", "cursor-agent"]
+    },
     gemini: %{
       default_command: "gemini",
       display_name: "Gemini CLI",
@@ -1070,6 +1083,17 @@ defmodule CliSubprocessCore.ProviderCLI do
     ]
   end
 
+  defp default_known_locations(:cursor, ambient_env) do
+    home = Map.get(ambient_env, "HOME") || System.user_home!()
+
+    [
+      Path.join([home, ".local", "bin", "agent"]),
+      Path.join([home, ".cursor", "bin", "agent"]),
+      "/usr/local/bin/agent",
+      "/usr/bin/agent"
+    ]
+  end
+
   defp default_known_locations(_provider, _ambient_env), do: []
 
   defp run_lookup_steps(steps, settings) when is_list(steps) do
@@ -1466,6 +1490,7 @@ defmodule CliSubprocessCore.ProviderCLI do
 
   defp auth_hint(:claude), do: "Run `claude login` on the target and retry."
   defp auth_hint(:codex), do: "Authenticate Codex on the target and retry."
+  defp auth_hint(:cursor), do: "Set CURSOR_API_KEY or run agent login on the target host."
   defp auth_hint(:gemini), do: "Authenticate Gemini CLI on the target and retry."
   defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
   defp auth_hint(_provider), do: "Authenticate the CLI on the target and retry."

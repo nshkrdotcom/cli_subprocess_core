@@ -201,6 +201,39 @@ defmodule CliSubprocessCore.ProviderFeatures do
           "Codex app-server, dynamic tools, MCP, built-ins, and host execution remain provider-native or unproven at the core contract."
         ])
     },
+    cursor: %{
+      provider: :cursor,
+      permission_modes: %{
+        default: %{native_mode: :default, cli_args: [], cli_excerpt: nil, label: "default"},
+        bypass: %{
+          native_mode: :bypass,
+          cli_args: ["--force"],
+          cli_excerpt: "--force",
+          label: "force"
+        },
+        plan: %{
+          native_mode: :plan,
+          cli_args: ["--mode", "plan"],
+          cli_excerpt: "--mode plan",
+          label: "plan"
+        }
+      },
+      partial_features: %{
+        ollama: %{
+          supported?: false,
+          activation: nil,
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["Cursor does not expose an Ollama backend through the common CLI surface."]
+        }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Cursor profile normalizes observed tool_call events from stream-json output.",
+          "Cursor host tool execution is governed by the Cursor CLI process and remains outside core host-tool admission.",
+          "MCP approval is provider-native through --approve-mcps."
+        ])
+    },
     gemini: %{
       provider: :gemini,
       permission_modes: %{
