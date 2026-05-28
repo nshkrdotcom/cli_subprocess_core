@@ -27,7 +27,7 @@ defmodule CliSubprocessCore.SessionTest do
     end
 
     test "Cursor session emits normalized events from the built-in profile" do
-      assert_fixture_session(:cursor, Cursor, "cursor", "ship cursor", 9)
+      assert_fixture_session(:cursor, Cursor, "cursor", "ship cursor", 10)
     end
   end
 

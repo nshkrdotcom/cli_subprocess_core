@@ -44,7 +44,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Cursor do
   @impl true
   def init_parser_state(opts) do
     Shared.init_parser_state(id(), opts)
-    |> Map.put(:cursor_pending_tool_calls, %{})
+    |> Map.merge(%{
+      cursor_pending_tool_calls: %{},
+      cursor_assistant_text: ""
+    })
   end
 
   @impl true
@@ -214,6 +217,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Cursor do
   end
 
   defp assistant(%{"timestamp_ms" => _timestamp_ms} = raw, _message, text, state) do
+    state = append_cursor_assistant_text(state, text)
+
     Shared.emit_single(
       :assistant_delta,
       Payload.AssistantDelta.new(content: text, metadata: %{source: :cursor_partial}),
@@ -222,16 +227,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Cursor do
     )
   end
 
-  defp assistant(raw, message, _text, state) do
-    Shared.emit_single(
-      :assistant_message,
-      Payload.AssistantMessage.new(
-        content: Shared.content_blocks(message),
-        model: Shared.fetch_any(raw, [:model, "model"])
-      ),
-      raw,
-      state
-    )
+  defp assistant(raw, message, text, state) do
+    case cursor_snapshot_suffix(state, text) do
+      :not_snapshot ->
+        emit_assistant_message(raw, message, state, %{})
+
+      suffix ->
+        emit_assistant_snapshot(raw, message, text, suffix, state)
+    end
   end
 
   defp tool_use(raw, state) do
@@ -389,6 +392,57 @@ defmodule CliSubprocessCore.ProviderProfiles.Cursor do
       text when is_binary(text) -> text
       other -> to_string(other)
     end)
+  end
+
+  defp append_cursor_assistant_text(state, text) when is_binary(text) do
+    Map.update(state, :cursor_assistant_text, text, &(&1 <> text))
+  end
+
+  defp cursor_snapshot_suffix(state, text) when is_binary(text) do
+    accumulated = Map.get(state, :cursor_assistant_text, "")
+
+    if accumulated != "" and String.starts_with?(text, accumulated) do
+      String.replace_prefix(text, accumulated, "")
+    else
+      :not_snapshot
+    end
+  end
+
+  defp emit_assistant_snapshot(raw, message, text, suffix, state) do
+    state = Map.put(state, :cursor_assistant_text, text)
+
+    if suffix == "" do
+      emit_assistant_message(raw, message, state, %{source: :cursor_final_snapshot})
+    else
+      {delta, state} =
+        Shared.emit_event(
+          :assistant_delta,
+          Payload.AssistantDelta.new(
+            content: suffix,
+            metadata: %{source: :cursor_snapshot_suffix}
+          ),
+          raw,
+          state
+        )
+
+      {message_events, state} =
+        emit_assistant_message(raw, message, state, %{source: :cursor_final_snapshot})
+
+      {[delta | message_events], state}
+    end
+  end
+
+  defp emit_assistant_message(raw, message, state, metadata) do
+    Shared.emit_single(
+      :assistant_message,
+      Payload.AssistantMessage.new(
+        content: Shared.content_blocks(message),
+        model: Shared.fetch_any(raw, [:model, "model"]),
+        metadata: metadata
+      ),
+      raw,
+      state
+    )
   end
 
   defp tool_name(raw) do

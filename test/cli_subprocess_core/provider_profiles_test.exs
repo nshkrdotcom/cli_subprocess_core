@@ -909,6 +909,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                :assistant_delta,
                :tool_use,
                :tool_result,
+               :assistant_delta,
                :assistant_message,
                :result
              ]
@@ -936,8 +937,15 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                is_error: false
              } = Enum.at(events, 5).payload
 
-      assert %Payload.AssistantMessage{content: [%{"type" => "text", "text" => "Hello"}]} =
-               Enum.at(events, 6).payload
+      assert %Payload.AssistantDelta{
+               content: "lo",
+               metadata: %{source: :cursor_snapshot_suffix}
+             } = Enum.at(events, 6).payload
+
+      assert %Payload.AssistantMessage{
+               content: [%{"type" => "text", "text" => "Hello"}],
+               metadata: %{source: :cursor_final_snapshot}
+             } = Enum.at(events, 7).payload
 
       assert %Payload.Result{
                status: :completed,
@@ -947,10 +955,33 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                  result: "Hello",
                  usage: %{input_tokens: 3, output_tokens: 5}
                }
-             } = Enum.at(events, 7).payload
+             } = Enum.at(events, 8).payload
 
       assert [stderr] = decode_stderr(Cursor, "cursor warning")
       assert %Payload.Stderr{content: "cursor warning"} = stderr.payload
+    end
+
+    test "Cursor marks final assistant snapshots without duplicating complete streamed text" do
+      state = Cursor.init_parser_state([])
+
+      partial =
+        ~s({"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"STREAM_OK"}]},"session_id":"cursor-session-3","timestamp_ms":1001})
+
+      final =
+        ~s({"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"STREAM_OK"}]},"session_id":"cursor-session-3"})
+
+      {[partial_event], state} = Cursor.decode_stdout(partial, state)
+      {[final_event], _state} = Cursor.decode_stdout(final, state)
+
+      assert %Payload.AssistantDelta{
+               content: "STREAM_OK",
+               metadata: %{source: :cursor_partial}
+             } = partial_event.payload
+
+      assert %Payload.AssistantMessage{
+               content: [%{"type" => "text", "text" => "STREAM_OK"}],
+               metadata: %{source: :cursor_final_snapshot}
+             } = final_event.payload
     end
 
     test "Cursor force-closes pending tools on reconnect hints" do
