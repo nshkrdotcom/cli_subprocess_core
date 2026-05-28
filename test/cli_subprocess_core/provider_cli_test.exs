@@ -233,6 +233,36 @@ defmodule CliSubprocessCore.ProviderCLITest do
       end
     end
 
+    test "Antigravity honors ANTIGRAVITY_CLI_PATH" do
+      dir = TestSupport.tmp_dir!("core_antigravity_cli")
+      agy_path = TestSupport.write_executable!(dir, "agy", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"ANTIGRAVITY_CLI_PATH" => agy_path}, fn ->
+          assert {:ok, %CommandSpec{program: ^agy_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:antigravity)
+        end)
+      after
+        File.rm_rf(dir)
+      end
+    end
+
+    test "Antigravity finds the default local binary location" do
+      home = TestSupport.tmp_dir!("core_antigravity_cli_home")
+      bin_dir = Path.join([home, ".local", "bin"])
+      File.mkdir_p!(bin_dir)
+      agy_path = TestSupport.write_executable!(bin_dir, "agy", "#!/bin/bash\nexit 0\n")
+
+      try do
+        TestSupport.with_env(%{"HOME" => home, "PATH" => "/nonexistent_dir_only"}, fn ->
+          assert {:ok, %CommandSpec{program: ^agy_path, argv_prefix: []}} =
+                   ProviderCLI.resolve(:antigravity)
+        end)
+      after
+        File.rm_rf(home)
+      end
+    end
+
     test "Cursor honors CURSOR_CLI_PATH" do
       dir = TestSupport.tmp_dir!("core_cursor_cli")
       agent_path = TestSupport.write_executable!(dir, "agent", "#!/bin/bash\nexit 0\n")
@@ -664,6 +694,22 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert failure.kind == :auth_error
       assert failure.message =~ "Cursor Agent CLI requires authentication"
       assert failure.message =~ "Set CURSOR_API_KEY or run agent login"
+      assert ProviderCLI.runtime_failure_code(failure) == "auth_error"
+    end
+
+    test "classifies Antigravity auth failures with the provider hint" do
+      exit =
+        ProcessExit.from_reason({:exit_status, 1},
+          stderr: "Authentication required. Please login before continuing.\n"
+        )
+
+      assert %ErrorRuntimeFailure{} =
+               failure =
+               ProviderCLI.runtime_failure(:antigravity, exit)
+
+      assert failure.kind == :auth_error
+      assert failure.message =~ "Antigravity CLI requires authentication"
+      assert failure.message =~ "Authenticate the Antigravity CLI"
       assert ProviderCLI.runtime_failure_code(failure) == "auth_error"
     end
 

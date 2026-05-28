@@ -176,6 +176,19 @@ defmodule CliSubprocessCore.ModelInputTest do
     assert from_string.selection.resolved_model == "composer-2.5-fast"
   end
 
+  test "normalizes Antigravity model input through the whitelist without dynamic atoms" do
+    assert {:ok, normalized} = ModelInput.normalize(:antigravity, model: nil)
+
+    assert normalized.provider == :antigravity
+    assert normalized.selection.provider == :antigravity
+    assert normalized.selection.requested_model == nil
+    assert normalized.selection.resolved_model == "default"
+    assert normalized.attrs[:model_payload] == normalized.selection
+
+    assert {:ok, from_string} = ModelInput.normalize(:antigravity, %{"model" => "default"})
+    assert from_string.selection.resolved_model == "default"
+  end
+
   defp ollama_http(:get, "/api/version", nil, _opts) do
     {:ok, 200, %{"version" => "0.18.2"}}
   end

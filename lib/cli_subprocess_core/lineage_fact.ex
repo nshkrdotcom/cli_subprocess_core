@@ -6,6 +6,7 @@ defmodule CliSubprocessCore.LineageFact do
   @kinds [:pressure, :reconnect, :subprocess]
   @providers %{
     "amp" => :amp,
+    "antigravity" => :antigravity,
     "claude" => :claude,
     "codex" => :codex,
     "cursor" => :cursor,
@@ -91,7 +92,7 @@ defmodule CliSubprocessCore.LineageFact do
 
       :error ->
         raise ArgumentError,
-              "provider must be one of amp, claude, codex, cursor, gemini, got: #{inspect(provider)}"
+              "provider must be one of amp, antigravity, claude, codex, cursor, gemini, got: #{inspect(provider)}"
     end
   end
 

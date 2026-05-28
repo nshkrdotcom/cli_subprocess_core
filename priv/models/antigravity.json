@@ -1,0 +1,19 @@
+{
+  "provider": "antigravity",
+  "catalog_version": "2026-05-28",
+  "remote_default": "default",
+  "models": [
+    {
+      "id": "default",
+      "aliases": [
+        "auto"
+      ],
+      "visibility": "public",
+      "family": "antigravity",
+      "default": true,
+      "metadata": {
+        "description": "Default Antigravity CLI model selected by agy."
+      }
+    }
+  ]
+}

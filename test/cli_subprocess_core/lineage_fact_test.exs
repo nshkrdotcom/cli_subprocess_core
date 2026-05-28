@@ -44,6 +44,11 @@ defmodule CliSubprocessCore.LineageFactTest do
              provider: "cursor",
              provider_session_id: "provider-4"
            }).provider == :cursor
+
+    assert LineageFact.reconnect(%{
+             provider: "antigravity",
+             provider_session_id: "provider-5"
+           }).provider == :antigravity
   end
 
   test "rejects unknown provider strings without creating atoms" do
@@ -55,7 +60,9 @@ defmodule CliSubprocessCore.LineageFactTest do
         })
       end
 
-    assert error.message =~ "provider must be one of amp, claude, codex, cursor, gemini"
+    assert error.message =~
+             "provider must be one of amp, antigravity, claude, codex, cursor, gemini"
+
     assert error.message =~ "third-party-profile"
   end
 end

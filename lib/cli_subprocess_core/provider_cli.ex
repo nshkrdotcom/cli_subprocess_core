@@ -103,6 +103,19 @@ defmodule CliSubprocessCore.ProviderCLI do
       npx_package: nil,
       path_candidates: ["amp"]
     },
+    antigravity: %{
+      default_command: "agy",
+      display_name: "Antigravity CLI",
+      env_var: "ANTIGRAVITY_CLI_PATH",
+      install_hint: "Install the Antigravity CLI agent binary",
+      allow_js_entrypoint: false,
+      node_command: "node",
+      npm_global_bin: nil,
+      npx_command: nil,
+      npx_disable_env: nil,
+      npx_package: nil,
+      path_candidates: ["agy"]
+    },
     claude: %{
       default_command: "claude-code",
       remote_default_command: "claude",
@@ -1070,6 +1083,16 @@ defmodule CliSubprocessCore.ProviderCLI do
     ]
   end
 
+  defp default_known_locations(:antigravity, ambient_env) do
+    home = Map.get(ambient_env, "HOME") || System.user_home!()
+
+    [
+      Path.join([home, ".local", "bin", "agy"]),
+      "/usr/local/bin/agy",
+      "/usr/bin/agy"
+    ]
+  end
+
   defp default_known_locations(:claude, _ambient_env) do
     home = System.user_home!()
 
@@ -1493,6 +1516,10 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp auth_hint(:cursor), do: "Set CURSOR_API_KEY or run agent login on the target host."
   defp auth_hint(:gemini), do: "Authenticate Gemini CLI on the target and retry."
   defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
+
+  defp auth_hint(:antigravity),
+    do: "Authenticate the Antigravity CLI on the target and retry."
+
   defp auth_hint(_provider), do: "Authenticate the CLI on the target and retry."
 
   defp path_hint(%{path_semantics: :guest}), do: guest_path_hint()

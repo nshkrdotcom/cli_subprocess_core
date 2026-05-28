@@ -100,6 +100,38 @@ defmodule CliSubprocessCore.ProviderFeatures do
           "Amp host tool execution, MCP configuration, explicit tool lists, and tool suppression remain provider-native or unproven at the core contract."
         ])
     },
+    antigravity: %{
+      provider: :antigravity,
+      permission_modes: %{
+        default: %{native_mode: :default, cli_args: [], cli_excerpt: nil, label: "default"},
+        bypass: %{
+          native_mode: :bypass,
+          cli_args: ["--dangerously-skip-permissions"],
+          cli_excerpt: "--dangerously-skip-permissions",
+          label: "dangerously-skip-permissions"
+        },
+        dangerously_skip_permissions: %{
+          native_mode: :bypass,
+          cli_args: ["--dangerously-skip-permissions"],
+          cli_excerpt: "--dangerously-skip-permissions",
+          label: "dangerously-skip-permissions"
+        }
+      },
+      partial_features: %{
+        ollama: %{
+          supported?: false,
+          activation: nil,
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["Antigravity does not expose an Ollama backend through the common CLI surface."]
+        }
+      },
+      tool_capabilities:
+        Map.put(@observed_tool_capabilities, :notes, [
+          "The Antigravity profile normalizes plain-text assistant output from agy --print.",
+          "Antigravity host tool execution is governed by the Antigravity CLI process and remains outside core host-tool admission."
+        ])
+    },
     claude: %{
       provider: :claude,
       permission_modes: %{

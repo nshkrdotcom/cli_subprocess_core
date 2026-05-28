@@ -17,6 +17,9 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
     assert ProviderFeatures.permission_mode!(:cursor, :bypass).cli_excerpt == "--force"
     assert ProviderFeatures.permission_mode!(:cursor, :plan).cli_excerpt == "--mode plan"
+
+    assert ProviderFeatures.permission_mode!(:antigravity, :bypass).cli_excerpt ==
+             "--dangerously-skip-permissions"
   end
 
   test "permission_args/2 returns the manifest-backed CLI arguments" do
@@ -36,6 +39,10 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert ProviderFeatures.permission_args(:cursor, :bypass) == ["--force"]
     assert ProviderFeatures.permission_args(:cursor, :plan) == ["--mode", "plan"]
     assert ProviderFeatures.permission_args(:cursor, :ask) == []
+
+    assert ProviderFeatures.permission_args(:antigravity, :bypass) == [
+             "--dangerously-skip-permissions"
+           ]
   end
 
   test "ollama partial feature support is explicit per provider" do
@@ -44,6 +51,7 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     gemini = ProviderFeatures.partial_feature!(:gemini, :ollama)
     amp = ProviderFeatures.partial_feature!(:amp, :ollama)
     cursor = ProviderFeatures.partial_feature!(:cursor, :ollama)
+    antigravity = ProviderFeatures.partial_feature!(:antigravity, :ollama)
 
     assert claude.supported? == true
     assert claude.activation == %{provider_backend: :ollama}
@@ -59,10 +67,11 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert gemini.supported? == false
     assert amp.supported? == false
     assert cursor.supported? == false
+    assert antigravity.supported? == false
   end
 
   test "tool capability metadata separates observation from host execution" do
-    for provider <- [:amp, :claude, :codex, :cursor, :gemini] do
+    for provider <- [:amp, :antigravity, :claude, :codex, :cursor, :gemini] do
       tool_capabilities = ProviderFeatures.tool_capabilities!(provider)
 
       assert Map.take(tool_capabilities, ProviderFeatures.tool_capability_keys()) ==
@@ -97,5 +106,8 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
       assert :tools in profile_module.capabilities()
       assert ProviderFeatures.tool_capability!(profile_module.id(), :host_tools) == false
     end
+
+    refute :tools in CliSubprocessCore.ProviderProfiles.Antigravity.capabilities()
+    assert ProviderFeatures.tool_capability!(:antigravity, :host_tools) == false
   end
 end

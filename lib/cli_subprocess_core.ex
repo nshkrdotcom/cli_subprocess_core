@@ -11,13 +11,15 @@ defmodule CliSubprocessCore do
           | CliSubprocessCore.ProviderProfiles.Cursor
           | CliSubprocessCore.ProviderProfiles.Gemini
           | CliSubprocessCore.ProviderProfiles.Amp
+          | CliSubprocessCore.ProviderProfiles.Antigravity
 
   @first_party_profile_modules [
     CliSubprocessCore.ProviderProfiles.Claude,
     CliSubprocessCore.ProviderProfiles.Codex,
     CliSubprocessCore.ProviderProfiles.Cursor,
     CliSubprocessCore.ProviderProfiles.Gemini,
-    CliSubprocessCore.ProviderProfiles.Amp
+    CliSubprocessCore.ProviderProfiles.Amp,
+    CliSubprocessCore.ProviderProfiles.Antigravity
   ]
 
   @doc """

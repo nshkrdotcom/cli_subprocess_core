@@ -4,7 +4,7 @@ defmodule CliSubprocessCore.SessionTest do
   import ExUnit.CaptureLog
 
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor, Gemini}
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Antigravity, Claude, Codex, Cursor, Gemini}
   alias CliSubprocessCore.Session
 
   @session_event_tag :cli_subprocess_core_session
@@ -28,6 +28,10 @@ defmodule CliSubprocessCore.SessionTest do
 
     test "Cursor session emits normalized events from the built-in profile" do
       assert_fixture_session(:cursor, Cursor, "cursor", "ship cursor", 10)
+    end
+
+    test "Antigravity session emits normalized events from the built-in profile" do
+      assert_fixture_session(:antigravity, Antigravity, "antigravity", "ship antigravity", 4, nil)
     end
   end
 
@@ -445,7 +449,14 @@ defmodule CliSubprocessCore.SessionTest do
     assert :error = Session.extract_event({:unexpected, event})
   end
 
-  defp assert_fixture_session(provider, profile, fixture_name, prompt, expected_event_count) do
+  defp assert_fixture_session(
+         provider,
+         profile,
+         fixture_name,
+         prompt,
+         expected_event_count,
+         expected_provider_session_id \\ :provider_default
+       ) do
     ref = make_ref()
     fixture_path = fixture_path(fixture_name)
     script = create_fixture_cli(fixture_path)
@@ -477,7 +488,14 @@ defmodule CliSubprocessCore.SessionTest do
     assert run_started.metadata == %{lane: :core}
 
     assert Enum.any?(parsed_events, &(&1.kind == :result))
-    assert Enum.at(parsed_events, 0).provider_session_id == "#{provider}-session-1"
+
+    expected_provider_session_id =
+      case expected_provider_session_id do
+        :provider_default -> "#{provider}-session-1"
+        value -> value
+      end
+
+    assert Enum.at(parsed_events, 0).provider_session_id == expected_provider_session_id
 
     monitor = Process.monitor(session)
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000

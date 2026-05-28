@@ -22,6 +22,7 @@ defmodule CliSubprocessCore.ModelRegistry do
   @ollama_min_responses_version "0.13.4"
   @provider_names %{
     "amp" => :amp,
+    "antigravity" => :antigravity,
     "claude" => :claude,
     "codex" => :codex,
     "cursor" => :cursor,
