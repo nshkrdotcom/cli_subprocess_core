@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cursor Agent CLI (`:cursor`) first-party provider profile with stream-json
   parsing, live fixture evidence, model catalog entries, and provider feature
   metadata.
+- Documentation updates for Cursor as the fifth built-in profile, including
+  invocation shape, permission metadata, governed posture, and capability hints.
 
 ## [0.1.0] - 2026-04-06
 

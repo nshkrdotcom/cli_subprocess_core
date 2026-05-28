@@ -13,7 +13,9 @@ knowledge in separate lookup tables.
 - rendered CLI args for those permission modes
 - partial feature manifests for built-in providers
 
-Today the partial-feature manifest covers Ollama-backed model routing.
+Today the partial-feature manifest covers Ollama-backed model routing and the
+permission metadata covers each first-party provider's native permission
+terminology.
 
 ## Permission Metadata
 
@@ -31,6 +33,12 @@ iex> CliSubprocessCore.ProviderFeatures.permission_mode!(:codex, :yolo)
 
 iex> CliSubprocessCore.ProviderFeatures.permission_args(:amp, :dangerously_allow_all)
 ["--dangerously-allow-all"]
+
+iex> CliSubprocessCore.ProviderFeatures.permission_args(:cursor, :bypass)
+["--force"]
+
+iex> CliSubprocessCore.ProviderFeatures.permission_args(:cursor, :plan)
+["--mode", "plan"]
 ```
 
 This keeps provider profiles authoritative for the real CLI contract while
@@ -50,6 +58,8 @@ Examples:
   the provider-native rendering of a permission choice
 - Gemini `--sandbox` does not appear here because it is a separate
   provider-specific option, not a permission-mode alias
+- Cursor `:ask` is not a permission mode. It is an operational Cursor `mode`
+  rendered by the Cursor profile or SDK as `--mode ask`.
 
 ## Partial Features
 
@@ -88,6 +98,7 @@ Current built-in `:ollama` support:
 
 - Claude: supported through `provider_backend: :ollama`
 - Codex: supported through `provider_backend: :oss, oss_provider: "ollama"`
+- Cursor: unsupported on the common CLI surface
 - Gemini: unsupported on the common CLI surface
 - Amp: unsupported on the common CLI surface
 
@@ -108,14 +119,15 @@ Higher-level packages such as ASM may wrap this metadata to describe their own
 common surfaces, but the source of truth for built-in CLI behavior stays here.
 ## Session-Control Capability Vocabulary
 
-Provider manifests may now advertise the following session-control capabilities when the runtime
-really supports them:
+Provider manifests may now advertise the following session-control capabilities
+when the runtime really supports them:
 
 - `:session_history`
 - `:session_resume`
 - `:session_pause`
 - `:session_intervene`
 
-These names are intentionally shared with the upper orchestration layers. A profile should only
-publish them when the runtime can surface a truthful provider-native history/resume/pause path; the
-manifest is not the place for speculative compatibility claims.
+These names are intentionally shared with the upper orchestration layers. A
+profile should only publish them when the runtime can surface a truthful
+provider-native history/resume/pause path; the manifest is not the place for
+speculative claims.

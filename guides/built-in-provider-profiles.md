@@ -1,10 +1,11 @@
 # Built-In Provider Profiles
 
-`CliSubprocessCore` ships four first-party provider profiles for the common CLI
+`CliSubprocessCore` ships five first-party provider profiles for the common CLI
 runtime lane:
 
 - `CliSubprocessCore.ProviderProfiles.Claude`
 - `CliSubprocessCore.ProviderProfiles.Codex`
+- `CliSubprocessCore.ProviderProfiles.Cursor`
 - `CliSubprocessCore.ProviderProfiles.Gemini`
 - `CliSubprocessCore.ProviderProfiles.Amp`
 
@@ -19,6 +20,7 @@ These remain the runtime stack's first-party common profiles. They ship inside
 | --- | --- | --- |
 | Claude | `:claude` | `claude` |
 | Codex | `:codex` | `codex` |
+| Cursor | `:cursor` | `agent` |
 | Gemini | `:gemini` | `gemini` |
 | Amp | `:amp` | `amp` |
 
@@ -39,7 +41,7 @@ When `:governed_authority` is present, built-in profiles use only the
 authority-materialized command, cwd, env, config root, auth root, base URL,
 target refs, and `clear_env?: true` posture. Provider CLI env discovery, local
 `PATH`, npx fallback, known home locations, and version-manager env remain
-standalone compatibility behavior only.
+standalone behavior only.
 
 One important distinction:
 
@@ -118,6 +120,49 @@ validation layer. For one-shot exec runs it also closes stdin on start so the
 upstream Codex CLI does not block on EOF after the prompt is already present on
 argv.
 
+## Cursor
+
+Command shape:
+
+```text
+agent -p --trust --output-format stream-json --stream-partial-output ... <prompt>
+```
+
+The prompt is positional at the end of argv. Cursor does not use a `--prompt`
+flag in this profile.
+
+Common Cursor options:
+
+- `:prompt`
+- `:command` or `:cli_path`
+- `:cwd` (also emits `--workspace <cwd>`)
+- `:model`
+- `:model_payload`
+- `:resume`
+- `:continue`
+- `:mode`
+- `:sandbox`
+- `:approve_mcps`
+- `:worktree`
+- `:worktree_base`
+- `:skip_worktree_setup`
+- `:plugin_dirs`
+- `:headers`
+- `:permission_mode`
+- `:provider_permission_mode`
+
+Cursor reads `model_payload.resolved_model` before falling back to `:model`.
+When `:cwd` is supplied, the profile uses it as the process working directory
+and renders `--workspace <cwd>`.
+
+Governed Cursor launches use the shared `GovernedAuthority` contract. The
+authority owns command, cwd, env, and clear-env state. Cursor `config_root` and
+`auth_root` are metadata only at this layer; an authority materializer must put
+any required Cursor paths or `CURSOR_API_KEY` values into `authority.env`.
+
+Cursor `system/init` events are preserved as `Payload.Raw` with parser metadata.
+There is no separate `Payload.System` type in the core event model.
+
 ## Gemini
 
 Command shape:
@@ -183,6 +228,7 @@ Examples:
 
 - Claude advertises approval, cost, resume, streaming, thinking, and tool use.
 - Codex advertises reasoning, plan mode, structured output, and tool use.
+- Cursor advertises interrupt, MCP, plan, resume, sandbox, streaming, and tool use.
 - Gemini advertises sandbox and extension support.
 - Amp advertises approval, MCP config, thinking, and tool use.
 
@@ -218,7 +264,7 @@ info.capabilities
 
 The built-in status in this guide is a package ownership statement:
 
-- these four profiles ship with `cli_subprocess_core`
+- these five profiles ship with `cli_subprocess_core`
 - future third-party profiles belong in external packages
 - external profiles can still be preloaded into the default registry, but that
   preload does not make them first-party built-ins

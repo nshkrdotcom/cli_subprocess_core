@@ -25,6 +25,7 @@ Built-in implementations live in:
 
 - `lib/cli_subprocess_core/provider_profiles/codex.ex`
 - `lib/cli_subprocess_core/provider_profiles/claude.ex`
+- `lib/cli_subprocess_core/provider_profiles/cursor.ex`
 - `lib/cli_subprocess_core/provider_profiles/gemini.ex`
 - `lib/cli_subprocess_core/provider_profiles/amp.ex`
 
@@ -107,6 +108,11 @@ For a Codex request, the core should conceptually follow this pattern:
 
 The provider profile may still sanitize transport-level placeholders before
 emitting flags, but it must not implement fallback policy there.
+
+Cursor is the example for a positional-prompt profile: it renders
+`agent -p --trust --output-format stream-json --stream-partial-output ...`
+and appends the prompt as the final argv element instead of inventing a
+`--prompt` flag.
 
 ## Reviewer Checklist
 
