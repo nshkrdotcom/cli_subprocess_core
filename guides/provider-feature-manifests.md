@@ -39,6 +39,9 @@ iex> CliSubprocessCore.ProviderFeatures.permission_args(:cursor, :bypass)
 
 iex> CliSubprocessCore.ProviderFeatures.permission_args(:cursor, :plan)
 ["--mode", "plan"]
+
+iex> CliSubprocessCore.ProviderFeatures.permission_args(:antigravity, :bypass)
+["--dangerously-skip-permissions"]
 ```
 
 This keeps provider profiles authoritative for the real CLI contract while
@@ -60,6 +63,8 @@ Examples:
   provider-specific option, not a permission-mode alias
 - Cursor `:ask` is not a permission mode. It is an operational Cursor `mode`
   rendered by the Cursor profile or SDK as `--mode ask`.
+- Antigravity `--sandbox` is provider-native runtime behavior, while
+  `--dangerously-skip-permissions` is the permission-mode rendering.
 
 ## Partial Features
 
@@ -101,6 +106,7 @@ Current built-in `:ollama` support:
 - Cursor: unsupported on the common CLI surface
 - Gemini: unsupported on the common CLI surface
 - Amp: unsupported on the common CLI surface
+- Antigravity: unsupported on the common CLI surface
 
 For Codex, the compatibility manifest describes the validated default and the
 acceptance rule separately:

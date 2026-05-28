@@ -1,6 +1,6 @@
 # Built-In Provider Profiles
 
-`CliSubprocessCore` ships five first-party provider profiles for the common CLI
+`CliSubprocessCore` ships six first-party provider profiles for the common CLI
 runtime lane:
 
 - `CliSubprocessCore.ProviderProfiles.Claude`
@@ -8,6 +8,7 @@ runtime lane:
 - `CliSubprocessCore.ProviderProfiles.Cursor`
 - `CliSubprocessCore.ProviderProfiles.Gemini`
 - `CliSubprocessCore.ProviderProfiles.Amp`
+- `CliSubprocessCore.ProviderProfiles.Antigravity`
 
 They are loaded into the default provider registry at application startup.
 
@@ -23,13 +24,15 @@ These remain the runtime stack's first-party common profiles. They ship inside
 | Cursor | `:cursor` | `agent` |
 | Gemini | `:gemini` | `gemini` |
 | Amp | `:amp` | `amp` |
+| Antigravity | `:antigravity` | `agy` |
 
 ## Common Behavior
 
 All built-in profiles own:
 
 - command construction for the provider CLI
-- JSONL stdout decoding into normalized core events
+- stdout decoding into normalized core events, including JSONL providers and
+  plain-text providers such as Antigravity
 - stderr decoding into `:stderr` events
 - terminal exit handling
 - provider capability declaration
@@ -207,6 +210,40 @@ Common Amp options:
 - `:permission_mode`
 - `:provider_permission_mode`
 
+## Antigravity
+
+Command shape:
+
+```text
+agy --print <prompt> ...
+```
+
+`agy --print` emits plain text on stdout, not JSONL. The Antigravity profile
+maps each non-empty stdout line to an `:assistant_delta` event and uses the
+shared stderr and exit handling. It also closes stdin on start because the
+prompt is already fully present in argv.
+
+Common Antigravity options:
+
+- `:prompt`
+- `:command` or `:cli_path`
+- `:cwd`
+- `:model`
+- `:model_payload`
+- `:sandbox`
+- `:dangerously_skip_permissions`
+- `:conversation`
+- `:continue`
+- `:add_dirs`
+- `:print_timeout`
+- `:log_file`
+- `:permission_mode`
+- `:provider_permission_mode`
+
+`--add-dir` is repeatable and is never comma-delimited. `permission_mode:
+:bypass` renders `--dangerously-skip-permissions` unless that flag was already
+provided explicitly.
+
 ## How To Read These Knobs
 
 `CliSubprocessCore` is the built-in CLI profile layer. At this layer:
@@ -231,6 +268,8 @@ Examples:
 - Cursor advertises interrupt, MCP, plan, resume, sandbox, streaming, and tool use.
 - Gemini advertises sandbox and extension support.
 - Amp advertises approval, MCP config, thinking, and tool use.
+- Antigravity advertises sandbox, streaming, directory mapping, and
+  continuation on the common CLI lane.
 
 The coarse `:tools` profile capability means the profile can normalize observed
 provider tool events. It is not a common host-tool admission signal. Use
@@ -264,7 +303,7 @@ info.capabilities
 
 The built-in status in this guide is a package ownership statement:
 
-- these five profiles ship with `cli_subprocess_core`
+- these six profiles ship with `cli_subprocess_core`
 - future third-party profiles belong in external packages
 - external profiles can still be preloaded into the default registry, but that
   preload does not make them first-party built-ins

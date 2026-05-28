@@ -28,6 +28,7 @@ Built-in implementations live in:
 - `lib/cli_subprocess_core/provider_profiles/cursor.ex`
 - `lib/cli_subprocess_core/provider_profiles/gemini.ex`
 - `lib/cli_subprocess_core/provider_profiles/amp.ex`
+- `lib/cli_subprocess_core/provider_profiles/antigravity.ex`
 
 ## The Three Internal Stages
 
@@ -113,6 +114,10 @@ Cursor is the example for a positional-prompt profile: it renders
 `agent -p --trust --output-format stream-json --stream-partial-output ...`
 and appends the prompt as the final argv element instead of inventing a
 `--prompt` flag.
+
+Antigravity is the example for a plain-text `--print` profile: it renders
+`agy --print <prompt> ...`, treats stdout as UTF-8 text instead of JSONL, maps
+non-empty lines to assistant deltas, and closes stdin on start.
 
 ## Reviewer Checklist
 

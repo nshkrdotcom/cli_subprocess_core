@@ -19,7 +19,7 @@
 `cli_subprocess_core` is the shared runtime for provider-facing CLIs. It owns
 provider profile resolution, normalized command/session APIs, event and payload
 shaping, model policy helpers, and the built-in first-party profiles for
-Claude, Codex, Cursor, Gemini, and Amp.
+Claude, Codex, Cursor, Gemini, Amp, and Antigravity.
 
 The covered one-shot local process lane and the local session-bearing process
 lane now run on `execution_plane`. `cli_subprocess_core` keeps one public
