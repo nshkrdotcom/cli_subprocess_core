@@ -1,12 +1,13 @@
 {
   "provider": "claude",
-  "catalog_version": "2026-04-23",
+  "catalog_version": "2026-07-06",
   "remote_default": "sonnet",
   "models": [
     {
       "id": "sonnet",
       "aliases": [
         "default",
+        "claude-sonnet-5",
         "claude-sonnet-4-6"
       ],
       "visibility": "public",
@@ -15,14 +16,15 @@
         "low",
         "medium",
         "high",
+        "xhigh",
         "max"
       ],
       "default": true,
       "metadata": {
-        "display_name": "Sonnet 4.6",
-        "description": "Default recommended Claude model. Best for everyday tasks.",
-        "context_window_tokens": 200000,
-        "max_output_tokens": 64000,
+        "display_name": "Sonnet 5",
+        "description": "Default recommended Claude model. Best combination of speed and intelligence.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 3,
         "output_price_per_mtok_usd": 15
       }
@@ -30,6 +32,7 @@
     {
       "id": "sonnet[1m]",
       "aliases": [
+        "claude-sonnet-5[1m]",
         "claude-sonnet-4-6[1m]"
       ],
       "visibility": "public",
@@ -38,13 +41,14 @@
         "low",
         "medium",
         "high",
+        "xhigh",
         "max"
       ],
       "metadata": {
-        "display_name": "Sonnet 4.6 (1M context)",
-        "description": "Sonnet 4.6 with 1M context.",
+        "display_name": "Sonnet 5 (1M context)",
+        "description": "Sonnet 5 with 1M context.",
         "context_window_tokens": 1000000,
-        "max_output_tokens": 64000,
+        "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 3,
         "output_price_per_mtok_usd": 15
       }
@@ -52,6 +56,7 @@
     {
       "id": "opus",
       "aliases": [
+        "claude-opus-4-8",
         "claude-opus-4-7"
       ],
       "visibility": "public",
@@ -64,8 +69,8 @@
         "max"
       ],
       "metadata": {
-        "display_name": "Opus 4.7",
-        "description": "Most capable Claude model for complex work.",
+        "display_name": "Opus 4.8",
+        "description": "Most capable Opus-tier Claude model for complex, long-horizon work.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 5,
@@ -75,6 +80,7 @@
     {
       "id": "opus[1m]",
       "aliases": [
+        "claude-opus-4-8[1m]",
         "claude-opus-4-7[1m]"
       ],
       "visibility": "public",
@@ -87,12 +93,35 @@
         "max"
       ],
       "metadata": {
-        "display_name": "Opus 4.7 (1M context)",
-        "description": "Opus 4.7 with 1M context.",
+        "display_name": "Opus 4.8 (1M context)",
+        "description": "Opus 4.8 with 1M context.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 5,
         "output_price_per_mtok_usd": 25
+      }
+    },
+    {
+      "id": "fable",
+      "aliases": [
+        "claude-fable-5"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Fable 5",
+        "description": "Anthropic's most capable widely released Claude model for the most demanding reasoning and agentic work.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 10,
+        "output_price_per_mtok_usd": 50
       }
     },
     {

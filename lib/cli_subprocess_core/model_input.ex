@@ -95,6 +95,7 @@ defmodule CliSubprocessCore.ModelInput do
       |> maybe_put(:ollama_http, fetch_attr(attrs, :ollama_http))
       |> maybe_put(:ollama_timeout_ms, fetch_attr(attrs, :ollama_timeout_ms))
       |> maybe_put(:external_model_overrides, fetch_attr(attrs, :external_model_overrides))
+      |> maybe_put(:allow_unknown, fetch_attr(attrs, :allow_unknown))
       |> maybe_put_reasoning(
         fetch_attr(attrs, :reasoning_effort) || fetch_attr(attrs, :reasoning)
       )

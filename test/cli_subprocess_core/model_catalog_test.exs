@@ -26,7 +26,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert claude_catalog.catalog_version == "2026-04-23"
+      assert claude_catalog.catalog_version == "2026-07-06"
       assert claude_catalog.remote_default == "sonnet"
 
       assert Enum.map(claude_catalog.models, & &1.id) == [
@@ -34,19 +34,32 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                "sonnet[1m]",
                "opus",
                "opus[1m]",
+               "fable",
                "haiku",
                "legacy-sonnet"
              ]
 
       assert Enum.any?(claude_catalog.models, fn model ->
-               model.id == "opus" and "claude-opus-4-7" in model.aliases
+               model.id == "opus" and "claude-opus-4-8" in model.aliases
+             end)
+
+      assert Enum.any?(claude_catalog.models, fn model ->
+               model.id == "sonnet" and "claude-sonnet-5" in model.aliases
+             end)
+
+      assert Enum.any?(claude_catalog.models, fn model ->
+               model.id == "fable" and "claude-fable-5" in model.aliases
              end)
 
       assert Enum.find(claude_catalog.models, &(&1.id == "sonnet")).reasoning_efforts
              |> Map.keys()
-             |> Enum.sort() == ["high", "low", "max", "medium"]
+             |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
 
       assert Enum.find(claude_catalog.models, &(&1.id == "opus")).reasoning_efforts
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
+
+      assert Enum.find(claude_catalog.models, &(&1.id == "fable")).reasoning_efforts
              |> Map.keys()
              |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
 

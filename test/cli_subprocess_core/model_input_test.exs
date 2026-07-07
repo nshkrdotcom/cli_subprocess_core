@@ -4,6 +4,19 @@ defmodule CliSubprocessCore.ModelInputTest do
   alias CliSubprocessCore.ModelInput
   alias CliSubprocessCore.ModelRegistry.Selection
 
+  test "threads allow_unknown so a not-yet-registered model passes through" do
+    assert {:ok, normalized} =
+             ModelInput.normalize(:claude, model: "claude-brand-new-2027", allow_unknown: true)
+
+    assert normalized.selection.resolved_model == "claude-brand-new-2027"
+    assert normalized.selection.extra["unregistered"] == true
+  end
+
+  test "without allow_unknown, an unregistered model errors" do
+    assert {:error, {:unknown_model, "claude-brand-new-2027", _, :claude}} =
+             ModelInput.normalize(:claude, model: "claude-brand-new-2027")
+  end
+
   test "normalizes raw Codex Ollama attrs into one payload and strips raw keys" do
     assert {:ok, normalized} =
              ModelInput.normalize(:codex,

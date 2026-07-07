@@ -43,6 +43,25 @@ defmodule CliSubprocessCore.ModelRegistry do
   def resolve(provider, requested_model, opts \\ []) when is_list(opts) do
     provider = normalize_provider(provider)
 
+    case do_resolve(provider, requested_model, opts) do
+      {:error, {:unknown_model, requested, _known, _provider}}
+      when is_binary(requested) ->
+        # The underlying CLI may accept models newer than the catalog. When the
+        # caller opts in via `allow_unknown: true`, an unregistered model id is
+        # passed through as an explicit Selection instead of failing. The
+        # `extra["unregistered"]` marker lets consumers surface a warning.
+        if Keyword.get(opts, :allow_unknown, false) do
+          build_unregistered_selection(provider, requested, opts)
+        else
+          {:error, {:unknown_model, requested, catalog_model_ids(provider), provider}}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp do_resolve(provider, requested_model, opts) do
     with {:ok, provider_backend} <- resolve_provider_backend(provider, opts),
          {:ok, catalog} <- load_catalog(provider),
          {:ok, candidate, source, payload_requested} <-
@@ -70,6 +89,47 @@ defmodule CliSubprocessCore.ModelRegistry do
          backend_metadata: payload_attrs.backend_metadata,
          errors: []
        })}
+    end
+  end
+
+  defp build_unregistered_selection(provider, requested, opts) do
+    with {:ok, provider_backend} <- resolve_provider_backend(provider, opts),
+         {:ok, catalog} <- load_catalog(provider) do
+      requested_reasoning = Keyword.get(opts, :reasoning_effort, Keyword.get(opts, :reasoning))
+
+      selection =
+        Selection.new(%{
+          provider: provider,
+          requested_model: requested,
+          resolved_model: requested,
+          resolution_source: :explicit,
+          reasoning: unregistered_reasoning(requested_reasoning),
+          reasoning_effort: nil,
+          normalized_reasoning_effort: nil,
+          model_family: nil,
+          catalog_version: catalog.catalog_version,
+          visibility: :public,
+          provider_backend: provider_backend,
+          model_source: :catalog,
+          env_overrides: %{},
+          settings_patch: %{},
+          backend_metadata: %{},
+          errors: []
+        })
+
+      {:ok, %{selection | extra: Map.put(selection.extra, "unregistered", true)}}
+    end
+  end
+
+  defp unregistered_reasoning(nil), do: nil
+  defp unregistered_reasoning(reasoning) when is_binary(reasoning), do: reasoning
+  defp unregistered_reasoning(reasoning) when is_atom(reasoning), do: Atom.to_string(reasoning)
+  defp unregistered_reasoning(reasoning), do: to_string(reasoning)
+
+  defp catalog_model_ids(provider) do
+    case load_catalog(provider) do
+      {:ok, catalog} -> Enum.map(catalog.models, & &1.id)
+      {:error, _} -> []
     end
   end
 

@@ -59,6 +59,29 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert is_list(suggestions)
     end
 
+    test "allow_unknown passes an unregistered model through as a Selection" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:claude, "claude-brand-new-2027", allow_unknown: true)
+
+      assert payload.resolved_model == "claude-brand-new-2027"
+      assert payload.requested_model == "claude-brand-new-2027"
+      assert payload.resolution_source == :explicit
+      assert payload.extra["unregistered"] == true
+    end
+
+    test "allow_unknown still resolves known aliases normally (no unregistered marker)" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:claude, "claude-opus-4-8", allow_unknown: true)
+
+      assert payload.resolved_model == "opus"
+      refute Map.get(payload.extra, "unregistered")
+    end
+
+    test "unknown model still errors without allow_unknown" do
+      assert {:error, {:unknown_model, "claude-brand-new-2027", _known, :claude}} =
+               ModelRegistry.resolve(:claude, "claude-brand-new-2027")
+    end
+
     test "normalizes reasoning effort from resolved model" do
       assert {:ok, %Selection{} = payload} =
                ModelRegistry.resolve(:codex, "gpt-5.3-codex", reasoning_effort: :high)
@@ -79,10 +102,23 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
       assert opus_payload.reasoning == "xhigh"
 
-      assert {:error, {:invalid_reasoning_effort, :xhigh, allowed_efforts, :claude}} =
+      # Sonnet 5 supports xhigh (the first Sonnet-tier model to do so).
+      assert {:ok, %Selection{} = sonnet_xhigh_payload} =
                ModelRegistry.resolve(:claude, "sonnet", reasoning_effort: :xhigh)
 
-      assert Enum.sort(allowed_efforts) == ["high", "low", "max", "medium"]
+      assert sonnet_xhigh_payload.reasoning == "xhigh"
+
+      # Fable 5 supports the full effort range.
+      assert {:ok, %Selection{} = fable_payload} =
+               ModelRegistry.resolve(:claude, "fable", reasoning_effort: :xhigh)
+
+      assert fable_payload.reasoning == "xhigh"
+
+      # Haiku advertises no reasoning efforts, so any effort is rejected.
+      assert {:error, {:invalid_reasoning_effort, :max, allowed_efforts, :claude}} =
+               ModelRegistry.resolve(:claude, "haiku", reasoning_effort: :max)
+
+      assert allowed_efforts == []
     end
 
     test "errors on invalid reasoning effort" do
