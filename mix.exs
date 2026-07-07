@@ -149,7 +149,7 @@ defmodule CliSubprocessCore.MixProject do
       execution_plane_jsonrpc_dep(),
       execution_plane_process_dep(),
       {:jason, "~> 1.4"},
-      {:zoi, "~> 0.17"},
+      {:zoi, "~> 0.18"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
