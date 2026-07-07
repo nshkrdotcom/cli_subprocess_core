@@ -46,3 +46,21 @@ Use the local model-selection script for workflow validation:
 - Live provider commands use `~/scripts/with_bash_secrets <command>` and must
   not print secrets.
 - Full gate: `mix ci`, plus the model-selection script when model catalog behavior changes.
+
+## Design intent — stay a thin seam
+
+- This repo is a *planning/semantics* seam over `execution_plane`, not an
+  execution engine. It delegates every real subprocess to
+  `ExecutionPlane.Process.Transport` / `ExecutionPlaneProcess.execute` and must
+  not spawn OS processes itself. `json_rpc.ex` is deliberately a `defdelegate`
+  to `ExecutionPlane.Protocols.JsonRpc.Adapter`.
+- The eventuality is that `execution_plane` runs as a separate, hard-isolated
+  BEAM node for effect isolation (see execution_plane/AGENTS.md → *Design Intent
+  — Effect Isolation*). Keeping this repo a thin delegating seam (facades +
+  model policy + command/session semantics) is what lets that node separation
+  happen with zero changes here.
+- Do **not** vendor or re-absorb Execution Plane's transport to shorten the
+  dependency chain for publishing — that re-couples the effect mechanics into
+  the CLI core and defeats the isolation goal. If publish-time decoupling from
+  the plane is ever required, do it via an optional dep + explicit fallback
+  transport, not by copying the mechanics.
