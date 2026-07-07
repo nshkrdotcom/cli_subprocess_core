@@ -1,27 +1,8 @@
 {
   "provider": "codex",
-  "catalog_version": "2026-04-23",
+  "catalog_version": "2026-07-06",
   "remote_default": "gpt-5.4",
   "models": [
-    {
-      "id": "gpt-5.4",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "medium",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "gpt-5.4",
-        "description": "Strong model for everyday coding.",
-        "supported_in_api": true
-      },
-      "default": true
-    },
     {
       "id": "gpt-5.5",
       "aliases": [],
@@ -40,6 +21,25 @@
         "supported_in_api": true
       },
       "default": false
+    },
+    {
+      "id": "gpt-5.4",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "display_name": "gpt-5.4",
+        "description": "Strong model for everyday coding.",
+        "supported_in_api": true
+      },
+      "default": true
     },
     {
       "id": "gpt-5.4-mini",
@@ -75,26 +75,11 @@
       "metadata": {
         "display_name": "gpt-5.3-codex",
         "description": "Coding-optimized model.",
-        "supported_in_api": true
-      },
-      "default": false
-    },
-    {
-      "id": "gpt-5.3-codex-spark",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "high",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "GPT-5.3-Codex-Spark",
-        "description": "Ultra-fast coding model.",
-        "supported_in_api": false
+        "supported_in_api": true,
+        "upgrade": {
+          "id": "gpt-5.4",
+          "upgrade_copy": "Introducing GPT-5.4\n\nCodex just got an upgrade with GPT-5.4, our most capable model for professional work. It outperforms prior models while being more token efficient, with notable improvements on long-running tasks, tool calling, computer use, and frontend development.\n\nLearn more: https://openai.com/index/introducing-gpt-5-4\n\nYou can always keep using GPT-5.3-Codex if you prefer.\n"
+        }
       },
       "default": false
     },
@@ -113,6 +98,29 @@
       "metadata": {
         "display_name": "gpt-5.2",
         "description": "Optimized for professional work and long-running agents.",
+        "supported_in_api": true,
+        "upgrade": {
+          "id": "gpt-5.4",
+          "upgrade_copy": "Introducing GPT-5.4\n\nCodex just got an upgrade with GPT-5.4, our most capable model for professional work. It outperforms prior models while being more token efficient, with notable improvements on long-running tasks, tool calling, computer use, and frontend development.\n\nLearn more: https://openai.com/index/introducing-gpt-5-4\n\nYou can always keep using GPT-5.3-Codex if you prefer.\n"
+        }
+      },
+      "default": false
+    },
+    {
+      "id": "codex-auto-review",
+      "aliases": [],
+      "visibility": "internal",
+      "family": "review",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "display_name": "Codex Auto Review",
+        "description": "Automatic approval review model for Codex.",
         "supported_in_api": true
       },
       "default": false

@@ -7,22 +7,32 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-04-23"
+      assert codex_catalog.catalog_version == "2026-07-06"
       assert codex_catalog.remote_default == "gpt-5.4"
 
       assert Enum.map(codex_catalog.models, & &1.id) == [
-               "gpt-5.4",
                "gpt-5.5",
+               "gpt-5.4",
                "gpt-5.4-mini",
                "gpt-5.3-codex",
-               "gpt-5.3-codex-spark",
-               "gpt-5.2"
+               "gpt-5.2",
+               "codex-auto-review"
              ]
 
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.2-codex"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.1-codex-max"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5-codex"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5-codex-internal"))
+      refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.3-codex-spark"))
+
+      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.4")).default
+
+      assert Enum.find(codex_catalog.models, &(&1.id == "codex-auto-review")).visibility ==
+               :internal
+
+      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.3-codex")).metadata["upgrade"][
+               "id"
+             ] == "gpt-5.4"
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude

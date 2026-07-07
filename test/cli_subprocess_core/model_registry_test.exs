@@ -82,6 +82,42 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:claude, "claude-brand-new-2027")
     end
 
+    test "allow_unknown passes an unregistered Codex model through as a Selection" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "gpt-5.9-not-yet-released", allow_unknown: true)
+
+      assert payload.resolved_model == "gpt-5.9-not-yet-released"
+      assert payload.requested_model == "gpt-5.9-not-yet-released"
+      assert payload.resolution_source == :explicit
+      assert payload.provider == :codex
+      assert payload.extra["unregistered"] == true
+    end
+
+    test "allow_unknown still resolves known Codex aliases normally (no unregistered marker)" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, "gpt-5.4", allow_unknown: true)
+
+      assert payload.resolved_model == "gpt-5.4"
+      refute Map.get(payload.extra, "unregistered")
+    end
+
+    test "unknown Codex model still errors without allow_unknown" do
+      assert {:error, {:unknown_model, "gpt-5.9-not-yet-released", _known, :codex}} =
+               ModelRegistry.resolve(:codex, "gpt-5.9-not-yet-released")
+    end
+
+    test "allow_unknown passes through an env-derived unknown Codex model too" do
+      assert {:ok, %Selection{} = payload} =
+               ModelRegistry.resolve(:codex, nil,
+                 env_model: "gpt-5.9-not-yet-released",
+                 allow_unknown: true
+               )
+
+      assert payload.resolved_model == "gpt-5.9-not-yet-released"
+      assert payload.resolution_source == :explicit
+      assert payload.extra["unregistered"] == true
+    end
+
     test "normalizes reasoning effort from resolved model" do
       assert {:ok, %Selection{} = payload} =
                ModelRegistry.resolve(:codex, "gpt-5.3-codex", reasoning_effort: :high)
@@ -255,11 +291,10 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
 
       assert models == [
-               "gpt-5.4",
                "gpt-5.5",
+               "gpt-5.4",
                "gpt-5.4-mini",
                "gpt-5.3-codex",
-               "gpt-5.3-codex-spark",
                "gpt-5.2"
              ]
 
@@ -268,6 +303,8 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       refute "gpt-5.1-codex-mini" in models
       refute "gpt-5-codex" in models
       refute "gpt-5-codex-internal" in models
+      refute "gpt-5.3-codex-spark" in models
+      refute "codex-auto-review" in models
     end
 
     test "returns all requested visibility families" do
