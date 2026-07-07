@@ -1,14 +1,14 @@
 {
   "provider": "codex",
   "catalog_version": "2026-07-06",
-  "remote_default": "gpt-5.4",
+  "remote_default": "gpt-5.5",
   "models": [
     {
       "id": "gpt-5.5",
       "aliases": [],
       "visibility": "public",
       "family": "gpt-5",
-      "default_reasoning_effort": "medium",
+      "default_reasoning_effort": "xhigh",
       "reasoning_efforts": {
         "low": 0.8,
         "medium": 1,
@@ -20,7 +20,7 @@
         "description": "Frontier model for complex coding, research, and real-world work.",
         "supported_in_api": true
       },
-      "default": false
+      "default": true
     },
     {
       "id": "gpt-5.4",
@@ -37,9 +37,13 @@
       "metadata": {
         "display_name": "gpt-5.4",
         "description": "Strong model for everyday coding.",
-        "supported_in_api": true
+        "supported_in_api": true,
+        "upgrade": {
+          "id": "gpt-5.5",
+          "upgrade_copy": "Introducing GPT-5.5\n\nGPT-5.5 is now available in Codex. It's our strongest agentic coding model yet, built to reason through large codebases, check assumptions with tools, and keep going until the work is done.\n\nLearn more: https://openai.com/index/introducing-gpt-5-5/\n\nYou can always keep using GPT-5.4 if you prefer.\n"
+        }
       },
-      "default": true
+      "default": false
     },
     {
       "id": "gpt-5.4-mini",
@@ -57,52 +61,6 @@
         "display_name": "GPT-5.4-Mini",
         "description": "Small, fast, and cost-efficient model for simpler coding tasks.",
         "supported_in_api": true
-      },
-      "default": false
-    },
-    {
-      "id": "gpt-5.3-codex",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "medium",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "gpt-5.3-codex",
-        "description": "Coding-optimized model.",
-        "supported_in_api": true,
-        "upgrade": {
-          "id": "gpt-5.4",
-          "upgrade_copy": "Introducing GPT-5.4\n\nCodex just got an upgrade with GPT-5.4, our most capable model for professional work. It outperforms prior models while being more token efficient, with notable improvements on long-running tasks, tool calling, computer use, and frontend development.\n\nLearn more: https://openai.com/index/introducing-gpt-5-4\n\nYou can always keep using GPT-5.3-Codex if you prefer.\n"
-        }
-      },
-      "default": false
-    },
-    {
-      "id": "gpt-5.2",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "medium",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "gpt-5.2",
-        "description": "Optimized for professional work and long-running agents.",
-        "supported_in_api": true,
-        "upgrade": {
-          "id": "gpt-5.4",
-          "upgrade_copy": "Introducing GPT-5.4\n\nCodex just got an upgrade with GPT-5.4, our most capable model for professional work. It outperforms prior models while being more token efficient, with notable improvements on long-running tasks, tool calling, computer use, and frontend development.\n\nLearn more: https://openai.com/index/introducing-gpt-5-4\n\nYou can always keep using GPT-5.3-Codex if you prefer.\n"
-        }
       },
       "default": false
     },

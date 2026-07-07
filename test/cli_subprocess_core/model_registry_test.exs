@@ -8,19 +8,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.resolve/3" do
     test "resolves with explicit request precedence" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.3-codex", model: "legacy")
+               ModelRegistry.resolve(:codex, "gpt-5.4", model: "legacy")
 
       assert payload.resolution_source == :explicit
-      assert payload.resolved_model == "gpt-5.3-codex"
+      assert payload.resolved_model == "gpt-5.4"
       assert payload.provider == :codex
     end
 
     test "ignores legacy model values passed through opts" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, nil, model: "gpt-5.3-codex")
+               ModelRegistry.resolve(:codex, nil, model: "gpt-5.4")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-5.4"
+      assert payload.resolved_model == "gpt-5.5"
       assert payload.requested_model == nil
     end
 
@@ -120,7 +120,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "normalizes reasoning effort from resolved model" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.3-codex", reasoning_effort: :high)
+               ModelRegistry.resolve(:codex, "gpt-5.4", reasoning_effort: :high)
 
       assert payload.reasoning == "high"
       assert is_number(payload.reasoning_effort)
@@ -293,9 +293,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert models == [
                "gpt-5.5",
                "gpt-5.4",
-               "gpt-5.4-mini",
-               "gpt-5.3-codex",
-               "gpt-5.2"
+               "gpt-5.4-mini"
              ]
 
       refute "gpt-5.2-codex" in models
@@ -305,6 +303,8 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       refute "gpt-5-codex-internal" in models
       refute "gpt-5.3-codex-spark" in models
       refute "codex-auto-review" in models
+      refute "gpt-5.3-codex" in models
+      refute "gpt-5.2" in models
     end
 
     test "returns all requested visibility families" do
@@ -339,7 +339,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-5.4"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-5.5"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
       assert {:ok, "auto-gemini-3"} = ModelRegistry.default_model(:gemini)
     end
@@ -485,12 +485,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.normalize_reasoning_effort/3" do
     test "normalizes symbolic reasoning effort" do
       assert {:ok, %{reasoning: "medium", reasoning_effort: 1, normalized_reasoning_effort: 1}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.3-codex", :medium)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4", :medium)
     end
 
     test "normalizes numeric reasoning effort when configured" do
       assert {:ok, %{reasoning: "low", reasoning_effort: 0.8, normalized_reasoning_effort: 0.8}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.3-codex", 0.8)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4", 0.8)
     end
   end
 
