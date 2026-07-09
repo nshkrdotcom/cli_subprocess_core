@@ -110,6 +110,11 @@ Common Codex options:
 
 The Codex profile does not own model or backend policy.
 
+The shared model registry currently exposes `gpt-5.5` as the live default,
+plus `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4`, and
+`gpt-5.4-mini`. The profile consumes that resolved selection; it does not add
+aliases or preserve retired model IDs.
+
 It reads the resolved payload for:
 
 - `--model`

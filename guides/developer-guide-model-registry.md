@@ -73,6 +73,26 @@ This gives the core one place to answer:
 - “what visibilities are exposed?”
 - “which reasoning values are valid for this model?”
 
+## Current Codex Catalog Evidence
+
+The bundled Codex catalog was verified on 2026-07-09 with an authenticated
+`codex-cli 0.144.0` `model/list` request using `includeHidden: true`. The
+current public lineup is `gpt-5.5` (default), `gpt-5.6-sol`,
+`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4`, and `gpt-5.4-mini`;
+`codex-auto-review` is internal.
+
+The pulled upstream source registry can lead the live backend. In the same
+checkout it placed Sol first and still included `gpt-5.2`, while the live
+backend kept `gpt-5.5` as default and did not return `gpt-5.2` even as a hidden
+entry. Maintainers must use the authenticated live result for the bundled
+Codex CLI catalog and record the CLI version and probe date when it changes.
+
+The GPT-5.6 variants are explicit Codex CLI IDs; this catalog does not add the
+OpenAI API's `gpt-5.6` family alias. Sol and Terra support `low`, `medium`,
+`high`, `xhigh`, `max`, and `ultra`; Luna supports the same set except
+`ultra`. The live Codex response currently reports `xhigh` as the default for
+all three.
+
 ## Resolution Sequence
 
 The authoritative resolution order is:
@@ -152,12 +172,12 @@ An integrating caller should do this:
 {:ok, selection} =
   CliSubprocessCore.ModelRegistry.build_arg_payload(
     :codex,
-    "gpt-5.4",
-    reasoning_effort: :medium
+    "gpt-5.6-sol",
+    reasoning_effort: :max
   )
 
 selection.resolved_model
-# => "gpt-5.4"
+# => "gpt-5.6-sol"
 ```
 
 After that, provider-specific command building can safely use the resolved

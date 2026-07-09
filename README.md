@@ -67,7 +67,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.1.0"}
+    {:cli_subprocess_core, "~> 0.1.1"}
   ]
 end
 ```

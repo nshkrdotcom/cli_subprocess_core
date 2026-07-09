@@ -3,6 +3,15 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
   alias CliSubprocessCore.ProviderFeatures
 
+  alias CliSubprocessCore.ProviderProfiles.{
+    Amp,
+    Antigravity,
+    Claude,
+    Codex,
+    Cursor,
+    Gemini
+  }
+
   test "permission manifests expose the provider-native bypass terms" do
     assert ProviderFeatures.permission_mode!(:gemini, :yolo).cli_excerpt == "--yolo"
 
@@ -95,11 +104,11 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
 
   test "coarse provider profile tools hints are not host tool admission" do
     profile_modules = [
-      CliSubprocessCore.ProviderProfiles.Amp,
-      CliSubprocessCore.ProviderProfiles.Claude,
-      CliSubprocessCore.ProviderProfiles.Codex,
-      CliSubprocessCore.ProviderProfiles.Cursor,
-      CliSubprocessCore.ProviderProfiles.Gemini
+      Amp,
+      Claude,
+      Codex,
+      Cursor,
+      Gemini
     ]
 
     for profile_module <- profile_modules do
@@ -107,7 +116,7 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
       assert ProviderFeatures.tool_capability!(profile_module.id(), :host_tools) == false
     end
 
-    refute :tools in CliSubprocessCore.ProviderProfiles.Antigravity.capabilities()
+    refute :tools in Antigravity.capabilities()
     assert ProviderFeatures.tool_capability!(:antigravity, :host_tools) == false
   end
 end

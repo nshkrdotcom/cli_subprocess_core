@@ -7,11 +7,14 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-07-06"
+      assert codex_catalog.catalog_version == "2026-07-09"
       assert codex_catalog.remote_default == "gpt-5.5"
 
       assert Enum.map(codex_catalog.models, & &1.id) == [
                "gpt-5.5",
+               "gpt-5.6-sol",
+               "gpt-5.6-terra",
+               "gpt-5.6-luna",
                "gpt-5.4",
                "gpt-5.4-mini",
                "codex-auto-review"
@@ -24,7 +27,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.3-codex-spark"))
       # Confirmed genuinely absent (not even hidden) via a live `model/list`
       # probe (includeHidden: true) against an authenticated codex CLI
-      # v0.142.5 install, 2026-07-06 - the backend no longer serves either
+      # v0.144.0 install, 2026-07-09 - the backend no longer serves either
       # model at all, even though the vendored codex-rs source snapshot
       # still defines them with visibility "list".
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.3-codex"))
@@ -35,12 +38,34 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.5")).default_reasoning_effort ==
                "xhigh"
 
+      assert codex_catalog.models
+             |> Enum.find(&(&1.id == "gpt-5.6-sol"))
+             |> Map.fetch!(:reasoning_efforts)
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium", "ultra", "xhigh"]
+
+      assert codex_catalog.models
+             |> Enum.find(&(&1.id == "gpt-5.6-terra"))
+             |> Map.fetch!(:reasoning_efforts)
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium", "ultra", "xhigh"]
+
+      assert codex_catalog.models
+             |> Enum.find(&(&1.id == "gpt-5.6-luna"))
+             |> Map.fetch!(:reasoning_efforts)
+             |> Map.keys()
+             |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
+
+      for model_id <- ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna) do
+        model = Enum.find(codex_catalog.models, &(&1.id == model_id))
+        assert model.default_reasoning_effort == "xhigh"
+        assert model.aliases == []
+      end
+
       assert Enum.find(codex_catalog.models, &(&1.id == "codex-auto-review")).visibility ==
                :internal
 
-      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.4")).metadata["upgrade"][
-               "id"
-             ] == "gpt-5.5"
+      refute Enum.find(codex_catalog.models, &(&1.id == "gpt-5.4")).metadata["upgrade"]
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude

@@ -127,6 +127,33 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.normalized_reasoning_effort == payload.reasoning_effort
     end
 
+    test "resolves the current GPT-5.6 Codex family" do
+      for model_id <- ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna) do
+        assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
+        assert payload.resolved_model == model_id
+        assert payload.reasoning == "xhigh"
+        refute Map.get(payload.extra, "unregistered")
+      end
+    end
+
+    test "validates GPT-5.6 max and ultra effort support per model" do
+      for model_id <- ~w(gpt-5.6-sol gpt-5.6-terra) do
+        assert {:ok, %Selection{reasoning: "max"}} =
+                 ModelRegistry.resolve(:codex, model_id, reasoning_effort: :max)
+
+        assert {:ok, %Selection{reasoning: "ultra"}} =
+                 ModelRegistry.resolve(:codex, model_id, reasoning_effort: :ultra)
+      end
+
+      assert {:ok, %Selection{reasoning: "max"}} =
+               ModelRegistry.resolve(:codex, "gpt-5.6-luna", reasoning_effort: :max)
+
+      assert {:error,
+              {:invalid_reasoning_effort, :ultra, ["high", "low", "max", "medium", "xhigh"],
+               :codex}} =
+               ModelRegistry.resolve(:codex, "gpt-5.6-luna", reasoning_effort: :ultra)
+    end
+
     test "normalizes Claude effort support from the catalog" do
       assert {:ok, %Selection{} = sonnet_payload} =
                ModelRegistry.resolve(:claude, "sonnet", reasoning_effort: :max)
@@ -292,6 +319,9 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
       assert models == [
                "gpt-5.5",
+               "gpt-5.6-sol",
+               "gpt-5.6-terra",
+               "gpt-5.6-luna",
                "gpt-5.4",
                "gpt-5.4-mini"
              ]
