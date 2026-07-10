@@ -10,8 +10,8 @@ Use the local model-selection script for workflow validation:
 ## Execution Plane stack rules
 
 - This repo is the CLI family kit above `execution_plane`; it owns provider CLI planning, command/session semantics, recovery envelopes, and facade surfaces.
-- First-party profiles currently shipped here: Claude, Codex, Cursor, Gemini,
-  Amp, and Antigravity.
+- First-party profiles currently shipped here: Claude, Codex, Cursor, Amp, and
+  Antigravity. Google coding-agent support is Antigravity-only.
 - Downstream provider SDKs should consume `CliSubprocessCore.*` facades such as `ExecutionSurface`, `TransportError`, `TransportInfo`, and `ProcessExit`, not raw `ExecutionPlane.*` modules.
 - Keep local sibling deps publish-aware. Local development uses
   `build_support/dependency_sources.exs` and

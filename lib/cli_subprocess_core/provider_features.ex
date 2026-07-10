@@ -265,39 +265,6 @@ defmodule CliSubprocessCore.ProviderFeatures do
           "Cursor host tool execution is governed by the Cursor CLI process and remains outside core host-tool admission.",
           "MCP approval is provider-native through --approve-mcps."
         ])
-    },
-    gemini: %{
-      provider: :gemini,
-      permission_modes: %{
-        default: %{native_mode: :default, cli_args: [], cli_excerpt: nil, label: "default"},
-        auto_edit: %{
-          native_mode: :auto_edit,
-          cli_args: ["--approval-mode", "auto_edit"],
-          cli_excerpt: "--approval-mode auto_edit",
-          label: "auto_edit"
-        },
-        plan: %{
-          native_mode: :plan,
-          cli_args: ["--approval-mode", "plan"],
-          cli_excerpt: "--approval-mode plan",
-          label: "plan"
-        },
-        yolo: %{native_mode: :yolo, cli_args: ["--yolo"], cli_excerpt: "--yolo", label: "yolo"}
-      },
-      partial_features: %{
-        ollama: %{
-          supported?: false,
-          activation: nil,
-          model_strategy: nil,
-          compatibility: nil,
-          notes: ["Gemini does not expose an Ollama backend through the common CLI surface."]
-        }
-      },
-      tool_capabilities:
-        Map.put(@observed_tool_capabilities, :notes, [
-          "The Gemini profile normalizes observed tool_use/tool_result events from stream-json output.",
-          "Gemini extensions, settings, tool allowlists, and no-tool/plain-response behavior remain provider-native or unproven at the core contract."
-        ])
     }
   }
 

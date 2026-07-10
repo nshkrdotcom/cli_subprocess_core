@@ -9,7 +9,6 @@ defmodule CliSubprocessCore do
           CliSubprocessCore.ProviderProfiles.Claude
           | CliSubprocessCore.ProviderProfiles.Codex
           | CliSubprocessCore.ProviderProfiles.Cursor
-          | CliSubprocessCore.ProviderProfiles.Gemini
           | CliSubprocessCore.ProviderProfiles.Amp
           | CliSubprocessCore.ProviderProfiles.Antigravity
 
@@ -17,7 +16,6 @@ defmodule CliSubprocessCore do
     CliSubprocessCore.ProviderProfiles.Claude,
     CliSubprocessCore.ProviderProfiles.Codex,
     CliSubprocessCore.ProviderProfiles.Cursor,
-    CliSubprocessCore.ProviderProfiles.Gemini,
     CliSubprocessCore.ProviderProfiles.Amp,
     CliSubprocessCore.ProviderProfiles.Antigravity
   ]

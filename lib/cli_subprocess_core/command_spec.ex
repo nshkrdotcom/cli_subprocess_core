@@ -3,9 +3,9 @@ defmodule CliSubprocessCore.CommandSpec do
   Resolved subprocess program plus any argv prefix that must precede provider
   arguments.
 
-  This lets core-owned provider resolution express launchers such as
-  `npx --yes --package @google/gemini-cli gemini ...` while still projecting to
-  a normal `CliSubprocessCore.Command` invocation for transport execution.
+  This lets core-owned provider resolution express launcher prefixes while
+  still projecting to a normal `CliSubprocessCore.Command` invocation for
+  transport execution.
   """
 
   @enforce_keys [:program]

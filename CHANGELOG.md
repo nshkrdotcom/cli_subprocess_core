@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-07-09
+## [0.1.1] - 2026-07-10
 
 ### Added
 
-- Current Codex GPT-5.6 Sol, Terra, and Luna catalog entries, including
-  model-specific `max` and `ultra` reasoning-effort validation.
+- Current Codex GPT-5.6 Sol, Terra, and Luna catalog entries plus the public
+  GPT-5.3-Codex-Spark ChatGPT Pro preview, including model-specific reasoning
+  defaults and `max`/`ultra` validation.
 - Cursor Agent CLI (`:cursor`) first-party provider profile with stream-json
   parsing, live fixture evidence, model catalog entries, and provider feature
   metadata.
@@ -21,11 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Codex catalog now follows an authenticated live `codex-cli 0.144.0`
-  `model/list` probe from 2026-07-09: `gpt-5.5` remains the default, the three
-  explicit GPT-5.6 variants are public, `codex-auto-review` remains internal,
-  and backend-absent `gpt-5.2` stays excluded.
+- The Codex catalog now follows an authenticated live `codex-cli 0.144.1`
+  `model/list` probe from 2026-07-10: `gpt-5.6-sol` is the default, Spark is
+  public but non-API, `codex-auto-review` remains internal, and backend-absent
+  `gpt-5.2` stays excluded.
 - Refreshed compatible dependencies, including Zoi 0.18.5.
+
+### Removed
+
+- Retired the Gemini CLI profile, catalog, discovery/fallback path, feature
+  manifest, and model-selection workflow target. Google coding-agent support
+  now uses the Antigravity profile only.
 
 ## [0.1.0] - 2026-04-06
 

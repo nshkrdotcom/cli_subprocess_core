@@ -8,13 +8,10 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     Antigravity,
     Claude,
     Codex,
-    Cursor,
-    Gemini
+    Cursor
   }
 
   test "permission manifests expose the provider-native bypass terms" do
-    assert ProviderFeatures.permission_mode!(:gemini, :yolo).cli_excerpt == "--yolo"
-
     assert ProviderFeatures.permission_mode!(:claude, :bypass_permissions).cli_excerpt ==
              "--permission-mode bypassPermissions"
 
@@ -32,8 +29,6 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
   end
 
   test "permission_args/2 returns the manifest-backed CLI arguments" do
-    assert ProviderFeatures.permission_args(:gemini, :yolo) == ["--yolo"]
-
     assert ProviderFeatures.permission_args(:claude, :bypass_permissions) == [
              "--permission-mode",
              "bypassPermissions"
@@ -57,7 +52,6 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
   test "ollama partial feature support is explicit per provider" do
     claude = ProviderFeatures.partial_feature!(:claude, :ollama)
     codex = ProviderFeatures.partial_feature!(:codex, :ollama)
-    gemini = ProviderFeatures.partial_feature!(:gemini, :ollama)
     amp = ProviderFeatures.partial_feature!(:amp, :ollama)
     cursor = ProviderFeatures.partial_feature!(:cursor, :ollama)
     antigravity = ProviderFeatures.partial_feature!(:antigravity, :ollama)
@@ -73,14 +67,13 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert codex.compatibility.acceptance == :runtime_validated_external_model
     assert codex.compatibility.validated_models == ["gpt-oss:20b"]
 
-    assert gemini.supported? == false
     assert amp.supported? == false
     assert cursor.supported? == false
     assert antigravity.supported? == false
   end
 
   test "tool capability metadata separates observation from host execution" do
-    for provider <- [:amp, :antigravity, :claude, :codex, :cursor, :gemini] do
+    for provider <- [:amp, :antigravity, :claude, :codex, :cursor] do
       tool_capabilities = ProviderFeatures.tool_capabilities!(provider)
 
       assert Map.take(tool_capabilities, ProviderFeatures.tool_capability_keys()) ==
@@ -107,8 +100,7 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
       Amp,
       Claude,
       Codex,
-      Cursor,
-      Gemini
+      Cursor
     ]
 
     for profile_module <- profile_modules do

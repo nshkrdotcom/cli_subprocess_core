@@ -120,16 +120,16 @@ defmodule CliSubprocessCore.ModelInputTest do
   test "preserves explicit payload extras without wrapping them under :extra" do
     payload =
       Selection.new(%{
-        provider: :gemini,
-        requested_model: "gemini-2.5-flash",
-        resolved_model: "gemini-2.5-flash",
+        provider: :amp,
+        requested_model: "amp-1",
+        resolved_model: "amp-1",
         resolution_source: :explicit,
         visibility: :restricted,
         model_source: :catalog,
         future_flag: true
       })
 
-    assert {:ok, normalized} = ModelInput.normalize(:gemini, model_payload: payload)
+    assert {:ok, normalized} = ModelInput.normalize(:amp, model_payload: payload)
     assert normalized.selection == payload
     assert normalized.attrs[:model_payload] == payload
     assert normalized.selection.extra == %{future_flag: true}
@@ -162,17 +162,6 @@ defmodule CliSubprocessCore.ModelInputTest do
              ModelInput.normalize(:claude,
                model_payload: payload,
                model: "opus"
-             )
-  end
-
-  test "validates Gemini payload conflicts through the shared normalizer" do
-    {:ok, payload} =
-      CliSubprocessCore.ModelRegistry.build_arg_payload(:gemini, "gemini-2.5-flash", [])
-
-    assert {:error, {:model_payload_conflict, :model, "gemini-2.5-flash", "gemini-2.5-pro"}} =
-             ModelInput.normalize(:gemini,
-               model_payload: payload,
-               model: "gemini-2.5-pro"
              )
   end
 

@@ -1,33 +1,14 @@
 {
   "provider": "codex",
-  "catalog_version": "2026-07-09",
-  "remote_default": "gpt-5.5",
+  "catalog_version": "2026-07-10",
+  "remote_default": "gpt-5.6-sol",
   "models": [
-    {
-      "id": "gpt-5.5",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "xhigh",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "GPT-5.5",
-        "description": "Frontier model for complex coding, research, and real-world work.",
-        "supported_in_api": true
-      },
-      "default": true
-    },
     {
       "id": "gpt-5.6-sol",
       "aliases": [],
       "visibility": "public",
       "family": "gpt-5.6",
-      "default_reasoning_effort": "xhigh",
+      "default_reasoning_effort": "low",
       "reasoning_efforts": {
         "low": 0.8,
         "medium": 1,
@@ -42,14 +23,14 @@
         "supported_in_api": true,
         "supports_personality": false
       },
-      "default": false
+      "default": true
     },
     {
       "id": "gpt-5.6-terra",
       "aliases": [],
       "visibility": "public",
       "family": "gpt-5.6",
-      "default_reasoning_effort": "xhigh",
+      "default_reasoning_effort": "medium",
       "reasoning_efforts": {
         "low": 0.8,
         "medium": 1,
@@ -71,7 +52,7 @@
       "aliases": [],
       "visibility": "public",
       "family": "gpt-5.6",
-      "default_reasoning_effort": "xhigh",
+      "default_reasoning_effort": "medium",
       "reasoning_efforts": {
         "low": 0.8,
         "medium": 1,
@@ -88,6 +69,25 @@
       "default": false
     },
     {
+      "id": "gpt-5.5",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "display_name": "GPT-5.5",
+        "description": "Frontier model for complex coding, research, and real-world work.",
+        "supported_in_api": true
+      },
+      "default": false
+    },
+    {
       "id": "gpt-5.4",
       "aliases": [],
       "visibility": "public",
@@ -100,7 +100,7 @@
         "xhigh": 2.1
       },
       "metadata": {
-        "display_name": "gpt-5.4",
+        "display_name": "GPT-5.4",
         "description": "Strong model for everyday coding.",
         "supported_in_api": true
       },
@@ -122,6 +122,27 @@
         "display_name": "GPT-5.4-Mini",
         "description": "Small, fast, and cost-efficient model for simpler coding tasks.",
         "supported_in_api": true
+      },
+      "default": false
+    },
+    {
+      "id": "gpt-5.3-codex-spark",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-5.3-codex",
+      "default_reasoning_effort": "high",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1
+      },
+      "metadata": {
+        "display_name": "GPT-5.3-Codex-Spark",
+        "description": "Ultra-fast coding model.",
+        "supported_in_api": false,
+        "supports_personality": true,
+        "input_modalities": ["text"]
       },
       "default": false
     },

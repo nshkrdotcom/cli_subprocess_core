@@ -48,7 +48,7 @@ than the default local subprocess:
 ```elixir
 {:ok, session, info} =
   CliSubprocessCore.Session.start_session(
-    provider: :gemini,
+    provider: :antigravity,
     prompt: "Hello from SSH",
     execution_surface: [
       surface_kind: :ssh_exec,

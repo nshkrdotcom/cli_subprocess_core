@@ -114,9 +114,6 @@ defmodule CliSubprocessCore.ProviderRuntimeProfileTest do
       {:codex, "phase5prelim://cli/codex",
        ~s({"type":"response.output_text.delta","delta":"codex wire","session_id":"codex-sim"}\n),
        "codex wire"},
-      {:gemini, "phase5prelim://cli/gemini",
-       ~s({"type":"message","role":"assistant","delta":true,"content":"gemini wire","session_id":"gemini-sim"}\n),
-       "gemini wire"},
       {:amp, "phase5prelim://cli/amp",
        ~s({"type":"message_streamed","delta":"amp wire","session_id":"amp-sim"}\n), "amp wire"}
     ]

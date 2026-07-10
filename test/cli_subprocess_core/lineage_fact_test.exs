@@ -61,7 +61,7 @@ defmodule CliSubprocessCore.LineageFactTest do
       end
 
     assert error.message =~
-             "provider must be one of amp, antigravity, claude, codex, cursor, gemini"
+             "provider must be one of amp, antigravity, claude, codex, cursor"
 
     assert error.message =~ "third-party-profile"
   end

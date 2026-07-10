@@ -20,7 +20,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:codex, nil, model: "gpt-5.4")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-5.5"
+      assert payload.resolved_model == "gpt-5.6-sol"
       assert payload.requested_model == nil
     end
 
@@ -33,10 +33,6 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     end
 
     test "falls back to provider default when no request or env model" do
-      assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:gemini, nil)
-      assert payload.resolution_source == :default
-      assert payload.resolved_model == "auto-gemini-3"
-
       assert {:ok, %Selection{} = claude_payload} = ModelRegistry.resolve(:claude, nil)
       assert claude_payload.resolution_source == :default
       assert claude_payload.resolved_model == "sonnet"
@@ -127,11 +123,16 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert payload.normalized_reasoning_effort == payload.reasoning_effort
     end
 
-    test "resolves the current GPT-5.6 Codex family" do
-      for model_id <- ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna) do
+    test "resolves the current Codex family with live default efforts" do
+      for {model_id, default_effort} <- [
+            {"gpt-5.6-sol", "low"},
+            {"gpt-5.6-terra", "medium"},
+            {"gpt-5.6-luna", "medium"},
+            {"gpt-5.3-codex-spark", "high"}
+          ] do
         assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
         assert payload.resolved_model == model_id
-        assert payload.reasoning == "xhigh"
+        assert payload.reasoning == default_effort
         refute Map.get(payload.extra, "unregistered")
       end
     end
@@ -318,12 +319,13 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
 
       assert models == [
-               "gpt-5.5",
                "gpt-5.6-sol",
                "gpt-5.6-terra",
                "gpt-5.6-luna",
+               "gpt-5.5",
                "gpt-5.4",
-               "gpt-5.4-mini"
+               "gpt-5.4-mini",
+               "gpt-5.3-codex-spark"
              ]
 
       refute "gpt-5.2-codex" in models
@@ -331,7 +333,6 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       refute "gpt-5.1-codex-mini" in models
       refute "gpt-5-codex" in models
       refute "gpt-5-codex-internal" in models
-      refute "gpt-5.3-codex-spark" in models
       refute "codex-auto-review" in models
       refute "gpt-5.3-codex" in models
       refute "gpt-5.2" in models
@@ -369,9 +370,8 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-5.5"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-5.6-sol"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
-      assert {:ok, "auto-gemini-3"} = ModelRegistry.default_model(:gemini)
     end
 
     test "hard fails when Claude Ollama backend has no explicit external default" do
@@ -389,22 +389,6 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   end
 
   describe "ModelRegistry.validate/2" do
-    test "returns model metadata for a known model" do
-      assert {:ok, model} = ModelRegistry.validate(:gemini, "gemini-3.1-flash-lite-preview")
-      assert model.id == "gemini-3.1-flash-lite-preview"
-    end
-
-    test "returns model metadata for Gemini CLI virtual model ids" do
-      assert {:ok, model} = ModelRegistry.validate(:gemini, "auto-gemini-3")
-      assert model.id == "auto-gemini-3"
-
-      assert {:ok, alias_model} = ModelRegistry.validate(:gemini, "default")
-      assert alias_model.id == "auto-gemini-3"
-
-      assert {:ok, pro_alias} = ModelRegistry.validate(:gemini, "pro")
-      assert pro_alias.id == "pro"
-    end
-
     test "returns hard error for invalid or unknown model" do
       assert {:error, {:unknown_model, "missing", _, :amp}} =
                ModelRegistry.validate(:amp, "missing")

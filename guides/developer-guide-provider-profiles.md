@@ -26,7 +26,6 @@ Built-in implementations live in:
 - `lib/cli_subprocess_core/provider_profiles/codex.ex`
 - `lib/cli_subprocess_core/provider_profiles/claude.ex`
 - `lib/cli_subprocess_core/provider_profiles/cursor.ex`
-- `lib/cli_subprocess_core/provider_profiles/gemini.ex`
 - `lib/cli_subprocess_core/provider_profiles/amp.ex`
 - `lib/cli_subprocess_core/provider_profiles/antigravity.ex`
 

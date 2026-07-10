@@ -8,7 +8,7 @@ surface =
 
 {:ok, options} =
   CliSubprocessCore.Command.Options.new(
-    provider: :gemini,
+    provider: :antigravity,
     prompt: "Say hello",
     execution_surface: surface
   )

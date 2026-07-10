@@ -7,16 +7,17 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-07-09"
-      assert codex_catalog.remote_default == "gpt-5.5"
+      assert codex_catalog.catalog_version == "2026-07-10"
+      assert codex_catalog.remote_default == "gpt-5.6-sol"
 
       assert Enum.map(codex_catalog.models, & &1.id) == [
-               "gpt-5.5",
                "gpt-5.6-sol",
                "gpt-5.6-terra",
                "gpt-5.6-luna",
+               "gpt-5.5",
                "gpt-5.4",
                "gpt-5.4-mini",
+               "gpt-5.3-codex-spark",
                "codex-auto-review"
              ]
 
@@ -24,19 +25,14 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.1-codex-max"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5-codex"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5-codex-internal"))
-      refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.3-codex-spark"))
-      # Confirmed genuinely absent (not even hidden) via a live `model/list`
-      # probe (includeHidden: true) against an authenticated codex CLI
-      # v0.144.0 install, 2026-07-09 - the backend no longer serves either
-      # model at all, even though the vendored codex-rs source snapshot
-      # still defines them with visibility "list".
+      # Confirmed absent via a live `model/list` probe (includeHidden: true)
+      # against an authenticated codex CLI v0.144.1 install, 2026-07-10.
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.3-codex"))
       refute Enum.any?(codex_catalog.models, &(&1.id == "gpt-5.2"))
 
-      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.5")).default
+      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.6-sol")).default
 
-      assert Enum.find(codex_catalog.models, &(&1.id == "gpt-5.5")).default_reasoning_effort ==
-               "xhigh"
+      refute Enum.find(codex_catalog.models, &(&1.id == "gpt-5.5")).default
 
       assert codex_catalog.models
              |> Enum.find(&(&1.id == "gpt-5.6-sol"))
@@ -56,11 +52,24 @@ defmodule CliSubprocessCore.ModelCatalogTest do
              |> Map.keys()
              |> Enum.sort() == ["high", "low", "max", "medium", "xhigh"]
 
-      for model_id <- ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna) do
+      for {model_id, default_effort} <- [
+            {"gpt-5.6-sol", "low"},
+            {"gpt-5.6-terra", "medium"},
+            {"gpt-5.6-luna", "medium"}
+          ] do
         model = Enum.find(codex_catalog.models, &(&1.id == model_id))
-        assert model.default_reasoning_effort == "xhigh"
+        assert model.default_reasoning_effort == default_effort
         assert model.aliases == []
       end
+
+      spark = Enum.find(codex_catalog.models, &(&1.id == "gpt-5.3-codex-spark"))
+      assert spark.visibility == :public
+      assert spark.default_reasoning_effort == "high"
+      assert spark.metadata["supported_in_api"] == false
+      assert spark.metadata["input_modalities"] == ["text"]
+
+      assert spark.reasoning_efforts |> Map.keys() |> Enum.sort() ==
+               ["high", "low", "medium", "xhigh"]
 
       assert Enum.find(codex_catalog.models, &(&1.id == "codex-auto-review")).visibility ==
                :internal
@@ -111,29 +120,6 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       refute Enum.any?(claude_catalog.models, fn model ->
                "claude-opus-4-6" in model.aliases
              end)
-
-      assert {:ok, gemini_catalog} = ModelCatalog.load(:gemini)
-      assert gemini_catalog.provider == :gemini
-      assert gemini_catalog.catalog_version == "2026-04-28"
-      assert gemini_catalog.remote_default == "auto-gemini-3"
-
-      assert Enum.map(gemini_catalog.models, & &1.id) == [
-               "auto-gemini-3",
-               "auto-gemini-2.5",
-               "pro",
-               "flash",
-               "flash-lite",
-               "gemini-3.1-pro-preview",
-               "gemini-3-flash-preview",
-               "gemini-3.1-flash-lite-preview",
-               "gemini-2.5-pro",
-               "gemini-2.5-flash",
-               "gemini-2.5-flash-lite"
-             ]
-
-      assert Enum.find(gemini_catalog.models, &(&1.id == "auto-gemini-3")).metadata[
-               "cli_virtual_model"
-             ] == true
 
       assert {:ok, amp_catalog} = ModelCatalog.load(:amp)
       assert amp_catalog.provider == :amp

@@ -10,7 +10,6 @@ TAG_FILTER=()
 ALL_REPOS=(
   "cli_subprocess_core"
   "codex_sdk"
-  "gemini_cli_sdk"
   "claude_agent_sdk"
   "amp_sdk"
   "agent_session_manager"
@@ -26,7 +25,7 @@ ALL_TASKS=(
 
 workspace_deps_for_repo() {
   case "$1" in
-    agent_session_manager|codex_sdk|gemini_cli_sdk|claude_agent_sdk|amp_sdk)
+    agent_session_manager|codex_sdk|claude_agent_sdk|amp_sdk)
       printf '%s\n' "execution_plane"
       printf '%s\n' "cli_subprocess_core"
       ;;
@@ -63,10 +62,9 @@ Aliases:
   core -> cli_subprocess_core
   asm -> agent_session_manager
   codex -> codex_sdk
-  gemini -> gemini_cli_sdk
   claude -> claude_agent_sdk
   amp -> amp_sdk
-  sdk -> codex_sdk,gemini_cli_sdk,claude_agent_sdk,amp_sdk
+  sdk -> codex_sdk,claude_agent_sdk,amp_sdk
 
 Examples:
   ./model_selection_ci.sh ci
@@ -122,7 +120,6 @@ resolve_repo() {
     core|cli_subprocess_core) echo "cli_subprocess_core" ;;
     asm|agent_session_manager|agent|manager) echo "agent_session_manager" ;;
     codex|codex_sdk) echo "codex_sdk" ;;
-    gemini|gemini_cli_sdk) echo "gemini_cli_sdk" ;;
     claude|claude_agent_sdk) echo "claude_agent_sdk" ;;
     amp|amp_sdk) echo "amp_sdk" ;;
     *)
@@ -141,10 +138,9 @@ repos_for_tag() {
     core) echo "cli_subprocess_core" ;;
     asm|agent|manager) echo "agent_session_manager" ;;
     codex) echo "codex_sdk" ;;
-    gemini) echo "gemini_cli_sdk" ;;
     claude) echo "claude_agent_sdk" ;;
     amp) echo "amp_sdk" ;;
-    sdk) echo "codex_sdk"; echo "gemini_cli_sdk"; echo "claude_agent_sdk"; echo "amp_sdk" ;;
+    sdk) echo "codex_sdk"; echo "claude_agent_sdk"; echo "amp_sdk" ;;
     all) printf '%s\n' "${ALL_REPOS[@]}" ;;
     *)
       echo ""

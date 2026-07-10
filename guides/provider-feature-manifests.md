@@ -59,8 +59,6 @@ Examples:
 
 - Codex `--dangerously-bypass-approvals-and-sandbox` appears here because it is
   the provider-native rendering of a permission choice
-- Gemini `--sandbox` does not appear here because it is a separate
-  provider-specific option, not a permission-mode alias
 - Cursor `:ask` is not a permission mode. It is an operational Cursor `mode`
   rendered by the Cursor profile or SDK as `--mode ask`.
 - Antigravity `--sandbox` is provider-native runtime behavior, while
@@ -104,7 +102,6 @@ Current built-in `:ollama` support:
 - Claude: supported through `provider_backend: :ollama`
 - Codex: supported through `provider_backend: :oss, oss_provider: "ollama"`
 - Cursor: unsupported on the common CLI surface
-- Gemini: unsupported on the common CLI surface
 - Amp: unsupported on the common CLI surface
 - Antigravity: unsupported on the common CLI surface
 

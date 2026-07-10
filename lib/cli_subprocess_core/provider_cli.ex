@@ -155,19 +155,6 @@ defmodule CliSubprocessCore.ProviderCLI do
       npx_disable_env: nil,
       npx_package: nil,
       path_candidates: ["agent", "cursor-agent"]
-    },
-    gemini: %{
-      default_command: "gemini",
-      display_name: "Gemini CLI",
-      env_var: "GEMINI_CLI_PATH",
-      install_hint: "npm install -g @google/gemini-cli",
-      allow_js_entrypoint: false,
-      node_command: "node",
-      npm_global_bin: "gemini",
-      npx_command: "gemini",
-      npx_disable_env: "GEMINI_NO_NPX",
-      npx_package: "@google/gemini-cli",
-      path_candidates: ["gemini"]
     }
   }
   @env_launchers ["/usr/bin/env", "/bin/env", "env"]
@@ -199,7 +186,7 @@ defmodule CliSubprocessCore.ProviderCLI do
   completed.
 
   This covers both local transport errors (for example `{:command_not_found,
-  "gemini"}`) and remote execution failures that only become visible after the
+  "provider"}`) and remote execution failures that only become visible after the
   provider command is invoked over an execution surface such as SSH.
   """
   @spec runtime_failure(atom(), term(), [runtime_failure_opt()]) :: ErrorRuntimeFailure.t()
@@ -1514,7 +1501,6 @@ defmodule CliSubprocessCore.ProviderCLI do
   defp auth_hint(:claude), do: "Run `claude login` on the target and retry."
   defp auth_hint(:codex), do: "Authenticate Codex on the target and retry."
   defp auth_hint(:cursor), do: "Set CURSOR_API_KEY or run agent login on the target host."
-  defp auth_hint(:gemini), do: "Authenticate Gemini CLI on the target and retry."
   defp auth_hint(:amp), do: "Authenticate Amp CLI on the target and retry."
 
   defp auth_hint(:antigravity),

@@ -3,7 +3,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor, Gemini}
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor}
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   describe "build_invocation/1" do
@@ -272,49 +272,6 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
              ]
     end
 
-    test "Gemini builds the expected CLI invocation" do
-      assert {:ok, %Command{} = command} =
-               Gemini.build_invocation(
-                 command: "gemini-bin",
-                 prompt: "hello",
-                 cwd: "/tmp/gemini",
-                 model_payload: %{
-                   provider: :gemini,
-                   requested_model: "gemini-2.5-pro",
-                   resolved_model: "gemini-2.5-pro",
-                   resolution_source: :explicit,
-                   reasoning: nil,
-                   reasoning_effort: nil,
-                   normalized_reasoning_effort: nil,
-                   model_family: "gemini",
-                   catalog_version: "2026-03-25",
-                   visibility: :public,
-                   errors: []
-                 },
-                 sandbox: true,
-                 extensions: ["fs", "git"],
-                 permission_mode: :plan
-               )
-
-      assert command.command == "gemini-bin"
-
-      assert command.args == [
-               "--prompt",
-               "hello",
-               "--output-format",
-               "stream-json",
-               "--model",
-               "gemini-2.5-pro",
-               "--sandbox",
-               "--extensions",
-               "fs,git",
-               "--approval-mode",
-               "plan"
-             ]
-
-      assert command.cwd == "/tmp/gemini"
-    end
-
     test "Amp builds the expected CLI invocation" do
       mcp_config = %{"servers" => [%{"name" => "demo"}]}
 
@@ -469,32 +426,6 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                        cwd: "/ambient"
                      )
                    end
-    end
-
-    test "uses resolved model payload when model option is not set" do
-      assert {:ok, %Command{} = command} =
-               Gemini.build_invocation(
-                 command: "gemini-bin",
-                 model_payload: %{
-                   provider: :gemini,
-                   requested_model: "legacy",
-                   resolved_model: "gemini-2.5-pro",
-                   resolution_source: :explicit,
-                   reasoning: nil,
-                   reasoning_effort: nil,
-                   normalized_reasoning_effort: nil,
-                   model_family: "gemini",
-                   catalog_version: "2026-03-25",
-                   visibility: :public,
-                   errors: []
-                 },
-                 prompt: "hello",
-                 cwd: "/tmp/gemini"
-               )
-
-      assert "--model" in command.args
-      idx = Enum.find_index(command.args, &(&1 == "--model"))
-      assert Enum.at(command.args, idx + 1) == "gemini-2.5-pro"
     end
 
     test "does not use raw model or reasoning options when payload is absent" do
@@ -760,60 +691,6 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Stderr{content: "codex warning"} = stderr.payload
     end
 
-    test "Gemini decodes its JSONL fixture into normalized events" do
-      events = decode_fixture(Gemini, "gemini")
-
-      assert Enum.map(events, & &1.kind) == [
-               :assistant_delta,
-               :assistant_message,
-               :user_message,
-               :tool_use,
-               :tool_result,
-               :result
-             ]
-
-      assert %Payload.AssistantDelta{content: "Hel"} = Enum.at(events, 0).payload
-      assert Enum.at(events, 0).provider_session_id == "gemini-session-1"
-
-      assert %Payload.AssistantMessage{content: ["Hello"], model: "gemini-2.5-pro"} =
-               Enum.at(events, 1).payload
-
-      assert %Payload.UserMessage{content: ["Please help"]} = Enum.at(events, 2).payload
-
-      assert %Payload.ToolUse{
-               tool_name: "search",
-               tool_call_id: "tool-3",
-               input: %{"q" => "weather"}
-             } = Enum.at(events, 3).payload
-
-      assert %Payload.ToolResult{tool_call_id: "tool-3", content: "sunny", is_error: false} =
-               Enum.at(events, 4).payload
-
-      assert %Payload.Result{
-               status: :completed,
-               stop_reason: "completed",
-               output: %{usage: %{input_tokens: 2, output_tokens: 4}}
-             } = Enum.at(events, 5).payload
-
-      assert [stderr] = decode_stderr(Gemini, "gemini warning")
-      assert %Payload.Stderr{content: "gemini warning"} = stderr.payload
-    end
-
-    test "Gemini preserves fatal provider severities on error events" do
-      {events, _state} =
-        Gemini.decode_stdout(
-          ~s({"type":"error","severity":"fatal","message":"Authentication failed","timestamp":"2026-02-11T12:00:02.000Z"}),
-          Gemini.init_parser_state([])
-        )
-
-      assert [%{kind: :error, payload: %Payload.Error{} = payload}] = events
-      assert payload.severity == :fatal
-      assert payload.code == "unknown"
-      assert payload.metadata["severity"] == "fatal"
-      assert payload.metadata["recovery"]["class"] == "provider_runtime_claim"
-      assert payload.metadata["recovery"]["retryable?"] == true
-    end
-
     test "Amp decodes its JSONL fixture into normalized events" do
       events = decode_fixture(Amp, "amp")
 
@@ -1010,7 +887,6 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       for {profile, fixture_name} <- [
             {Claude, "claude"},
             {Codex, "codex"},
-            {Gemini, "gemini"},
             {Amp, "amp"},
             {Cursor, "cursor"}
           ] do

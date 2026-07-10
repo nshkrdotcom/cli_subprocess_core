@@ -394,11 +394,10 @@ defmodule CliSubprocessCore.ModelInput do
   defp normalize_provider(nil), do: nil
 
   defp normalize_provider(value)
-       when value in [:claude, :gemini, :amp, :codex, :cursor, :antigravity],
+       when value in [:claude, :amp, :codex, :cursor, :antigravity],
        do: value
 
   defp normalize_provider("claude"), do: :claude
-  defp normalize_provider("gemini"), do: :gemini
   defp normalize_provider("amp"), do: :amp
   defp normalize_provider("codex"), do: :codex
   defp normalize_provider("cursor"), do: :cursor

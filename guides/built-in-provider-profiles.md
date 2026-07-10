@@ -1,12 +1,11 @@
 # Built-In Provider Profiles
 
-`CliSubprocessCore` ships six first-party provider profiles for the common CLI
+`CliSubprocessCore` ships five first-party provider profiles for the common CLI
 runtime lane:
 
 - `CliSubprocessCore.ProviderProfiles.Claude`
 - `CliSubprocessCore.ProviderProfiles.Codex`
 - `CliSubprocessCore.ProviderProfiles.Cursor`
-- `CliSubprocessCore.ProviderProfiles.Gemini`
 - `CliSubprocessCore.ProviderProfiles.Amp`
 - `CliSubprocessCore.ProviderProfiles.Antigravity`
 
@@ -22,7 +21,6 @@ These remain the runtime stack's first-party common profiles. They ship inside
 | Claude | `:claude` | `claude` |
 | Codex | `:codex` | `codex` |
 | Cursor | `:cursor` | `agent` |
-| Gemini | `:gemini` | `gemini` |
 | Amp | `:amp` | `amp` |
 | Antigravity | `:antigravity` | `agy` |
 
@@ -54,7 +52,7 @@ One important distinction:
 - `provider_permission_mode`
   - explicit provider-native permission choice when a caller already knows the
     exact native mode to use
-- provider-native options such as Gemini `sandbox`
+- provider-native options such as Antigravity `sandbox`
   - extra provider-specific flags that are not part of the shared permission
     abstraction
 
@@ -110,10 +108,11 @@ Common Codex options:
 
 The Codex profile does not own model or backend policy.
 
-The shared model registry currently exposes `gpt-5.5` as the live default,
-plus `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4`, and
-`gpt-5.4-mini`. The profile consumes that resolved selection; it does not add
-aliases or preserve retired model IDs.
+The shared model registry currently exposes `gpt-5.6-sol` as the live default,
+plus `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`,
+`gpt-5.4-mini`, and the ChatGPT Pro preview `gpt-5.3-codex-spark`. The profile
+consumes that resolved selection; it does not add aliases or preserve retired
+model IDs.
 
 It reads the resolved payload for:
 
@@ -170,29 +169,6 @@ any required Cursor paths or `CURSOR_API_KEY` values into `authority.env`.
 
 Cursor `system/init` events are preserved as `Payload.Raw` with parser metadata.
 There is no separate `Payload.System` type in the core event model.
-
-## Gemini
-
-Command shape:
-
-```text
-gemini --prompt ... --output-format stream-json ...
-```
-
-Common Gemini options:
-
-- `:prompt`
-- `:command`
-- `:model`
-- `:output_format`
-- `:sandbox`
-- `:extensions`
-- `:permission_mode`
-- `:provider_permission_mode`
-
-Gemini is the built-in profile that currently exposes an explicit provider
-`sandbox` flag on the common CLI lane. That is provider-native behavior, not a
-generic `CliSubprocessCore` sandbox abstraction shared across all providers.
 
 ## Amp
 
@@ -257,7 +233,7 @@ provided explicitly.
   the profile map it to native CLI args"
 - `provider_permission_mode` means "skip the normalized concept and specify the
   provider-native permission term directly"
-- provider-specific options such as Gemini `sandbox` are separate from the
+- provider-specific options such as Antigravity `sandbox` are separate from the
   permission mapping and only exist for the providers that actually support
   them
 
@@ -271,7 +247,6 @@ Examples:
 - Claude advertises approval, cost, resume, streaming, thinking, and tool use.
 - Codex advertises reasoning, plan mode, structured output, and tool use.
 - Cursor advertises interrupt, MCP, plan, resume, sandbox, streaming, and tool use.
-- Gemini advertises sandbox and extension support.
 - Amp advertises approval, MCP config, thinking, and tool use.
 - Antigravity advertises sandbox, streaming, directory mapping, and
   continuation on the common CLI lane.
@@ -288,8 +263,8 @@ tool contract:
   a narrower native behavior.
 
 Provider SDKs own any provider-specific tool rendering or settings. Core
-profiles must not turn Gemini settings, Claude hooks/MCP, Codex app-server
-payloads, or Amp tool configuration into shared semantics.
+profiles must not turn Claude hooks/MCP, Codex app-server payloads, or Amp tool
+configuration into shared semantics.
 
 ## Example
 
@@ -308,7 +283,7 @@ info.capabilities
 
 The built-in status in this guide is a package ownership statement:
 
-- these six profiles ship with `cli_subprocess_core`
+- these five profiles ship with `cli_subprocess_core`
 - future third-party profiles belong in external packages
 - external profiles can still be preloaded into the default registry, but that
   preload does not make them first-party built-ins

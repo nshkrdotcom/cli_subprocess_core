@@ -8,7 +8,6 @@ defmodule CliSubprocessCoreTest do
              ProviderProfiles.Claude,
              ProviderProfiles.Codex,
              ProviderProfiles.Cursor,
-             ProviderProfiles.Gemini,
              ProviderProfiles.Amp,
              ProviderProfiles.Antigravity
            ]
@@ -25,7 +24,6 @@ defmodule CliSubprocessCoreTest do
              ProviderProfiles.Claude,
              ProviderProfiles.Codex,
              ProviderProfiles.Cursor,
-             ProviderProfiles.Gemini,
              ProviderProfiles.Amp,
              ProviderProfiles.Antigravity,
              CliSubprocessCore.TestSupport.ProviderProfiles.Echo

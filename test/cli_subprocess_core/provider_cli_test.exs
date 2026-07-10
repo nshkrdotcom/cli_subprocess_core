@@ -8,142 +8,6 @@ defmodule CliSubprocessCore.ProviderCLITest do
   alias CliSubprocessCore.TestSupport
   alias ExecutionPlane.ProcessExit
 
-  defp isolated_env(overrides \\ %{}) do
-    Map.merge(
-      %{
-        "GEMINI_CLI_PATH" => nil,
-        "PATH" => "/nonexistent_dir_only",
-        "GEMINI_NO_NPX" => "1"
-      },
-      overrides
-    )
-  end
-
-  describe "resolve/3 for Gemini" do
-    test "finds gemini via GEMINI_CLI_PATH env var" do
-      dir = TestSupport.tmp_dir!("core_gemini_cli")
-      gemini_path = TestSupport.write_executable!(dir, "gemini", "#!/bin/bash\nexit 0\n")
-
-      try do
-        TestSupport.with_env(%{"GEMINI_CLI_PATH" => gemini_path}, fn ->
-          assert {:ok, %CommandSpec{program: ^gemini_path, argv_prefix: []}} =
-                   ProviderCLI.resolve(:gemini)
-        end)
-      after
-        File.rm_rf(dir)
-      end
-    end
-
-    test "returns error for nonexistent GEMINI_CLI_PATH" do
-      TestSupport.with_env(%{"GEMINI_CLI_PATH" => "/nonexistent/gemini"}, fn ->
-        assert {:error, %Error{kind: :cli_not_found} = error} = ProviderCLI.resolve(:gemini)
-        assert error.message =~ "GEMINI_CLI_PATH points to non-existent file"
-      end)
-    end
-
-    test "returns error for non-executable GEMINI_CLI_PATH" do
-      dir = TestSupport.tmp_dir!("core_gemini_cli_non_exec")
-      non_exec = TestSupport.write_file!(dir, "gemini", "echo hi\n")
-
-      try do
-        TestSupport.with_env(%{"GEMINI_CLI_PATH" => non_exec}, fn ->
-          assert {:error, %Error{kind: :cli_not_found} = error} = ProviderCLI.resolve(:gemini)
-          assert error.message =~ "GEMINI_CLI_PATH points to non-executable file"
-        end)
-      after
-        File.rm_rf(dir)
-      end
-    end
-
-    test "finds gemini in PATH when env var is not set" do
-      dir = TestSupport.tmp_dir!("core_gemini_cli_path")
-      gemini_path = TestSupport.write_executable!(dir, "gemini", "#!/bin/bash\nexit 0\n")
-      path = dir <> ":" <> (System.get_env("PATH") || "")
-
-      try do
-        TestSupport.with_env(%{"GEMINI_CLI_PATH" => nil, "PATH" => path}, fn ->
-          assert {:ok, %CommandSpec{program: ^gemini_path, argv_prefix: []}} =
-                   ProviderCLI.resolve(:gemini)
-        end)
-      after
-        File.rm_rf(dir)
-      end
-    end
-
-    test "finds gemini in npm global prefix bin directory" do
-      npm_dir = TestSupport.tmp_dir!("core_gemini_npm_bin")
-      prefix_dir = TestSupport.tmp_dir!("core_gemini_prefix")
-      bin_dir = Path.join(prefix_dir, "bin")
-      File.mkdir_p!(bin_dir)
-      gemini_path = TestSupport.write_executable!(bin_dir, "gemini", "#!/bin/bash\nexit 0\n")
-
-      TestSupport.write_executable!(npm_dir, "npm", "#!/bin/bash\necho '#{prefix_dir}'\n")
-      path = npm_dir <> ":/nonexistent_dir_only"
-
-      try do
-        TestSupport.with_env(isolated_env(%{"PATH" => path}), fn ->
-          assert {:ok, %CommandSpec{program: ^gemini_path}} = ProviderCLI.resolve(:gemini)
-        end)
-      after
-        File.rm_rf(npm_dir)
-        File.rm_rf(prefix_dir)
-      end
-    end
-
-    test "falls back to npx when gemini is not on PATH or in npm global" do
-      npx_dir = TestSupport.tmp_dir!("core_gemini_npx")
-      npx_path = TestSupport.write_executable!(npx_dir, "npx", "#!/bin/bash\nexit 0\n")
-      path = npx_dir <> ":/nonexistent_dir_only"
-
-      try do
-        TestSupport.with_env(
-          %{
-            "GEMINI_CLI_PATH" => nil,
-            "PATH" => path,
-            "GEMINI_NO_NPX" => nil
-          },
-          fn ->
-            assert {:ok,
-                    %CommandSpec{
-                      program: ^npx_path,
-                      argv_prefix: ["--yes", "--package", "@google/gemini-cli", "gemini"]
-                    }} = ProviderCLI.resolve(:gemini)
-          end
-        )
-      after
-        File.rm_rf(npx_dir)
-      end
-    end
-
-    test "npx fallback is disabled when GEMINI_NO_NPX=1" do
-      npx_dir = TestSupport.tmp_dir!("core_gemini_npx_disabled")
-      TestSupport.write_executable!(npx_dir, "npx", "#!/bin/bash\nexit 0\n")
-      path = npx_dir <> ":/nonexistent_dir_only"
-
-      try do
-        TestSupport.with_env(
-          %{
-            "GEMINI_CLI_PATH" => nil,
-            "PATH" => path,
-            "GEMINI_NO_NPX" => "1"
-          },
-          fn ->
-            assert {:error, %Error{kind: :cli_not_found}} = ProviderCLI.resolve(:gemini)
-          end
-        )
-      after
-        File.rm_rf(npx_dir)
-      end
-    end
-
-    test "returns an error when gemini is unavailable everywhere" do
-      TestSupport.with_env(isolated_env(), fn ->
-        assert {:error, %Error{kind: :cli_not_found} = error} = ProviderCLI.resolve(:gemini)
-        assert error.message =~ "Gemini CLI not found"
-      end)
-    end
-  end
-
   describe "resolve/3 for other built-in providers" do
     test "Codex honors CODEX_PATH" do
       dir = TestSupport.tmp_dir!("core_codex_cli")
@@ -387,11 +251,6 @@ defmodule CliSubprocessCore.ProviderCLITest do
     end
   end
 
-  test "explicit command overrides are preserved without filesystem discovery" do
-    assert {:ok, %CommandSpec{program: "custom-gemini", argv_prefix: []}} =
-             ProviderCLI.resolve(:gemini, command: "custom-gemini")
-  end
-
   test "remote execution surfaces bypass local CODEX_PATH leakage and fall back to the provider command name" do
     dir = TestSupport.tmp_dir!("core_codex_remote_resolution")
     codex_path = TestSupport.write_executable!(dir, "codex", "#!/bin/bash\nexit 0\n")
@@ -492,34 +351,6 @@ defmodule CliSubprocessCore.ProviderCLITest do
     end
   end
 
-  test "governed authority bypasses npx and npx disable env" do
-    dir = TestSupport.tmp_dir!("core_gemini_governed_npx")
-    TestSupport.write_executable!(dir, "npx", "#!/bin/bash\nexit 0\n")
-
-    try do
-      TestSupport.with_env(%{"PATH" => dir, "GEMINI_NO_NPX" => nil}, fn ->
-        assert {:ok, %CommandSpec{program: "/authority/bin/gemini", argv_prefix: []}} =
-                 ProviderCLI.resolve(:gemini,
-                   governed_authority: [
-                     authority_ref: "authority://cli/provider-cli",
-                     credential_lease_ref: "lease://gemini/provider-cli",
-                     connector_instance_ref: "connector-instance://gemini/provider-cli",
-                     connector_binding_ref: "connector-binding://gemini/provider-cli",
-                     provider_account_ref: "provider-account://gemini/provider-cli",
-                     native_auth_assertion_ref: "native-auth-assertion://gemini/provider-cli",
-                     target_ref: "target://local/provider-cli",
-                     operation_policy_ref: "operation-policy://gemini/provider-cli",
-                     command: "/authority/bin/gemini",
-                     env: %{"GEMINI_CONFIG_HOME" => "/authority/gemini-home"},
-                     clear_env?: true
-                   ]
-                 )
-      end)
-    after
-      File.rm_rf(dir)
-    end
-  end
-
   test "governed authority rejects missing materialized command" do
     assert {:error, %Error{kind: :cli_not_found} = error} =
              ProviderCLI.resolve(:codex,
@@ -565,30 +396,6 @@ defmodule CliSubprocessCore.ProviderCLITest do
       assert failure.message =~ "remote target ssh.example"
       assert failure.message =~ "remote non-login PATH"
       assert ProviderCLI.runtime_failure_code(failure) == "cli_not_found"
-    end
-
-    test "classifies env-wrapper remote command misses as cli_not_found" do
-      exit =
-        ProcessExit.from_reason({:exit_status, 127},
-          stderr: "env: ‘gemini’: No such file or directory\n"
-        )
-
-      assert %ErrorRuntimeFailure{} =
-               failure =
-               ProviderCLI.runtime_failure(
-                 :gemini,
-                 exit,
-                 execution_surface: [
-                   surface_kind: :ssh_exec,
-                   transport_options: [destination: "gemini.example"]
-                 ]
-               )
-
-      assert failure.kind == :cli_not_found
-      assert failure.exit_code == 127
-      assert failure.message =~ "Gemini CLI not found"
-      assert failure.message =~ "remote target gemini.example"
-      assert failure.message =~ "remote non-login PATH"
     end
 
     test "preserves remote destination context from the core execution-surface struct" do

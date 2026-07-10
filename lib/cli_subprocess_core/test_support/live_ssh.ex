@@ -86,16 +86,16 @@ defmodule CliSubprocessCore.TestSupport.LiveSSH do
     |> Keyword.put(:transport_options, surface.transport_options)
   end
 
-  @spec provider_command(:amp | :claude | :codex | :gemini) :: String.t() | nil
-  def provider_command(provider) when provider in [:amp, :claude, :codex, :gemini] do
+  @spec provider_command(:amp | :claude | :codex) :: String.t() | nil
+  def provider_command(provider) when provider in [:amp, :claude, :codex] do
     case env_value(provider_command_env(provider)) do
       value when is_binary(value) and value != "" -> value
       _other -> nil
     end
   end
 
-  @spec provider_command_env(:amp | :claude | :codex | :gemini) :: String.t()
-  def provider_command_env(provider) when provider in [:amp, :claude, :codex, :gemini] do
+  @spec provider_command_env(:amp | :claude | :codex) :: String.t()
+  def provider_command_env(provider) when provider in [:amp, :claude, :codex] do
     @provider_command_env_prefix <> String.upcase(Atom.to_string(provider)) <> "_COMMAND"
   end
 

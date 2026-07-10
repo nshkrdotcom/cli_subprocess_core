@@ -28,28 +28,23 @@ defmodule CliSubprocessCore.CommandTest do
   end
 
   test "builds normalized invocations from command specs with argv prefixes" do
-    spec =
-      CommandSpec.new("npx", argv_prefix: ["--yes", "--package", "@google/gemini-cli", "gemini"])
+    spec = CommandSpec.new("launcher", argv_prefix: ["--package", "provider-cli"])
 
     command = Command.new(spec, ["--prompt", "hello"])
 
-    assert command.command == "npx"
+    assert command.command == "launcher"
 
     assert command.args == [
-             "--yes",
              "--package",
-             "@google/gemini-cli",
-             "gemini",
+             "provider-cli",
              "--prompt",
              "hello"
            ]
 
     assert Command.argv(command) == [
-             "npx",
-             "--yes",
+             "launcher",
              "--package",
-             "@google/gemini-cli",
-             "gemini",
+             "provider-cli",
              "--prompt",
              "hello"
            ]
@@ -91,7 +86,7 @@ defmodule CliSubprocessCore.CommandTest do
   end
 
   test "merges environment data immutably" do
-    command = Command.new("gemini", ["chat"], env: %{"HOME" => "/tmp"})
+    command = Command.new("amp", ["chat"], env: %{"HOME" => "/tmp"})
     updated = Command.put_env(command, "DEBUG", "1")
 
     assert command.env == %{"HOME" => "/tmp"}

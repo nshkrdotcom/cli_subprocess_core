@@ -3,7 +3,6 @@ defmodule CliSubprocessCore.DependencyBoundaryTest do
 
   @forbidden_deps [
     :agent_session_manager,
-    :gemini_cli_sdk,
     :claude_agent_sdk,
     :codex_sdk,
     :amp_sdk,

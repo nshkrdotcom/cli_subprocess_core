@@ -19,7 +19,7 @@
 `cli_subprocess_core` is the shared runtime for provider-facing CLIs. It owns
 provider profile resolution, normalized command/session APIs, event and payload
 shaping, model policy helpers, and the built-in first-party profiles for
-Claude, Codex, Cursor, Gemini, Amp, and Antigravity.
+Claude, Codex, Cursor, Amp, and Antigravity.
 
 The covered one-shot local process lane and the local session-bearing process
 lane now run on `execution_plane`. `cli_subprocess_core` keeps one public
@@ -123,7 +123,7 @@ ref = make_ref()
 
 {:ok, _session, info} =
   CliSubprocessCore.Session.start_session(
-    provider: :gemini,
+    provider: :antigravity,
     prompt: "Hello from the shared runtime",
     subscriber: {self(), ref}
   )

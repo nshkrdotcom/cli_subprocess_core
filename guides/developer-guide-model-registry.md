@@ -39,14 +39,13 @@ The model-selection internals live in:
 - `lib/cli_subprocess_core/ollama.ex`
 - `priv/models/codex.json`
 - `priv/models/claude.json`
-- `priv/models/gemini.json`
 - `priv/models/amp.json`
 
 ## What the Catalogs Contain
 
 Each provider catalog is a core-owned source of truth.
 
-For Gemini and Amp, that source is static JSON only.
+For Amp, that source is static JSON only.
 
 For Claude and Codex, the source is split:
 
@@ -75,23 +74,25 @@ This gives the core one place to answer:
 
 ## Current Codex Catalog Evidence
 
-The bundled Codex catalog was verified on 2026-07-09 with an authenticated
-`codex-cli 0.144.0` `model/list` request using `includeHidden: true`. The
-current public lineup is `gpt-5.5` (default), `gpt-5.6-sol`,
-`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4`, and `gpt-5.4-mini`;
-`codex-auto-review` is internal.
+The bundled Codex catalog was verified on 2026-07-10 with an authenticated
+`codex-cli 0.144.1` `model/list` request using `includeHidden: true`. The
+current public lineup is `gpt-5.6-sol` (default), `gpt-5.6-terra`,
+`gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, and the ChatGPT Pro
+research-preview `gpt-5.3-codex-spark`; `codex-auto-review` is internal.
 
 The pulled upstream source registry can lead the live backend. In the same
 checkout it placed Sol first and still included `gpt-5.2`, while the live
-backend kept `gpt-5.5` as default and did not return `gpt-5.2` even as a hidden
-entry. Maintainers must use the authenticated live result for the bundled
-Codex CLI catalog and record the CLI version and probe date when it changes.
+backend made Sol the default, exposed Spark, and did not return `gpt-5.2` even
+as a hidden entry. Maintainers must use the authenticated live result for the
+bundled Codex CLI catalog and record the CLI version and probe date when it
+changes.
 
 The GPT-5.6 variants are explicit Codex CLI IDs; this catalog does not add the
 OpenAI API's `gpt-5.6` family alias. Sol and Terra support `low`, `medium`,
 `high`, `xhigh`, `max`, and `ultra`; Luna supports the same set except
-`ultra`. The live Codex response currently reports `xhigh` as the default for
-all three.
+`ultra`. The live response reports Sol's default as `low` and Terra/Luna as
+`medium`. Spark is text-only, supports `low` through `xhigh`, defaults to
+`high`, and is not available through the OpenAI API during its preview.
 
 ## Resolution Sequence
 
@@ -157,7 +158,6 @@ The provider profiles are:
 
 - `lib/cli_subprocess_core/provider_profiles/codex.ex`
 - `lib/cli_subprocess_core/provider_profiles/claude.ex`
-- `lib/cli_subprocess_core/provider_profiles/gemini.ex`
 - `lib/cli_subprocess_core/provider_profiles/amp.ex`
 
 Those modules should not make a second policy decision. Their job is to turn
@@ -191,7 +191,7 @@ authoritative payload attached.
 
 Across the current first-party provider SDK repos, that means:
 
-- `claude_agent_sdk`, `codex_sdk`, and `gemini_cli_sdk` should route mixed
+- `claude_agent_sdk` and `codex_sdk` should route mixed
   raw-versus-payload model input through `CliSubprocessCore.ModelInput`
 - repo-local env defaults are fallback inputs only when no explicit payload was
   supplied

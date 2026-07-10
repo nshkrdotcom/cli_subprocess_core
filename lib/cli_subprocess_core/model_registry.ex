@@ -25,8 +25,7 @@ defmodule CliSubprocessCore.ModelRegistry do
     "antigravity" => :antigravity,
     "claude" => :claude,
     "codex" => :codex,
-    "cursor" => :cursor,
-    "gemini" => :gemini
+    "cursor" => :cursor
   }
   @all_visibilities [:public, :private, :internal, :restricted]
   @visibility_filters %{
