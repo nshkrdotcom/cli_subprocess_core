@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata.
 - Documentation updates for Cursor as the fifth built-in profile, including
   invocation shape, permission metadata, governed posture, and capability hints.
+- Atom-safety guardrail: `.credo.exs` with `Credo.Check.Warning.UnsafeToAtom`
+  enabled (scoped to `lib/`) plus a `scripts/atom_guard.sh` CI backstop wired
+  into `mix ci` (which now runs `credo --strict`).
+- Secrets guardrail: `scripts/secrets_guard.sh` in `mix ci`; `.env` files
+  gitignored.
+- README documents registry ownership and hex publish-ordering: this package
+  publishes first, then `claude_agent_sdk` / `agent_session_manager`.
 
 ### Changed
 
@@ -27,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public but non-API, `codex-auto-review` remains internal, and backend-absent
   `gpt-5.2` stays excluded.
 - Refreshed compatible dependencies, including Zoi 0.18.5.
+
+### Security
+
+- `Command` env validation returns offending **keys** (or `:not_a_map`) in
+  `{:invalid_env, ...}` error tuples instead of echoing the full env map,
+  whose values routinely include credentials.
 
 ### Removed
 
