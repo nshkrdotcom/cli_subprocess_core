@@ -51,6 +51,19 @@ facade over `ExecutionPlane.Process.Transport.Surface`.
 - `CliSubprocessCore.ModelRegistry`, `CliSubprocessCore.ModelInput`, and
   related catalog helpers for centralized model policy.
 
+### Registry ownership and hex publish-ordering
+
+The shared model catalog (`priv/models/*.json`) ships from this package.
+Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
+their model lineup from whichever copy of this package their build uses —
+the workspace sibling for `:path` dependencies, the published package for
+hex consumers. When releasing to hex, **publish `cli_subprocess_core`
+first**, then the consumers, so their published versions see the current
+catalog. Consumers switching between `:path` and `:github`/`:hex`
+resolution should prune any previously fetched `deps/cli_subprocess_core`
+copy — a stale fetched catalog would otherwise shadow the live one in
+isolated builds.
+
 ## What This Package Does Not Own
 
 `cli_subprocess_core` no longer owns the lower process substrate.
