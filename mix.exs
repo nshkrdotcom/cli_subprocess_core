@@ -183,6 +183,7 @@ defmodule CliSubprocessCore.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "cmd ./scripts/atom_guard.sh",
+        "cmd ./scripts/secrets_guard.sh",
         "credo --strict",
         "cmd env MIX_ENV=test mix test",
         "dialyzer"

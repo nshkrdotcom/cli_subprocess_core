@@ -62,8 +62,20 @@ defmodule CliSubprocessCore.CommandTest do
     assert {:error, {:invalid_cwd, 123}} ==
              Command.validate(%Command{command: "amp", args: [], cwd: 123, env: %{}})
 
-    assert {:error, {:invalid_env, [bad: "env"]}} ==
+    # Error tuples carry offending KEYS only — env values may hold secrets.
+    assert {:error, {:invalid_env, [:bad]}} ==
              Command.validate(%Command{command: "amp", args: [], cwd: nil, env: [bad: "env"]})
+
+    assert {:error, {:invalid_env, ["GOOD"]}} ==
+             Command.validate(%Command{
+               command: "amp",
+               args: [],
+               cwd: nil,
+               env: %{"GOOD" => :not_a_string, "OK" => "fine"}
+             })
+
+    assert {:error, {:invalid_env, :not_a_map}} ==
+             Command.validate(%Command{command: "amp", args: [], cwd: nil, env: "K=secretvalue"})
 
     assert {:error, {:invalid_clear_env, :invalid}} ==
              Command.validate(%Command{

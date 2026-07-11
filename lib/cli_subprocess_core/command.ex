@@ -516,15 +516,27 @@ defmodule CliSubprocessCore.Command do
   defp validate_cwd(cwd) when is_binary(cwd), do: :ok
   defp validate_cwd(cwd), do: {:error, {:invalid_cwd, cwd}}
 
+  # Error tuples may be logged — return offending KEYS only, never the env
+  # values (which routinely include credentials).
   defp validate_env(env) when is_map(env) do
-    if Enum.all?(env, fn {key, value} -> is_binary(key) and is_binary(value) end) do
+    offending =
+      for {key, value} <- env, not (is_binary(key) and is_binary(value)), do: key
+
+    if offending == [] do
       :ok
     else
-      {:error, {:invalid_env, env}}
+      {:error, {:invalid_env, offending}}
     end
   end
 
-  defp validate_env(env), do: {:error, {:invalid_env, env}}
+  defp validate_env(env) when is_list(env) do
+    {:error, {:invalid_env, Enum.map(env, &env_entry_key/1)}}
+  end
+
+  defp validate_env(_env), do: {:error, {:invalid_env, :not_a_map}}
+
+  defp env_entry_key({key, _value}), do: key
+  defp env_entry_key(_other), do: :invalid_entry
   defp validate_clear_env(value) when is_boolean(value), do: :ok
   defp validate_clear_env(value), do: {:error, {:invalid_clear_env, value}}
 

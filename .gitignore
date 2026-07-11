@@ -22,3 +22,8 @@ cli_subprocess_core-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 .dependency_sources.local.exs
+
+# Local secrets — never commit a real .env (templates *.env.example are fine)
+.env
+*.env
+!*.env.example
