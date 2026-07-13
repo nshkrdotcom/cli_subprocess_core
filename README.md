@@ -22,13 +22,16 @@ shaping, model policy helpers, and the built-in first-party profiles for
 Claude, Codex, Cursor, Amp, and Antigravity.
 
 The covered one-shot local process lane and the local session-bearing process
-lane now run on `execution_plane`. `cli_subprocess_core` keeps one public
+lane run on the single `execution_plane` package. `cli_subprocess_core` keeps one public
 placement seam, `execution_surface`, while the shared lower substrate for
 local and non-local runtime execution now lives in `execution_plane`.
 
 Downstream provider SDKs get this default local CLI execution path by depending
 on `cli_subprocess_core`; they do not need to declare Execution Plane packages
-manually for ordinary subprocess use.
+manually for ordinary subprocess use. The separate
+`execution_plane_jsonrpc` and `execution_plane_process` source components are
+not public dependencies: core, JSON-RPC, and process runtime modules ship in
+the one generated `execution_plane` package.
 
 For downstream packages that still type against the historical module name,
 `CliSubprocessCore.ExecutionSurface` remains available as a compatibility
@@ -57,9 +60,10 @@ The shared model catalog (`priv/models/*.json`) ships from this package.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-hex consumers. When releasing to hex, **publish `cli_subprocess_core`
-first**, then the consumers, so their published versions see the current
-catalog. Consumers switching between `:path` and `:github`/`:hex`
+hex consumers. The release order is `execution_plane`, then
+`cli_subprocess_core`, then the provider/ASM consumers, so every published
+version sees both its lower runtime and the current catalog. Consumers
+switching between `:path` and `:github`/`:hex`
 resolution should prune any previously fetched `deps/cli_subprocess_core`
 copy — a stale fetched catalog would otherwise shadow the live one in
 isolated builds.
@@ -80,7 +84,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.1.1"}
+    {:cli_subprocess_core, "~> 0.2.0"}
   ]
 end
 ```

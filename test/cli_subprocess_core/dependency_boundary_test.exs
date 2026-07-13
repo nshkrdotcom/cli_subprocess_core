@@ -13,6 +13,22 @@ defmodule CliSubprocessCore.DependencyBoundaryTest do
     assert_forbidden_deps_absent(Mix.Project.config()[:deps], @forbidden_deps)
   end
 
+  test "cli_subprocess_core declares exactly one Execution Plane dependency" do
+    declared = Enum.map(Mix.Project.config()[:deps], &dep_name/1)
+
+    assert Enum.count(declared, &(&1 == :execution_plane)) == 1
+    refute :execution_plane_jsonrpc in declared
+    refute :execution_plane_process in declared
+  end
+
+  test "Gemini CLI remains retired from the first-party profile registry" do
+    profile_names = Enum.map(CliSubprocessCore.first_party_profile_modules(), &Atom.to_string/1)
+
+    refute Enum.any?(profile_names, &String.contains?(&1, "Gemini"))
+
+    assert CliSubprocessCore.ProviderProfiles.Antigravity in CliSubprocessCore.first_party_profile_modules()
+  end
+
   defp assert_forbidden_deps_absent(deps, forbidden_deps) when is_list(deps) do
     declared = MapSet.new(Enum.map(deps, &dep_name/1))
 

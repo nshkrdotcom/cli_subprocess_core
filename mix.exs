@@ -5,7 +5,7 @@ end
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.2.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -35,7 +35,7 @@ defmodule CliSubprocessCore.MixProject do
   defp docs do
     [
       main: "overview",
-      source_ref: "v#{@version}",
+      source_ref: "v0.2.0",
       homepage_url: @homepage_url,
       assets: %{"assets" => "assets"},
       logo: "assets/cli_subprocess_core.svg",
@@ -114,7 +114,7 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       description: description(),
       files:
-        ~w(lib priv/models scripts build_support .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
+        ~w(lib priv/models scripts build_support guides examples docs .formatter.exs mix.exs mix.lock README* CHANGELOG* LICENSE* AGENTS.md assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -144,28 +144,45 @@ defmodule CliSubprocessCore.MixProject do
   end
 
   defp deps do
-    [
-      execution_plane_dep(),
-      execution_plane_jsonrpc_dep(),
-      execution_plane_process_dep(),
-      {:jason, "~> 1.4"},
-      {:zoi, "~> 0.18"},
-      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: :dev, runtime: false}
-    ]
+    execution_plane = execution_plane_dep()
+
+    [execution_plane] ++
+      local_ground_overrides(execution_plane) ++
+      [
+        {:jason, "~> 1.4"},
+        {:zoi, "~> 0.18"},
+        {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+        {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+        {:dialyxir, "~> 1.4", only: :dev, runtime: false}
+      ]
   end
 
   defp execution_plane_dep do
     DependencySources.dep(:execution_plane, __DIR__)
   end
 
-  defp execution_plane_jsonrpc_dep do
-    DependencySources.dep(:execution_plane_jsonrpc, __DIR__)
+  # The generated Execution Plane artifact declares ordinary Hex Ground
+  # dependencies. Until those parents are published, local and projection
+  # consumers override them at the top level. Hex mode omits these entries, so
+  # they never enter the published CLI package dependency surface.
+  defp local_ground_overrides({:execution_plane, opts}) when is_list(opts) do
+    if local_ground_paths_available?() do
+      [
+        {:ground_plane_contracts,
+         path: "../ground_plane/core/ground_plane_contracts", override: true},
+        {:ground_plane_persistence_policy,
+         path: "../ground_plane/core/persistence_policy", override: true}
+      ]
+    else
+      []
+    end
   end
 
-  defp execution_plane_process_dep do
-    DependencySources.dep(:execution_plane_process, __DIR__)
+  defp local_ground_overrides(_execution_plane), do: []
+
+  defp local_ground_paths_available? do
+    File.dir?(Path.expand("../ground_plane/core/ground_plane_contracts", __DIR__)) and
+      File.dir?(Path.expand("../ground_plane/core/persistence_policy", __DIR__))
   end
 
   defp dialyzer do

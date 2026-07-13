@@ -466,12 +466,15 @@ defmodule CliSubprocessCore.SessionTest do
                metadata: %{lane: :core}
              )
 
+    # The fixture can emit all frames and exit before the later event
+    # assertions finish. Monitor immediately so a normal exit is not observed
+    # as `:noproc` after the fact.
+    monitor = Process.monitor(session)
+
     assert info.provider == provider
     assert info.profile == profile
     assert info.invocation.command == script
     assert info.transport.status == :connected
-    assert Session.info(session).provider == provider
-    assert Session.info(session).profile == profile
 
     events = receive_session_events(ref, expected_event_count)
 
@@ -493,7 +496,6 @@ defmodule CliSubprocessCore.SessionTest do
 
     assert Enum.at(parsed_events, 0).provider_session_id == expected_provider_session_id
 
-    monitor = Process.monitor(session)
     assert_receive {:DOWN, ^monitor, :process, ^session, :normal}, 2_000
   end
 

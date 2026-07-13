@@ -18,21 +18,22 @@ Use the local model-selection script for workflow validation:
   `build_support/dependency_sources.config.exs`. Committed default dependency
   priority is `path -> GitHub -> Hex` so local sibling checkouts resolve
   consistently across downstream workspaces while clean standalone clones fall
-  back to GitHub. Local path development uses the package homes such as
-  `../execution_plane/core/execution_plane` for `:execution_plane`,
-  `../execution_plane/protocols/execution_plane_jsonrpc` and
-  `../execution_plane/runtimes/execution_plane_process`. Hex builds must
-  resolve Execution Plane packages by version.
+  back to GitHub. Local path development uses the generated package at
+  `../execution_plane/dist/monolith/execution_plane`; clean clones use the root
+  of `projection/execution_plane`; Hex builds resolve the one
+  `execution_plane` package by version. Do not reintroduce separate JSON-RPC or
+  process child-package dependencies.
 - Local dependency overrides use `.dependency_sources.local.exs`.
 - Default dependency priority is `path -> GitHub -> Hex`; publish mode is
   Hex-only and must fail with exact blockers if an internal dep is unavailable
   on Hex.
 - Dependency source selection must not use environment variables.
-- Weld maintains helper drift, manifests, clone checks, publish checks, and
-  publish order, but this repo is not a Weld consumer in this pass and must not
-  receive a blind Weld dependency.
-- Do not point `:execution_plane` at the sibling repo root. That root is the
-  non-published Blitz workspace project, not the Hex package.
+- Weld owns the upstream generated artifact and durable projection branch.
+  This consumer keeps its dependency-source helper thin and must not add a
+  second projection mechanism.
+- Do not point `:execution_plane` at the sibling source repo root or its
+  `core/execution_plane` component. Neither contains the complete published
+  core + JSON-RPC + process package shape.
 - Runtime application code under `lib/**` must not call direct OS env APIs such
   as `System.get_env`, `System.fetch_env`, `System.put_env`, or
   `System.delete_env`.

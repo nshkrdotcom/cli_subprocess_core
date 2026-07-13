@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-07-10
+## [0.2.0] - 2026-07-13
 
 ### Added
 
@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replaced separate Execution Plane core, JSON-RPC, and process package
+  dependencies with the single generated `execution_plane ~> 0.1.0` package.
+- Local development now consumes the generated monolith artifact and clean
+  clones fall back to the durable `projection/execution_plane` branch.
 - The Codex catalog now follows an authenticated live `codex-cli 0.144.1`
   `model/list` probe from 2026-07-10: `gpt-5.6-sol` is the default, Spark is
   public but non-API, `codex-auto-review` remains internal, and backend-absent
