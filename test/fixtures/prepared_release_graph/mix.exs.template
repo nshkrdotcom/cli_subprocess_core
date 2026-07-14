@@ -1,0 +1,52 @@
+fixture_config_path = Path.join(__DIR__, "workspace_paths.exs")
+
+unless File.regular?(fixture_config_path) do
+  raise """
+  missing generated #{fixture_config_path}
+
+  Run scripts/prepared_release_graph_ci.sh with an explicit --workspace-root.
+  """
+end
+
+{fixture_config, _binding} = Code.eval_file(fixture_config_path)
+
+defmodule PreparedReleaseGraph.MixProject do
+  use Mix.Project
+
+  @fixture_config fixture_config
+  @internal_apps [
+    :ground_plane_contracts,
+    :ground_plane_persistence_policy,
+    :execution_plane,
+    :cli_subprocess_core,
+    :codex_sdk,
+    :claude_agent_sdk,
+    :amp_sdk,
+    :cursor_cli_sdk,
+    :antigravity_cli_sdk,
+    :agent_session_manager,
+    :prompt_runner_sdk,
+    :inference
+  ]
+
+  def project do
+    [
+      app: :prepared_release_graph,
+      version: "0.1.0",
+      elixir: "~> 1.19",
+      start_permanent: false,
+      deps: deps(),
+      prepared_release_graph: @fixture_config
+    ]
+  end
+
+  def application do
+    [extra_applications: [:logger]]
+  end
+
+  defp deps do
+    Enum.map(@internal_apps, fn app ->
+      {app, [path: Map.fetch!(@fixture_config.paths, app), override: true]}
+    end)
+  end
+end

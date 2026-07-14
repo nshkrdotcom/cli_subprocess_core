@@ -1,0 +1,215 @@
+defmodule PreparedReleaseGraphTest do
+  use ExUnit.Case, async: false
+
+  alias CliSubprocessCore.JSONRPC
+
+  @expected_apps [
+    :ground_plane_contracts,
+    :ground_plane_persistence_policy,
+    :execution_plane,
+    :cli_subprocess_core,
+    :codex_sdk,
+    :claude_agent_sdk,
+    :amp_sdk,
+    :cursor_cli_sdk,
+    :antigravity_cli_sdk,
+    :agent_session_manager,
+    :prompt_runner_sdk,
+    :inference
+  ]
+
+  @phantom_apps [
+    :execution_plane_jsonrpc,
+    :execution_plane_process,
+    :gemini_cli_sdk
+  ]
+
+  test "top-level overrides select the exact prepared public dependency graph" do
+    receipt = PreparedReleaseGraph.dependency_receipt()
+
+    assert receipt.direct_apps == @expected_apps
+    assert receipt.first_party_apps == @expected_apps
+    assert receipt.git_dependencies == []
+    assert receipt.execution_plane_count == 1
+    assert receipt.ground_plane_count == 2
+    assert receipt.cli_core_count == 1
+
+    refute Enum.any?(receipt.all_apps, &(&1 in @phantom_apps))
+    refute Enum.any?(receipt.all_apps, &(&1 == :gemini_cli_sdk))
+    refute File.read!("mix.lock") =~ "{:git,"
+
+    if PreparedReleaseGraph.fixture_mode() == :package do
+      refute Enum.any?(receipt.first_party_paths, fn path ->
+               PreparedReleaseGraph.canonical_workspace_path?(path)
+             end)
+    end
+  end
+
+  test "compiled modules and OTP applications have one public owner" do
+    ownership = PreparedReleaseGraph.module_ownership()
+
+    assert ownership.execution_plane != %{}
+    assert ownership.ground_plane != %{}
+    assert Enum.all?(ownership.execution_plane, fn {_module, paths} -> length(paths) == 1 end)
+    assert Enum.all?(ownership.ground_plane, fn {_module, paths} -> length(paths) == 1 end)
+
+    assert PreparedReleaseGraph.first_party_application_files() == @expected_apps
+
+    Enum.each(@expected_apps, fn app ->
+      assert Application.spec(app, :vsn), "expected #{inspect(app)} to have an OTP application"
+    end)
+
+    Enum.each(@phantom_apps, fn app ->
+      refute Application.spec(app), "unexpected phantom OTP application #{inspect(app)}"
+    end)
+  end
+
+  test "generated Execution Plane starts its supervision tree exactly once" do
+    assert_single_registered(ExecutionPlane.Application.Supervisor)
+    assert_single_registered(ExecutionPlane.Process.Supervisor)
+    assert_single_registered(ExecutionPlane.TaskSupervisor)
+    assert_single_registered(ExecutionPlane.Process.TransportSupervisor)
+
+    assert [{_id, process_supervisor, :supervisor, _modules}] =
+             Supervisor.which_children(ExecutionPlane.Application.Supervisor)
+
+    assert process_supervisor == Process.whereis(ExecutionPlane.Process.Supervisor)
+    assert length(Supervisor.which_children(ExecutionPlane.Process.Supervisor)) == 2
+  end
+
+  test "JSON-RPC round-trips through the CLI Core facade" do
+    script = executable_script!("json-rpc", json_rpc_server())
+
+    assert {:ok, session} = JSONRPC.start(command: script)
+
+    try do
+      assert {:ok, %{"value" => "phase-6"}} =
+               JSONRPC.request(session, "echo", %{"value" => "phase-6"})
+    after
+      :ok = JSONRPC.close(session)
+    end
+
+    assert_eventually_clean()
+  end
+
+  test "bounded Cursor command flows SDK to CLI Core to generated Execution Plane" do
+    script = executable_script!("cursor", cursor_response_script())
+
+    options = %CursorCliSdk.Options{cli_command: script, timeout_ms: 2_000}
+
+    assert {:ok, "PREPARED_GRAPH_OK"} = CursorCliSdk.run("offline phase 6 proof", options)
+    assert Code.ensure_loaded?(CliSubprocessCore.Session)
+    assert Code.ensure_loaded?(ExecutionPlane.Process.Transport)
+    assert_eventually_clean()
+  end
+
+  test "five SDK roots coexist and ASM keeps the retired provider out" do
+    assert Enum.all?(
+             [Codex, ClaudeAgentSDK, AmpSdk, CursorCliSdk, AntigravityCliSdk],
+             &Code.ensure_loaded?/1
+           )
+
+    assert Enum.sort(ASM.ProviderRegistry.supported_providers()) ==
+             [:amp, :antigravity, :claude, :codex, :cursor]
+
+    assert {:error, error} = ASM.ProviderRegistry.fetch(:gemini)
+    assert error.kind == :config_invalid
+  end
+
+  test "Inference defaults to model endpoints and requires explicit ASM admission" do
+    model_client =
+      Inference.client!(
+        adapter: Inference.Adapters.Mock,
+        provider: :mock,
+        adapter_opts: [response_text: "MODEL_ENDPOINT_OK"]
+      )
+
+    assert {:ok, %{text: "MODEL_ENDPOINT_OK"}} = Inference.complete(model_client, "offline")
+
+    default_asm =
+      Inference.client!(adapter: Inference.Adapters.ASM, provider: :codex, model: "codex")
+
+    assert {:error, error} = Inference.Client.validate_adapter_kind(default_asm)
+    assert error.category == :unsupported_capability
+    assert error.metadata.provider_kind == :agent_session
+
+    admitted_asm =
+      Inference.client!(
+        adapter: Inference.Adapters.ASM,
+        admitted_kinds: [:agent_session],
+        provider: :codex,
+        model: "codex"
+      )
+
+    assert :ok = Inference.Client.validate_adapter_kind(admitted_asm)
+  end
+
+  test "runtime shutdown leaves no transport or task leak" do
+    assert_eventually_clean()
+    assert Task.Supervisor.children(ExecutionPlane.TaskSupervisor) == []
+    assert Task.Supervisor.children(CliSubprocessCore.TaskSupervisor) == []
+  end
+
+  defp assert_single_registered(name) do
+    pid = Process.whereis(name)
+    assert is_pid(pid), "expected #{inspect(name)} to be registered"
+    assert Process.alive?(pid)
+    assert Enum.count(Process.registered(), &(&1 == name)) == 1
+  end
+
+  defp assert_eventually_clean(attempts \\ 50)
+
+  defp assert_eventually_clean(0) do
+    assert DynamicSupervisor.count_children(ExecutionPlane.Process.TransportSupervisor).active ==
+             0
+  end
+
+  defp assert_eventually_clean(attempts) do
+    if DynamicSupervisor.count_children(ExecutionPlane.Process.TransportSupervisor).active == 0 do
+      :ok
+    else
+      Process.sleep(20)
+      assert_eventually_clean(attempts - 1)
+    end
+  end
+
+  defp executable_script!(name, body) do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "prepared-release-graph-#{name}-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+    path = Path.join(dir, name)
+    File.write!(path, "#!/usr/bin/env bash\nset -euo pipefail\n" <> body)
+    File.chmod!(path, 0o755)
+    on_exit(fn -> File.rm_rf!(dir) end)
+    path
+  end
+
+  defp json_rpc_server do
+    python =
+      System.find_executable("python3") || System.find_executable("python") ||
+        raise "python is required for the prepared JSON-RPC proof"
+
+    """
+    exec #{python} -c '
+    import json, sys
+    for raw in sys.stdin:
+        message = json.loads(raw)
+        if "id" in message:
+            sys.stdout.write(json.dumps({"id": message["id"], "result": message.get("params")}) + "\\n")
+            sys.stdout.flush()
+    '
+    """
+  end
+
+  defp cursor_response_script do
+    """
+    printf '%s\\n' \
+      '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"PREPARED_GRAPH_OK"}]},"session_id":"phase-6"}' \
+      '{"type":"result","subtype":"success","duration_ms":1,"is_error":false,"result":"PREPARED_GRAPH_OK","session_id":"phase-6","usage":{"inputTokens":1,"outputTokens":1}}'
+    """
+  end
+end

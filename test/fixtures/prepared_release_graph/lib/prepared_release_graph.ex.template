@@ -1,0 +1,147 @@
+defmodule PreparedReleaseGraph do
+  @moduledoc false
+
+  @first_party_apps [
+    :ground_plane_contracts,
+    :ground_plane_persistence_policy,
+    :execution_plane,
+    :cli_subprocess_core,
+    :codex_sdk,
+    :claude_agent_sdk,
+    :amp_sdk,
+    :cursor_cli_sdk,
+    :antigravity_cli_sdk,
+    :agent_session_manager,
+    :prompt_runner_sdk,
+    :inference
+  ]
+
+  @spec fixture_mode() :: :source | :package
+  def fixture_mode do
+    fixture_config().mode
+  end
+
+  @spec canonical_workspace_path?(String.t()) :: boolean()
+  def canonical_workspace_path?(path) when is_binary(path) do
+    workspace_root = Path.expand(fixture_config().canonical_workspace_root)
+    expanded_path = Path.expand(path)
+
+    expanded_path == workspace_root or String.starts_with?(expanded_path, workspace_root <> "/")
+  end
+
+  @spec dependency_receipt() :: map()
+  def dependency_receipt do
+    direct_specs = Mix.Project.config()[:deps]
+    direct_apps = Enum.map(direct_specs, &dep_app/1)
+    records = dependency_records()
+    all_apps = records |> Enum.map(& &1.app) |> Enum.uniq()
+
+    first_party_records = Enum.filter(records, &(&1.app in @first_party_apps))
+    first_party_apps = Enum.filter(@first_party_apps, &(&1 in all_apps))
+
+    %{
+      direct_apps: direct_apps,
+      first_party_apps: first_party_apps,
+      first_party_paths: Enum.map(first_party_records, & &1.path),
+      all_apps: all_apps,
+      git_dependencies:
+        records
+        |> Enum.filter(&(&1.source == :git))
+        |> Enum.map(& &1.app)
+        |> Enum.uniq()
+        |> Enum.sort(),
+      execution_plane_count: count_resolved(first_party_records, :execution_plane),
+      ground_plane_count:
+        count_resolved(first_party_records, :ground_plane_contracts) +
+          count_resolved(first_party_records, :ground_plane_persistence_policy),
+      cli_core_count: count_resolved(first_party_records, :cli_subprocess_core)
+    }
+  end
+
+  @spec module_ownership() :: %{
+          execution_plane: %{String.t() => [String.t()]},
+          ground_plane: %{String.t() => [String.t()]}
+        }
+  def module_ownership do
+    ownership =
+      Mix.Project.build_path()
+      |> Path.join("lib/*/ebin/Elixir.*.beam")
+      |> Path.wildcard()
+      |> Enum.reduce(%{}, fn path, acc ->
+        Map.update(acc, Path.basename(path, ".beam"), [path], &[path | &1])
+      end)
+
+    %{
+      execution_plane: ownership_for_prefix(ownership, "Elixir.ExecutionPlane."),
+      ground_plane: ownership_for_prefix(ownership, "Elixir.GroundPlane.")
+    }
+  end
+
+  @spec first_party_application_files() :: [atom()]
+  def first_party_application_files do
+    available =
+      Mix.Project.build_path()
+      |> Path.join("lib/*/ebin/*.app")
+      |> Path.wildcard()
+      |> MapSet.new(&Path.basename(&1, ".app"))
+
+    Enum.filter(@first_party_apps, &MapSet.member?(available, Atom.to_string(&1)))
+  end
+
+  defp fixture_config do
+    Mix.Project.config()
+    |> Keyword.fetch!(:prepared_release_graph)
+  end
+
+  defp dependency_records do
+    loaded = Mix.Dep.load_and_cache()
+
+    overridden_apps =
+      loaded
+      |> Enum.filter(& &1.top_level)
+      |> MapSet.new(& &1.app)
+
+    loaded
+    |> flatten_deps()
+    |> Enum.reject(fn dep -> not dep.top_level and MapSet.member?(overridden_apps, dep.app) end)
+    |> Enum.map(fn dep ->
+      %{
+        app: dep.app,
+        path: dep.opts[:dest] || dep.opts[:path] || "",
+        source: dep_source(dep)
+      }
+    end)
+    |> Enum.uniq()
+  end
+
+  defp flatten_deps(deps) when is_list(deps) do
+    Enum.flat_map(deps, fn dep -> [dep | flatten_deps(dep.deps)] end)
+  end
+
+  defp dep_source(%Mix.Dep{scm: Mix.SCM.Git}), do: :git
+  defp dep_source(%Mix.Dep{scm: Mix.SCM.Path}), do: :path
+
+  defp dep_source(%Mix.Dep{opts: opts}) do
+    cond do
+      Keyword.has_key?(opts, :git) -> :git
+      Keyword.has_key?(opts, :path) -> :path
+      true -> :hex
+    end
+  end
+
+  defp count_resolved(records, app) do
+    records
+    |> Enum.filter(&(&1.app == app))
+    |> Enum.uniq_by(&{&1.app, &1.path, &1.source})
+    |> length()
+  end
+
+  defp ownership_for_prefix(ownership, prefix) do
+    ownership
+    |> Enum.filter(fn {module, _paths} -> String.starts_with?(module, prefix) end)
+    |> Map.new(fn {module, paths} -> {module, Enum.sort(paths)} end)
+  end
+
+  defp dep_app({app, _opts}), do: app
+  defp dep_app({app, _requirement, _opts}), do: app
+end
