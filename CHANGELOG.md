@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Restricted the Hex archive to runtime source, model data, dependency-source
+  support, consumer guides/examples, and public release documentation/assets.
 - Replaced separate Execution Plane core, JSON-RPC, and process package
   dependencies with the single generated `execution_plane ~> 0.1.0` package.
 - Local development now consumes the generated monolith artifact and clean

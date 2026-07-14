@@ -9,12 +9,19 @@ defmodule CliSubprocessCore.ReleasePreparationTest do
     assert project[:docs][:source_ref] == "v0.2.0"
   end
 
-  test "package includes public documentation and release evidence" do
+  test "package includes consumer documentation without release tooling" do
     package_files = Mix.Project.config()[:package][:files]
 
     assert "guides" in package_files
     assert "examples" in package_files
-    assert "docs" in package_files
+    assert "build_support" in package_files
+    assert "assets" in package_files
+
+    refute "scripts" in package_files
+    refute "docs" in package_files
+    refute ".formatter.exs" in package_files
+    refute "mix.lock" in package_files
+    refute "AGENTS.md" in package_files
   end
 
   test "generated Execution Plane exports every lower module used by core" do

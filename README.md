@@ -1,18 +1,15 @@
 <p align="center">
-  <img src="assets/cli_subprocess_core.svg" alt="CliSubprocessCore logo" width="240" />
+  <img src="assets/cli_subprocess_core.svg" alt="CliSubprocessCore logo" width="200" />
 </p>
 
 # CliSubprocessCore
 
 <p align="center">
-  <a href="https://hex.pm/packages/cli_subprocess_core">
-    <img src="https://img.shields.io/hexpm/v/cli_subprocess_core.svg" alt="Hex" />
-  </a>
-  <a href="https://hexdocs.pm/cli_subprocess_core">
-    <img src="https://img.shields.io/badge/hexdocs-docs-blue.svg" alt="HexDocs" />
-  </a>
   <a href="https://github.com/nshkrdotcom/cli_subprocess_core">
     <img src="https://img.shields.io/badge/github-nshkrdotcom%2Fcli__subprocess__core-24292e.svg" alt="GitHub" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" />
   </a>
 </p>
 
