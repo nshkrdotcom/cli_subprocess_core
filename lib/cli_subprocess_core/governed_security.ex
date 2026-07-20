@@ -165,14 +165,9 @@ defmodule CliSubprocessCore.GovernedSecurity do
 
   defp do_redact(%DateTime{} = value, _redactions), do: value
 
-  defp do_redact(%module{} = value, redactions) do
+  defp do_redact(%_{} = value, redactions) do
     attrs = value |> Map.from_struct() |> do_redact(redactions)
-
-    if function_exported?(module, :__struct__, 0) do
-      struct(module, attrs)
-    else
-      attrs
-    end
+    struct(value, attrs)
   rescue
     _error -> @redacted
   end

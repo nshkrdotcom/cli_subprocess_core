@@ -8,6 +8,7 @@ defmodule CliSubprocessCore.CommandTest do
   alias CliSubprocessCore.TestSupport.FakeSSH
   alias CliSubprocessCore.TestSupport.ProviderProfiles.CommandRunner
   alias ExecutionPlane.Process.Transport.Surface, as: RuntimeExecutionSurface
+  alias ExecutionPlane.ProcessExit
 
   test "builds normalized invocations" do
     command =
@@ -328,6 +329,8 @@ defmodule CliSubprocessCore.CommandTest do
              )
 
     assert result.stdout == "from-authority|unset"
+    assert %ProcessExit{status: :success, code: 0} = result.exit
+    assert RunResult.success?(result)
     assert result.invocation.clear_env? == true
     assert result.invocation.env == %{"MARKER" => "from-authority"}
   end
