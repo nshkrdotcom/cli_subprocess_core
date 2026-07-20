@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.Session.Options do
 
   alias CliSubprocessCore.{
     ExecutionSurface,
+    GovernedAuthority,
     ProviderProfile,
     ProviderRegistry,
     ProviderRuntimeProfile
@@ -28,7 +29,8 @@ defmodule CliSubprocessCore.Session.Options do
     :lease_ref,
     :surface_ref,
     :boundary_class,
-    :observability
+    :observability,
+    :governed_authority
   ]
 
   defstruct provider: nil,
@@ -45,6 +47,7 @@ defmodule CliSubprocessCore.Session.Options do
             surface_ref: nil,
             boundary_class: nil,
             observability: %{},
+            governed_authority: nil,
             provider_options: [],
             starter: nil
 
@@ -65,6 +68,7 @@ defmodule CliSubprocessCore.Session.Options do
           surface_ref: String.t() | nil,
           boundary_class: atom() | String.t() | nil,
           observability: map(),
+          governed_authority: GovernedAuthority.t() | nil,
           provider_options: keyword(),
           starter: {pid(), reference()} | nil
         }
@@ -88,6 +92,8 @@ defmodule CliSubprocessCore.Session.Options do
           | {:invalid_boundary_class, term()}
           | {:invalid_observability, term()}
           | {:invalid_starter, term()}
+          | GovernedAuthority.validation_error()
+          | {:governed_launch_smuggling, term()}
           | ProviderRuntimeProfile.resolve_error()
 
   @doc """
@@ -101,21 +107,39 @@ defmodule CliSubprocessCore.Session.Options do
     provider_options = Keyword.drop(opts, @reserved_keys)
     profile = Keyword.get(opts, :profile)
 
-    with {:ok, profile} <- validate_profile(profile),
+    with {:ok, governed_authority} <-
+           GovernedAuthority.new(Keyword.get(opts, :governed_authority)),
+         :ok <- reject_governed_smuggling(provider_options, governed_authority),
+         {:ok, profile} <- validate_profile(profile),
          {:ok, provider} <- validate_provider(Keyword.get(opts, :provider), profile),
          :ok <- validate_registry(Keyword.get(opts, :registry, @default_registry)),
          :ok <- reject_transport_selector(opts),
          :ok <- reject_public_simulation_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
+         :ok <- reject_surface_supplementation(execution_surface, governed_authority),
          {:ok, {provider_options, execution_surface}} <-
-           ProviderRuntimeProfile.resolve(provider, provider_options, execution_surface),
+           resolve_provider_runtime_profile(
+             provider,
+             provider_options,
+             execution_surface,
+             governed_authority
+           ),
          :ok <- validate_subscriber(Keyword.get(opts, :subscriber)),
-         :ok <- validate_metadata(Keyword.get(opts, :metadata, %{})),
+         :ok <- validate_metadata(Keyword.get(opts, :metadata, %{}), governed_authority),
          :ok <-
            validate_session_event_tag(
              Keyword.get(opts, :session_event_tag, @default_session_event_tag)
            ),
          :ok <- validate_starter(Keyword.get(opts, :starter)) do
+      provider_options =
+        case governed_authority do
+          nil ->
+            provider_options
+
+          %GovernedAuthority{} = authority ->
+            Keyword.put(provider_options, :governed_authority, authority)
+        end
+
       {:ok,
        %__MODULE__{
          provider: provider,
@@ -132,6 +156,7 @@ defmodule CliSubprocessCore.Session.Options do
          surface_ref: execution_surface.surface_ref,
          boundary_class: execution_surface.boundary_class,
          observability: execution_surface.observability,
+         governed_authority: governed_authority,
          provider_options: provider_options,
          starter: Keyword.get(opts, :starter)
        }}
@@ -212,8 +237,16 @@ defmodule CliSubprocessCore.Session.Options do
 
   defp validate_subscriber(subscriber), do: {:error, {:invalid_subscriber, subscriber}}
 
-  defp validate_metadata(metadata) when is_map(metadata), do: :ok
-  defp validate_metadata(metadata), do: {:error, {:invalid_metadata, metadata}}
+  defp validate_metadata(metadata, nil) when is_map(metadata), do: :ok
+
+  defp validate_metadata(metadata, %GovernedAuthority{}) when is_map(metadata) do
+    GovernedAuthority.reject_supplementation(metadata)
+  end
+
+  defp validate_metadata(_metadata, %GovernedAuthority{}),
+    do: {:error, {:invalid_metadata, :not_a_map}}
+
+  defp validate_metadata(metadata, nil), do: {:error, {:invalid_metadata, metadata}}
 
   defp validate_session_event_tag(tag) when is_atom(tag), do: :ok
   defp validate_session_event_tag(tag), do: {:error, {:invalid_session_event_tag, tag}}
@@ -240,4 +273,32 @@ defmodule CliSubprocessCore.Session.Options do
 
   defp public_simulation_entry?({key, _value}), do: key in [:simulation, "simulation"]
   defp public_simulation_entry?(_entry), do: false
+
+  defp reject_governed_smuggling(_provider_options, nil), do: :ok
+
+  defp reject_governed_smuggling(provider_options, %GovernedAuthority{}) do
+    GovernedAuthority.reject_supplementation(provider_options)
+  end
+
+  defp reject_surface_supplementation(_execution_surface, nil), do: :ok
+
+  defp reject_surface_supplementation(execution_surface, %GovernedAuthority{}) do
+    GovernedAuthority.reject_supplementation(%{
+      transport_options: execution_surface.transport_options,
+      observability: execution_surface.observability
+    })
+  end
+
+  defp resolve_provider_runtime_profile(provider, provider_options, execution_surface, nil) do
+    ProviderRuntimeProfile.resolve(provider, provider_options, execution_surface)
+  end
+
+  defp resolve_provider_runtime_profile(
+         _provider,
+         provider_options,
+         execution_surface,
+         %GovernedAuthority{}
+       ) do
+    {:ok, {provider_options, execution_surface}}
+  end
 end

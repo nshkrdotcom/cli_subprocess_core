@@ -10,6 +10,30 @@ defmodule CliSubprocessCore.GovernedAuthority do
 
   alias CliSubprocessCore.{Command, CommandSpec}
 
+  @input_fields [
+    :authority_ref,
+    :credential_lease_ref,
+    :connector_instance_ref,
+    :connector_binding_ref,
+    :provider_account_ref,
+    :native_auth_assertion_ref,
+    :target_ref,
+    :operation_policy_ref,
+    :materialized_command,
+    :command,
+    :materialized_cwd,
+    :cwd,
+    :materialized_env,
+    :env,
+    :clear_env?,
+    :clear_env,
+    :config_root,
+    :auth_root,
+    :base_url,
+    :command_ref,
+    :redaction_ref
+  ]
+
   @enforce_keys [
     :authority_ref,
     :credential_lease_ref,
@@ -77,35 +101,37 @@ defmodule CliSubprocessCore.GovernedAuthority do
       |> Map.new()
       |> new()
     else
-      {:error, {:invalid_governed_authority, attrs}}
+      {:error, {:invalid_governed_authority, :not_a_keyword_list}}
     end
   end
 
   def new(attrs) when is_map(attrs) do
-    authority = %__MODULE__{
-      authority_ref: string_field(attrs, :authority_ref),
-      credential_lease_ref: string_field(attrs, :credential_lease_ref),
-      connector_instance_ref: string_field(attrs, :connector_instance_ref),
-      connector_binding_ref: string_field(attrs, :connector_binding_ref),
-      provider_account_ref: string_field(attrs, :provider_account_ref),
-      native_auth_assertion_ref: string_field(attrs, :native_auth_assertion_ref),
-      target_ref: string_field(attrs, :target_ref),
-      operation_policy_ref: string_field(attrs, :operation_policy_ref),
-      command: string_field(attrs, :materialized_command) || string_field(attrs, :command),
-      cwd: string_field(attrs, :materialized_cwd) || string_field(attrs, :cwd),
-      env: env_field(attrs),
-      clear_env?: field(attrs, :clear_env?, field(attrs, :clear_env, true)),
-      config_root: string_field(attrs, :config_root),
-      auth_root: string_field(attrs, :auth_root),
-      base_url: string_field(attrs, :base_url),
-      command_ref: string_field(attrs, :command_ref),
-      redaction_ref: string_field(attrs, :redaction_ref)
-    }
+    with :ok <- validate_known_fields(attrs) do
+      authority = %__MODULE__{
+        authority_ref: string_field(attrs, :authority_ref),
+        credential_lease_ref: string_field(attrs, :credential_lease_ref),
+        connector_instance_ref: string_field(attrs, :connector_instance_ref),
+        connector_binding_ref: string_field(attrs, :connector_binding_ref),
+        provider_account_ref: string_field(attrs, :provider_account_ref),
+        native_auth_assertion_ref: string_field(attrs, :native_auth_assertion_ref),
+        target_ref: string_field(attrs, :target_ref),
+        operation_policy_ref: string_field(attrs, :operation_policy_ref),
+        command: string_field(attrs, :materialized_command) || string_field(attrs, :command),
+        cwd: string_field(attrs, :materialized_cwd) || string_field(attrs, :cwd),
+        env: env_field(attrs),
+        clear_env?: field(attrs, :clear_env?, field(attrs, :clear_env, true)),
+        config_root: string_field(attrs, :config_root),
+        auth_root: string_field(attrs, :auth_root),
+        base_url: string_field(attrs, :base_url),
+        command_ref: string_field(attrs, :command_ref),
+        redaction_ref: string_field(attrs, :redaction_ref)
+      }
 
-    validate(authority)
+      validate(authority)
+    end
   end
 
-  def new(other), do: {:error, {:invalid_governed_authority, other}}
+  def new(_other), do: {:error, {:invalid_governed_authority, :unsupported_input}}
 
   @spec fetch!(nil | t() | keyword() | map()) :: t()
   def fetch!(attrs) do
@@ -155,6 +181,15 @@ defmodule CliSubprocessCore.GovernedAuthority do
     end
   end
 
+  @doc false
+  @spec reject_supplementation(term()) :: :ok | {:error, {:governed_launch_smuggling, term()}}
+  def reject_supplementation(value) do
+    case CliSubprocessCore.GovernedSecurity.find_supplementation(value) do
+      nil -> :ok
+      path -> {:error, {:governed_launch_smuggling, {:supplemental_material, path}}}
+    end
+  end
+
   @spec redacted(t() | nil) :: map() | nil
   def redacted(nil), do: nil
 
@@ -172,7 +207,7 @@ defmodule CliSubprocessCore.GovernedAuthority do
       redaction_ref: authority.redaction_ref,
       command: redacted_value(authority.command),
       cwd: redacted_value(authority.cwd),
-      env_keys: Map.keys(authority.env) |> Enum.sort(),
+      env_keys: redacted_env_keys(authority.env),
       clear_env?: true,
       config_root: redacted_value(authority.config_root),
       auth_root: redacted_value(authority.auth_root),
@@ -190,12 +225,13 @@ defmodule CliSubprocessCore.GovernedAuthority do
          :ok <- require_binary(authority.target_ref, :target_ref),
          :ok <- require_binary(authority.operation_policy_ref, :operation_policy_ref),
          :ok <- require_binary(authority.command, :command),
-         :ok <- optional_binary(authority.cwd, :cwd),
+         :ok <- absolute_path(authority.command, :command),
+         :ok <- optional_absolute_path(authority.cwd, :cwd),
          :ok <- validate_env(authority.env),
          :ok <- validate_clear_env(authority.clear_env?),
-         :ok <- optional_binary(authority.config_root, :config_root),
-         :ok <- optional_binary(authority.auth_root, :auth_root),
-         :ok <- optional_binary(authority.base_url, :base_url),
+         :ok <- optional_absolute_path(authority.config_root, :config_root),
+         :ok <- optional_absolute_path(authority.auth_root, :auth_root),
+         :ok <- optional_http_uri(authority.base_url, :base_url),
          :ok <- optional_binary(authority.command_ref, :command_ref),
          :ok <- optional_binary(authority.redaction_ref, :redaction_ref) do
       {:ok, authority}
@@ -204,16 +240,48 @@ defmodule CliSubprocessCore.GovernedAuthority do
 
   defp require_binary(value, _key) when is_binary(value) and value != "", do: :ok
   defp require_binary(nil, key), do: {:error, {:missing_governed_authority_field, key}}
-  defp require_binary(value, key), do: {:error, {:invalid_governed_authority_field, key, value}}
+
+  defp require_binary(_value, key),
+    do: {:error, {:invalid_governed_authority_field, key, :invalid_value}}
 
   defp optional_binary(nil, _key), do: :ok
   defp optional_binary(value, _key) when is_binary(value), do: :ok
-  defp optional_binary(value, key), do: {:error, {:invalid_governed_authority_field, key, value}}
+
+  defp optional_binary(_value, key),
+    do: {:error, {:invalid_governed_authority_field, key, :invalid_value}}
+
+  defp absolute_path(value, key) when is_binary(value) do
+    if canonical_absolute_path?(value),
+      do: :ok,
+      else: {:error, {:invalid_governed_authority_field, key, :not_canonical_absolute_path}}
+  end
+
+  defp absolute_path(_value, key),
+    do: {:error, {:invalid_governed_authority_field, key, :not_canonical_absolute_path}}
+
+  defp optional_absolute_path(nil, _key), do: :ok
+  defp optional_absolute_path(value, key), do: absolute_path(value, key)
+
+  defp optional_http_uri(nil, _key), do: :ok
+
+  defp optional_http_uri(value, key) when is_binary(value) do
+    case URI.new(value) do
+      {:ok, %URI{scheme: scheme, host: host}}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        :ok
+
+      _other ->
+        {:error, {:invalid_governed_authority_field, key, :invalid_http_uri}}
+    end
+  end
+
+  defp optional_http_uri(_value, key),
+    do: {:error, {:invalid_governed_authority_field, key, :invalid_http_uri}}
 
   defp validate_clear_env(true), do: :ok
 
   defp validate_clear_env(value),
-    do: {:error, {:invalid_governed_authority_field, :clear_env?, value}}
+    do: {:error, {:invalid_governed_authority_field, :clear_env?, invalid_boolean(value)}}
 
   defp validate_env(env) when is_map(env) do
     if Enum.all?(env, fn {key, value} -> is_binary(key) and is_binary(value) end) do
@@ -223,7 +291,36 @@ defmodule CliSubprocessCore.GovernedAuthority do
     end
   end
 
-  defp validate_env(env), do: {:error, {:invalid_governed_authority_field, :env, env}}
+  defp validate_env(_env), do: {:error, {:invalid_governed_authority_field, :env, :not_a_map}}
+
+  defp validate_known_fields(attrs) do
+    allowed = MapSet.new(Enum.flat_map(@input_fields, &[&1, Atom.to_string(&1)]))
+    unknown = attrs |> Map.keys() |> Enum.reject(&MapSet.member?(allowed, &1))
+
+    if unknown == [] do
+      :ok
+    else
+      {:error,
+       {:invalid_governed_authority_field, :unknown_fields,
+        Enum.map(unknown, &safe_field_name/1) |> Enum.sort()}}
+    end
+  end
+
+  defp canonical_absolute_path?(value) do
+    String.valid?(value) and value != "" and Path.type(value) == :absolute and
+      Path.expand(value) == value
+  end
+
+  defp safe_field_name(value) when is_atom(value),
+    do: value |> Atom.to_string() |> safe_field_name()
+
+  defp safe_field_name(value) when is_binary(value) do
+    if byte_size(value) <= 128 and String.match?(value, ~r/\A[A-Za-z_][A-Za-z0-9_?]*\z/),
+      do: value,
+      else: "invalid_field"
+  end
+
+  defp safe_field_name(_value), do: "invalid_field"
 
   defp env_field(attrs) do
     attrs
@@ -266,12 +363,34 @@ defmodule CliSubprocessCore.GovernedAuthority do
 
   defp redacted_env_keys(_env), do: []
 
-  defp redacted_env_key(value) when is_binary(value), do: value
-  defp redacted_env_key(value) when is_atom(value), do: Atom.to_string(value)
+  defp redacted_env_key(value) when is_binary(value) do
+    if byte_size(value) <= 128 and String.match?(value, ~r/\A[A-Za-z_][A-Za-z0-9_]*\z/),
+      do: value,
+      else: "[invalid-env-key]"
+  end
+
+  defp redacted_env_key(value) when is_atom(value),
+    do: value |> Atom.to_string() |> redacted_env_key()
+
   defp redacted_env_key(value) when is_integer(value), do: Integer.to_string(value)
-  defp redacted_env_key(value), do: inspect(value)
+  defp redacted_env_key(_value), do: "[invalid-env-key]"
+
+  defp invalid_boolean(value) when is_boolean(value), do: value
+  defp invalid_boolean(_value), do: :invalid_value
 
   defp redacted_value(nil), do: nil
   defp redacted_value(value) when is_binary(value), do: "[redacted:#{byte_size(value)}]"
   defp redacted_value(value), do: inspect(value)
+end
+
+defimpl Inspect, for: CliSubprocessCore.GovernedAuthority do
+  import Inspect.Algebra
+
+  def inspect(authority, opts) do
+    concat([
+      "#CliSubprocessCore.GovernedAuthority<",
+      to_doc(CliSubprocessCore.GovernedAuthority.redacted(authority), opts),
+      ">"
+    ])
+  end
 end

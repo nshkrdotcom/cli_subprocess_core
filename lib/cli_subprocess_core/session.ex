@@ -10,6 +10,7 @@ defmodule CliSubprocessCore.Session do
   alias CliSubprocessCore.{
     Command,
     Event,
+    GovernedSecurity,
     Payload,
     ProviderProfile,
     ProviderRegistry,
@@ -476,6 +477,8 @@ defmodule CliSubprocessCore.Session do
 
   defp normalize_and_dispatch(state, events) do
     Enum.reduce(events, state, fn event, acc ->
+      event = GovernedSecurity.sanitize_event(event, acc.options.governed_authority)
+
       runtime =
         case event.provider_session_id do
           value when is_binary(value) -> Runtime.put_provider_session_id(acc.runtime, value)
@@ -506,7 +509,7 @@ defmodule CliSubprocessCore.Session do
     transport_stderr =
       transport_stderr(Transport, state.transport_pid, transport_info)
 
-    %{
+    info = %{
       capabilities: state.profile.capabilities(),
       delivery: Delivery.new(state.options.session_event_tag),
       invocation: state.invocation,
@@ -525,6 +528,8 @@ defmodule CliSubprocessCore.Session do
           transport_info
         )
     }
+
+    sanitize_session_info(info, state.options.governed_authority)
   end
 
   defp maybe_send_started(%{options: %Options{starter: nil}}), do: :ok
@@ -574,6 +579,8 @@ defmodule CliSubprocessCore.Session do
   end
 
   defp dispatch_event(state, %Event{} = event) do
+    event = GovernedSecurity.sanitize_event(event, state.options.governed_authority)
+
     Enum.each(state.subscribers, fn
       {pid, %{tag: :legacy}} ->
         Kernel.send(pid, {:session_event, event})
@@ -584,6 +591,18 @@ defmodule CliSubprocessCore.Session do
       _other ->
         :ok
     end)
+  end
+
+  defp sanitize_session_info(info, nil), do: info
+
+  defp sanitize_session_info(info, authority) do
+    %{
+      info
+      | invocation: GovernedSecurity.sanitize_invocation(info.invocation),
+        metadata: GovernedSecurity.redact(info.metadata, authority),
+        runtime: GovernedSecurity.redact(info.runtime, authority),
+        transport: GovernedSecurity.redact(info.transport, authority)
+    }
   end
 
   defp await_transport_started(module, transport, timeout_ms \\ @transport_start_timeout_ms)

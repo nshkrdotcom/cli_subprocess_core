@@ -8,7 +8,13 @@ defmodule CliSubprocessCore.RuntimeGateway.Support do
   ))
 
   def attrs(%_{} = value), do: Map.from_struct(value)
-  def attrs(value) when is_list(value), do: Map.new(value)
+
+  def attrs(value) when is_list(value) do
+    if Enum.all?(value, &match?({_, _}, &1)),
+      do: Map.new(value),
+      else: %{__invalid_input__: true}
+  end
+
   def attrs(value) when is_map(value), do: value
 
   def value(attrs, key, default \\ nil),
@@ -32,13 +38,25 @@ defmodule CliSubprocessCore.RuntimeGateway.Support do
 
   def safe_input?(value)
       when is_binary(value) or is_integer(value) or is_boolean(value) or is_nil(value),
-      do: not absolute_path?(value)
+      do: safe_scalar?(value)
 
   def safe_input?(value) when is_atom(value), do: true
 
   def safe_input?(_value), do: false
 
-  def ref?(value), do: is_binary(value) and String.trim(value) != "" and not absolute_path?(value)
+  def ref?(value) when is_binary(value) do
+    byte_size(value) <= 512 and String.valid?(value) and value != "" and
+      String.trim(value) == value and not absolute_path?(value) and
+      not String.match?(value, ~r/[\x00-\x1f\x7f]/)
+  end
+
+  def ref?(_value), do: false
+
+  def reason_code?(value) when is_binary(value) do
+    byte_size(value) <= 128 and String.match?(value, ~r/\A[a-z][a-z0-9_.:-]*\z/)
+  end
+
+  def reason_code?(_value), do: false
 
   def digest?("sha256:" <> hex),
     do: byte_size(hex) == 64 and String.match?(hex, ~r/\A[0-9a-f]{64}\z/)
@@ -48,7 +66,16 @@ defmodule CliSubprocessCore.RuntimeGateway.Support do
   def non_negative_integer?(value), do: is_integer(value) and value >= 0
 
   defp forbidden_key?(key),
-    do: MapSet.member?(@forbidden_keys, key) or String.starts_with?(key, "raw_")
+    do:
+      MapSet.member?(@forbidden_keys, key) or String.starts_with?(key, "raw_") or
+        String.ends_with?(key, ["_api_key", "_password", "_private_key", "_secret", "_token"])
+
+  defp safe_scalar?(value) when is_binary(value) do
+    byte_size(value) <= 1_024 and String.valid?(value) and not absolute_path?(value) and
+      not String.match?(value, ~r/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/)
+  end
+
+  defp safe_scalar?(_value), do: true
 
   defp absolute_path?(value) when is_binary(value) do
     String.starts_with?(value, ["/", "~/"]) or
@@ -86,7 +113,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Error do
     }
 
     if S.known_fields?(attrs, @fields) and S.safe_input?(attrs) and
-         error.category in @categories and S.ref?(error.reason_code) and
+         error.category in @categories and S.reason_code?(error.reason_code) and
          is_boolean(error.retryable) and is_boolean(error.ambiguous) and
          optional_ref?(error.evidence_ref) and
          error.ambiguous == (error.category == "ambiguous") do
@@ -268,10 +295,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Status do
 
     terminal? = status.state in Session.terminal_states()
 
-    terminal_coherent? =
-      not terminal? or
-        (status.input_open == false and status.output_open == false and
-           Support.ref?(status.receipt_ref))
+    terminal_coherent? = terminal_coherent?(status, terminal?)
 
     if Support.known_fields?(attrs, @fields) and Support.safe_input?(attrs) and
          Support.ref?(status.session_ref) and Support.positive_integer?(status.generation) and
@@ -291,6 +315,25 @@ defmodule CliSubprocessCore.RuntimeGateway.Status do
   defp optional_ref?(value), do: Support.ref?(value)
   defp optional_exit_status?(nil), do: true
   defp optional_exit_status?(value), do: is_integer(value) and value >= 0 and value <= 255
+
+  defp terminal_coherent?(status, false) do
+    is_nil(status.receipt_ref) and is_nil(status.exit_status)
+  end
+
+  defp terminal_coherent?(status, true) do
+    streams_closed? = status.input_open == false and status.output_open == false
+    receipt? = Support.ref?(status.receipt_ref)
+
+    outcome_coherent? =
+      case status.state do
+        "completed" -> status.exit_status == 0 and is_nil(status.error_ref)
+        "failed" -> status.exit_status != 0
+        state when state in ["cancelled", "ambiguous", "terminated"] -> status.exit_status != 0
+      end
+
+    streams_closed? and receipt? and outcome_coherent?
+  end
+
   defp normalize_string(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_string(value), do: value
 end

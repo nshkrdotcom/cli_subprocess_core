@@ -7,7 +7,15 @@ defmodule CliSubprocessCore.Command do
   """
 
   alias CliSubprocessCore.Command.{Error, Options, RunResult}
-  alias CliSubprocessCore.{CommandSpec, GovernedAuthority, ProviderProfile, ProviderRegistry}
+
+  alias CliSubprocessCore.{
+    CommandSpec,
+    GovernedAuthority,
+    GovernedSecurity,
+    ProviderProfile,
+    ProviderRegistry
+  }
+
   alias ExecutionPlane.Command, as: RuntimeCommand
   alias ExecutionPlane.Contracts.FailureClass
   alias ExecutionPlane.ExecutionRef
@@ -118,7 +126,9 @@ defmodule CliSubprocessCore.Command do
     case Options.new(opts) do
       {:ok, options} ->
         with {:ok, invocation} <- resolve_invocation(options) do
-          do_run(invocation, options)
+          invocation
+          |> do_run(options)
+          |> sanitize_governed_outcome(options.governed_authority)
         end
 
       {:error, reason} ->
@@ -134,7 +144,9 @@ defmodule CliSubprocessCore.Command do
   def run(%__MODULE__{} = invocation, opts) when is_list(opts) do
     case Options.new(invocation, opts) do
       {:ok, options} ->
-        do_run(invocation, options)
+        invocation
+        |> do_run(options)
+        |> sanitize_governed_outcome(options.governed_authority)
 
       {:error, reason} ->
         {:error, Error.invalid_options(reason, %{invocation: invocation})}
@@ -556,4 +568,35 @@ defmodule CliSubprocessCore.Command do
   defp validate_user(nil), do: :ok
   defp validate_user(user) when is_binary(user) and user != "", do: :ok
   defp validate_user(user), do: {:error, {:invalid_user, user}}
+
+  defp sanitize_governed_outcome(outcome, nil), do: outcome
+
+  defp sanitize_governed_outcome({:ok, %RunResult{} = result}, authority) do
+    {:ok, GovernedSecurity.sanitize_run_result(result, authority)}
+  end
+
+  defp sanitize_governed_outcome({:error, %Error{} = error}, authority) do
+    {:error, GovernedSecurity.redact(error, authority)}
+  end
+end
+
+defimpl Inspect, for: CliSubprocessCore.Command do
+  import Inspect.Algebra
+
+  def inspect(command, opts) do
+    safe = %{
+      command: redacted(command.command),
+      arg_count: length(command.args),
+      cwd: redacted(command.cwd),
+      env_keys: command.env |> Map.keys() |> Enum.sort(),
+      clear_env?: command.clear_env?,
+      user: redacted(command.user)
+    }
+
+    concat(["#CliSubprocessCore.Command<", to_doc(safe, opts), ">"])
+  end
+
+  defp redacted(nil), do: nil
+  defp redacted(value) when is_binary(value), do: "[redacted:#{byte_size(value)}]"
+  defp redacted(_value), do: "[redacted]"
 end

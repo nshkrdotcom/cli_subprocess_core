@@ -49,7 +49,29 @@ defmodule CliSubprocessCore.Command.Options do
     :anthropic_base_url,
     :codex_oss_base_url,
     :config_values,
-    :provider_runtime_profile_ref
+    :provider_runtime_profile_ref,
+    :access_token,
+    :api_key,
+    :auth_token,
+    :authorization,
+    :bearer_token,
+    :client_secret,
+    :credential,
+    :credential_material,
+    :headers,
+    :home,
+    :http_headers,
+    :password,
+    :private_key,
+    :proxy,
+    :query,
+    :query_params,
+    :refresh_token,
+    :route,
+    :routing,
+    :secret,
+    :token,
+    :url
   ]
 
   defstruct invocation: nil,
@@ -130,6 +152,7 @@ defmodule CliSubprocessCore.Command.Options do
          {:ok, governed_authority} <-
            GovernedAuthority.new(Keyword.get(opts, :governed_authority)),
          :ok <- GovernedAuthority.enforce_invocation(invocation, governed_authority),
+         :ok <- reject_prebuilt_governed_supplementation(invocation, opts, governed_authority),
          :ok <- reject_transport_selector(opts),
          :ok <- reject_public_simulation_selector(opts),
          {:ok, execution_surface} <- ExecutionSurface.new(opts),
@@ -315,7 +338,35 @@ defmodule CliSubprocessCore.Command.Options do
         {:error, {:governed_launch_smuggling, :model_payload, :backend_metadata}}
 
       true ->
-        :ok
+        GovernedAuthority.reject_supplementation(provider_options)
+    end
+  end
+
+  defp reject_prebuilt_governed_supplementation(_invocation, _opts, nil), do: :ok
+
+  defp reject_prebuilt_governed_supplementation(invocation, opts, %GovernedAuthority{}) do
+    with :ok <- reject_prebuilt_argv_supplementation(invocation.args) do
+      opts
+      |> Keyword.drop([
+        :governed_authority,
+        :stdin,
+        :timeout,
+        :stderr,
+        :close_stdin,
+        :surface_kind,
+        :target_id,
+        :lease_ref,
+        :surface_ref,
+        :boundary_class
+      ])
+      |> GovernedAuthority.reject_supplementation()
+    end
+  end
+
+  defp reject_prebuilt_argv_supplementation(args) do
+    case CliSubprocessCore.GovernedSecurity.find_argv_supplementation(args) do
+      nil -> :ok
+      flag -> {:error, {:governed_launch_smuggling, :argv, flag}}
     end
   end
 

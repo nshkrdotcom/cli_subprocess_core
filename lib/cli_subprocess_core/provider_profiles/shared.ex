@@ -60,7 +60,29 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :ollama_base_url,
     :anthropic_base_url,
     :codex_oss_base_url,
-    :config_values
+    :config_values,
+    :access_token,
+    :api_key,
+    :auth_token,
+    :authorization,
+    :bearer_token,
+    :client_secret,
+    :credential,
+    :credential_material,
+    :headers,
+    :home,
+    :http_headers,
+    :password,
+    :private_key,
+    :proxy,
+    :query,
+    :query_params,
+    :refresh_token,
+    :route,
+    :routing,
+    :secret,
+    :token,
+    :url
   ]
 
   @type parser_state :: %{
@@ -163,7 +185,20 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
               "governed launch model payload env overrides must come from materialized authority"
 
       true ->
+        reject_recursive_governed_supplementation!(opts)
+    end
+  end
+
+  defp reject_recursive_governed_supplementation!(opts) do
+    opts = Keyword.delete(opts, :governed_authority)
+
+    case GovernedAuthority.reject_supplementation(opts) do
+      :ok ->
         :ok
+
+      {:error, {:governed_launch_smuggling, {:supplemental_material, path}}} ->
+        raise ArgumentError,
+              "governed launch supplemental material at #{Enum.join(path, ".")} must come from materialized authority"
     end
   end
 
