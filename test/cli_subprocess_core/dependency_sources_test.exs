@@ -4,6 +4,20 @@ defmodule CliSubprocessCore.DependencySourcesTest do
   @repo_root Path.expand("../..", __DIR__)
   @config_path Path.join(@repo_root, "build_support/dependency_sources.config.exs")
 
+  # The ecosystem convention, and the reason it is not negotiable here: `mix`
+  # unifies dependencies by APP NAME, and `:execution_plane` names two
+  # different packages — `core/execution_plane` (core only) and the generated
+  # `dist/monolith/execution_plane` (core + process + jsonrpc). Every sibling
+  # repository that declares Execution Plane pins the canonical component
+  # paths, so a graph containing this package and any of them can only resolve
+  # if this package pins them too. Pointing `:execution_plane` at the monolith
+  # makes `mix deps.get` refuse the combined graph outright.
+  @canonical_components %{
+    execution_plane: "core/execution_plane",
+    execution_plane_process: "runtimes/execution_plane_process",
+    execution_plane_jsonrpc: "protocols/execution_plane_jsonrpc"
+  }
+
   setup do
     tmp_root =
       Path.join(
@@ -20,58 +34,73 @@ defmodule CliSubprocessCore.DependencySourcesTest do
     {:ok, repo_root: repo_root, tmp_root: tmp_root}
   end
 
-  test "one Execution Plane dependency targets the generated artifact and projection branch" do
-    {config, _binding} = Code.eval_file(@config_path)
-
+  test "the manifest declares exactly the canonical Execution Plane components" do
+    config = DependencySources.config!(@repo_root)
     deps = Map.fetch!(config, :deps)
-    assert Map.keys(deps) == [:execution_plane]
 
-    dep = Map.fetch!(deps, :execution_plane)
+    assert Enum.sort(Map.keys(deps)) == Enum.sort(Map.keys(@canonical_components))
 
-    assert dep.path == "../execution_plane/dist/monolith/execution_plane"
-    assert dep.default_order == [:path, :github, :hex]
-    assert dep.publish_order == [:hex]
-    assert dep.github.repo == "nshkrdotcom/execution_plane"
-    assert dep.github.branch == "projection/execution_plane"
-    refute Map.has_key?(dep.github, :subdir)
-    assert dep.hex == "~> 0.1.0"
+    for {app, subdir} <- @canonical_components do
+      dep = Map.fetch!(deps, app)
+
+      assert dep.path == "../execution_plane/#{subdir}",
+             "#{app} must pin the canonical component path the rest of the ecosystem uses"
+
+      assert dep.github.repo == "nshkrdotcom/execution_plane"
+      assert dep.github.subdir == subdir
+      assert dep.hex == "~> 0.1.0"
+      assert dep.default_order == [:path, :github, :hex]
+      assert dep.publish_order == [:hex]
+    end
   end
 
-  test "clean clone mode selects the root projection branch", %{repo_root: repo_root} do
-    assert [{:execution_plane, opts}] = DependencySources.deps(repo_root, publish?: false)
+  test "no component points at the generated monolith artifact" do
+    config = DependencySources.config!(@repo_root)
 
-    assert opts[:github] == "nshkrdotcom/execution_plane"
-    assert opts[:branch] == "projection/execution_plane"
-    refute Keyword.has_key?(opts, :subdir)
+    paths =
+      config
+      |> Map.fetch!(:deps)
+      |> Enum.map(fn {_app, dep} -> dep.path end)
+
+    refute Enum.any?(paths, &String.contains?(&1, "dist/monolith")),
+           "the monolith bundles all three components under the single app name " <>
+             ":execution_plane, which cannot coexist with a sibling that pins core only"
   end
 
-  test "a generated artifact in a clean fixture switches clone mode to path", %{
+  test "a clean clone falls back to the component subdirectories", %{repo_root: repo_root} do
+    deps = DependencySources.deps(repo_root, publish?: false, notify?: false)
+
+    for {app, subdir} <- @canonical_components do
+      assert {^app, opts} = List.keyfind(deps, app, 0)
+      assert opts[:github] == "nshkrdotcom/execution_plane"
+      assert opts[:subdir] == subdir
+    end
+  end
+
+  test "sibling component checkouts switch clone mode to path", %{
     repo_root: repo_root,
     tmp_root: tmp_root
   } do
-    generated_root = Path.join(tmp_root, "execution_plane/dist/monolith/execution_plane")
-    File.mkdir_p!(generated_root)
+    for {_app, subdir} <- @canonical_components do
+      File.mkdir_p!(Path.join(tmp_root, "execution_plane/#{subdir}"))
+    end
 
-    assert [{:execution_plane, opts}] = DependencySources.deps(repo_root, publish?: false)
+    deps = DependencySources.deps(repo_root, publish?: false, notify?: false)
 
-    # The settled helper normalizes a selected `:path` source to an absolute
-    # path, so a resolved sibling checkout no longer depends on the working
-    # directory Mix happens to run from.
-    assert opts[:path] == Path.join(tmp_root, "execution_plane/dist/monolith/execution_plane")
+    for {app, subdir} <- @canonical_components do
+      assert {^app, opts} = List.keyfind(deps, app, 0)
+      assert opts[:path] == Path.join(tmp_root, "execution_plane/#{subdir}")
+    end
   end
 
-  test "publish mode contains one Hex Execution dependency and no child packages" do
-    assert [{:execution_plane, "~> 0.1.0"}] =
-             DependencySources.deps(@repo_root, publish?: true)
+  test "publish mode resolves every component from Hex" do
+    deps = DependencySources.deps(@repo_root, publish?: true, notify?: false)
 
-    refute String.contains?(
-             inspect(DependencySources.deps(@repo_root, publish?: true)),
-             "jsonrpc"
-           )
+    for {app, _subdir} <- @canonical_components do
+      assert {^app, "~> 0.1.0"} = List.keyfind(deps, app, 0)
+    end
 
-    refute String.contains?(
-             inspect(DependencySources.deps(@repo_root, publish?: true)),
-             "process"
-           )
+    refute String.contains?(inspect(deps), "path:")
+    refute String.contains?(inspect(deps), "github:")
   end
 end

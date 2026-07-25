@@ -18,11 +18,10 @@ Use the local model-selection script for workflow validation:
   `build_support/dependency_sources.config.exs`. Committed default dependency
   priority is `path -> GitHub -> Hex` so local sibling checkouts resolve
   consistently across downstream workspaces while clean standalone clones fall
-  back to GitHub. Local path development uses the generated package at
-  `../execution_plane/dist/monolith/execution_plane`; clean clones use the root
-  of `projection/execution_plane`; Hex builds resolve the one
-  `execution_plane` package by version. Do not reintroduce separate JSON-RPC or
-  process child-package dependencies.
+  back to GitHub. This repo pins the three canonical Execution Plane components
+  — `core/execution_plane`, `runtimes/execution_plane_process`, and
+  `protocols/execution_plane_jsonrpc` — by path, by GitHub `subdir`, and by Hex
+  version.
 - Local dependency overrides use `.dependency_sources.local.exs`.
 - Default dependency priority is `path -> GitHub -> Hex`; publish mode is
   Hex-only and must fail with exact blockers if an internal dep is unavailable
@@ -31,9 +30,20 @@ Use the local model-selection script for workflow validation:
 - Weld owns the upstream generated artifact and durable projection branch.
   This consumer keeps its dependency-source helper thin and must not add a
   second projection mechanism.
-- Do not point `:execution_plane` at the sibling source repo root or its
-  `core/execution_plane` component. Neither contains the complete published
-  core + JSON-RPC + process package shape.
+- Do not point `:execution_plane` at the generated
+  `../execution_plane/dist/monolith/execution_plane` artifact. `mix` unifies
+  dependencies by APP NAME, and `:execution_plane` names two different
+  packages: the core-only component, and that monolith which bundles core +
+  process + JSON-RPC under the same name. Every sibling repository that
+  declares Execution Plane — `jido_integration`, `citadel`, `pristine`,
+  `llama_cpp_sdk`, `mezzanine`, `switchyard`, `reqllm_next`, `jido_hive`,
+  `self_hosted_inference_core` — pins the canonical components, so a graph
+  containing this package and any of them resolves only if this package pins
+  them too. Choosing the monolith makes `mix deps.get` refuse the combined
+  graph; and `ExecutionPlane.Process.Transport.Surface`, which
+  `execution_surface.ex` calls at compile time, then resolves against a
+  core-only package that does not contain it.
+- Do not point `:execution_plane` at the sibling source repo root.
 - Runtime application code under `lib/**` must not call direct OS env APIs such
   as `System.get_env`, `System.fetch_env`, `System.put_env`, or
   `System.delete_env`.

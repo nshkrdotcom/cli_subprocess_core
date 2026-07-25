@@ -146,7 +146,7 @@ defmodule CliSubprocessCore.MixProject do
   defp deps do
     execution_plane = execution_plane_dep()
 
-    [execution_plane] ++
+    [execution_plane, execution_plane_process_dep(), execution_plane_jsonrpc_dep()] ++
       local_ground_overrides(execution_plane) ++
       [
         {:jason, "~> 1.4"},
@@ -159,6 +159,14 @@ defmodule CliSubprocessCore.MixProject do
 
   defp execution_plane_dep do
     DependencySources.dep(:execution_plane, __DIR__)
+  end
+
+  defp execution_plane_process_dep do
+    DependencySources.dep(:execution_plane_process, __DIR__)
+  end
+
+  defp execution_plane_jsonrpc_dep do
+    DependencySources.dep(:execution_plane_jsonrpc, __DIR__)
   end
 
   # The generated Execution Plane artifact declares ordinary Hex Ground
