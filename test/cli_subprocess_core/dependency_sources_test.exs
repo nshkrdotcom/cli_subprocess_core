@@ -53,7 +53,11 @@ defmodule CliSubprocessCore.DependencySourcesTest do
     File.mkdir_p!(generated_root)
 
     assert [{:execution_plane, opts}] = DependencySources.deps(repo_root, publish?: false)
-    assert opts[:path] == "../execution_plane/dist/monolith/execution_plane"
+
+    # The settled helper normalizes a selected `:path` source to an absolute
+    # path, so a resolved sibling checkout no longer depends on the working
+    # directory Mix happens to run from.
+    assert opts[:path] == Path.join(tmp_root, "execution_plane/dist/monolith/execution_plane")
   end
 
   test "publish mode contains one Hex Execution dependency and no child packages" do
