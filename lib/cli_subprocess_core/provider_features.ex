@@ -182,6 +182,16 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "Claude/Ollama can run a direct external model id or keep canonical Claude names mapped via external_model_overrides.",
             "Claude/Ollama has no silent default model; callers must provide model intent."
           ]
+        },
+        structured_output: %{
+          supported?: true,
+          activation: %{option: :output_schema},
+          model_strategy: nil,
+          compatibility: %{wire_form: :inline_json, cli_flag: "--json-schema"},
+          notes: [
+            "The Claude CLI takes the schema as inline JSON on --json-schema.",
+            "A schema-conforming reply arrives as structured_output on the result frame and is lifted onto Payload.Result.object."
+          ]
         }
       },
       tool_capabilities:
@@ -224,6 +234,16 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "Any Ollama model that the upstream Codex CLI can start is allowed on the shared route.",
             "gpt-oss:20b remains the default validated Codex/Ollama example and default OSS bootstrap target.",
             "Non-catalog models may run with upstream fallback metadata, which can degrade behavior."
+          ]
+        },
+        structured_output: %{
+          supported?: true,
+          activation: %{option: :output_schema},
+          model_strategy: nil,
+          compatibility: %{wire_form: :file_path, cli_flag: "--output-schema"},
+          notes: [
+            "codex exec types --output-schema as a path and exits non-zero when it cannot read the file, so the schema is materialized on disk.",
+            "A schema-constrained reply arrives as the final agent message and is decoded onto Payload.Result.object."
           ]
         }
       },

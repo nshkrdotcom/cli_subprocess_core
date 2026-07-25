@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.CompletionContractTest do
   alias CliSubprocessCore.EphemeralFiles
   alias CliSubprocessCore.OutputSchemaFile
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor}
 
   @schema %{
@@ -137,6 +138,37 @@ defmodule CliSubprocessCore.CompletionContractTest do
                Codex.build_invocation(command: "codex-bin", prompt: "hi")
 
       refute "--output-schema" in command.args
+    end
+  end
+
+  describe "structured output is a declared per-provider capability (PMX-F25)" do
+    test "Claude takes the schema as inline JSON on --json-schema" do
+      assert {:ok, %Command{} = command} =
+               Claude.build_invocation(
+                 command: "claude-bin",
+                 prompt: "hi",
+                 output_schema: @schema
+               )
+
+      assert ["--json-schema", encoded] = arg_pair(command.args, "--json-schema")
+      assert Jason.decode!(encoded) == @schema
+    end
+
+    test "both CLI providers declare the capability, with their real wire form" do
+      assert {:ok, claude} = ProviderFeatures.partial_feature(:claude, :structured_output)
+      assert claude.supported?
+      assert claude.compatibility.wire_form == :inline_json
+      assert claude.compatibility.cli_flag == "--json-schema"
+
+      assert {:ok, codex} = ProviderFeatures.partial_feature(:codex, :structured_output)
+      assert codex.supported?
+      assert codex.compatibility.wire_form == :file_path
+      assert codex.compatibility.cli_flag == "--output-schema"
+    end
+
+    test "a provider with no structured-output evidence declares none" do
+      assert :error = ProviderFeatures.partial_feature(:cursor, :structured_output)
+      assert :error = ProviderFeatures.partial_feature(:amp, :structured_output)
     end
   end
 

@@ -71,6 +71,9 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
     |> Shared.maybe_add_pair("--append-system-prompt", Keyword.get(opts, :append_system_prompt))
     |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
+    # The Claude CLI takes the schema as inline JSON, unlike codex exec which
+    # types its flag as a path. The asymmetry is a provider fact, not a choice.
+    |> Shared.maybe_add_json_pair("--json-schema", Keyword.get(opts, :output_schema))
     |> Kernel.++(permission_flags(opts))
     |> Kernel.++(completion_only_flags(opts))
     |> Shared.maybe_add_flag("--thinking", Keyword.get(opts, :include_thinking, false))
