@@ -77,7 +77,9 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
     test "Codex builds the expected CLI invocation" do
       schema = %{"type" => "object", "properties" => %{"answer" => %{"type" => "string"}}}
 
-      assert {:ok, %Command{} = command} =
+      # `codex exec` types --output-schema as a path, so an invocation carrying
+      # a schema also carries the teardown that removes the file it wrote.
+      assert {:ok, %Command{} = command, teardown} =
                Codex.build_invocation(
                  command: "codex-bin",
                  prompt: "review this diff",
@@ -102,6 +104,9 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
       assert command.command == "codex-bin"
 
+      schema_path = Enum.at(command.args, 8)
+      assert Jason.decode!(File.read!(schema_path)) == schema
+
       assert command.args == [
                "exec",
                "--json",
@@ -111,12 +116,13 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
                ~s(model_reasoning_effort="high"),
                "--skip-git-repo-check",
                "--output-schema",
-               Jason.encode!(schema),
+               schema_path,
                "--dangerously-bypass-approvals-and-sandbox",
                "review this diff"
              ]
 
       assert command.cwd == "/tmp/codex"
+      assert teardown.() == :ok
     end
 
     test "Codex invocation preserves materializer-owned clear_env flag" do

@@ -287,6 +287,9 @@ defmodule CliSubprocessCore.ProviderProfiles.Cursor do
       Payload.Result.new(
         status: status,
         stop_reason: subtype(raw) || Shared.fetch_any(raw, [:status, "status"]) || :unknown,
+        # No structured-output surface is proven for this provider, so the
+        # field stays explicitly empty rather than guessed at.
+        object: nil,
         output: %{
           duration_ms: Shared.int_value(raw, [:duration_ms, "duration_ms"]),
           result: Shared.fetch_any(raw, [:result, "result"]),

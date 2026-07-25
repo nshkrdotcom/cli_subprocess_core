@@ -105,6 +105,20 @@ Common Codex options:
 - `:output_schema`
 - `:permission_mode`
 - `:provider_permission_mode`
+- `:completion_only`
+
+`:output_schema` is written to a temporary JSON file and the **path** is what
+reaches `--output-schema`. `codex exec` types that flag as a path and exits
+non-zero when it cannot read the file, so an inline schema is a hard failure.
+An invocation carrying a schema returns `{:ok, invocation, teardown}`; the
+teardown removes the file, and `CliSubprocessCore.EphemeralFiles` removes it
+anyway if the owning process dies before running it.
+
+`:completion_only` selects a completion-only invocation: Claude receives an
+empty tool set, plan permission mode, no settings sources, and strict MCP
+config; Codex receives a read-only sandbox and an `approval_policy="never"`
+config override. In both cases it replaces, rather than merges with, a
+caller-supplied permission mode.
 
 The Codex profile does not own model or backend policy.
 

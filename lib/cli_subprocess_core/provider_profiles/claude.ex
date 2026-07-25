@@ -71,8 +71,31 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
     |> Shared.maybe_add_pair("--append-system-prompt", Keyword.get(opts, :append_system_prompt))
     |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
-    |> Kernel.++(ProviderFeatures.permission_args(id(), Shared.permission_mode(opts)))
+    |> Kernel.++(permission_flags(opts))
+    |> Kernel.++(completion_only_flags(opts))
     |> Shared.maybe_add_flag("--thinking", Keyword.get(opts, :include_thinking, false))
+  end
+
+  defp permission_flags(opts) do
+    if Shared.completion_only?(opts) do
+      # Plan mode is the provider's own no-write mode. It replaces any
+      # caller-supplied mode rather than being merged with it, so a
+      # completion-only invocation cannot be widened by an option bag.
+      ProviderFeatures.permission_args(id(), :plan)
+    else
+      ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
+    end
+  end
+
+  # D-19: a completion is not a coding agent. An empty tool set, no settings
+  # sources, and strict MCP config together mean the invocation exposes no
+  # tools, no hooks, no skills, and no MCP servers.
+  defp completion_only_flags(opts) do
+    if Shared.completion_only?(opts) do
+      ["--tools", "", "--setting-sources", "", "--strict-mcp-config"]
+    else
+      []
+    end
   end
 
   defp model_value(opts) do
@@ -258,7 +281,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
               input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
               output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
             }
-          }
+          },
+          # The Claude CLI returns a schema-constrained reply on the result
+          # frame; without this it was decoded and then discarded.
+          object: Shared.fetch_any(raw, [:structured_output, "structured_output"])
         ),
         raw,
         state

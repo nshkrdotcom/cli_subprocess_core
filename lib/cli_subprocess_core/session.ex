@@ -37,7 +37,8 @@ defmodule CliSubprocessCore.Session do
             parser_state: nil,
             subscribers: %{},
             transport_pid: nil,
-            transport_ref: nil
+            transport_ref: nil,
+            teardown: nil
 
   @type subscriber_info :: %{
           monitor_ref: reference(),
@@ -53,7 +54,8 @@ defmodule CliSubprocessCore.Session do
           parser_state: term(),
           subscribers: %{optional(pid()) => subscriber_info()},
           transport_pid: pid(),
-          transport_ref: reference()
+          transport_ref: reference(),
+          teardown: CliSubprocessCore.ProviderProfile.teardown() | nil
         }
 
   @doc """
@@ -211,8 +213,11 @@ defmodule CliSubprocessCore.Session do
          {:ok, profile} <- resolve_profile(options),
          provider_profile_options = Options.provider_profile_options(options),
          transport_profile_options = profile.transport_options(provider_profile_options),
-         {:ok, invocation} <- profile.build_invocation(provider_profile_options),
-         :ok <- ProviderProfile.validate_invocation(invocation),
+         {:ok, invocation, teardown} <-
+           ProviderProfile.normalize_build_result(
+             profile.build_invocation(provider_profile_options)
+           ),
+         :ok <- validate_built_invocation(invocation, teardown),
          {:ok, transport_pid, transport_ref} <-
            start_transport(options, transport_profile_options, invocation) do
       state =
@@ -226,7 +231,8 @@ defmodule CliSubprocessCore.Session do
           parser_state: profile.init_parser_state(provider_profile_options),
           subscribers: %{},
           transport_pid: transport_pid,
-          transport_ref: transport_ref
+          transport_ref: transport_ref,
+          teardown: teardown
         }
         |> maybe_put_subscriber(options.subscriber)
 
@@ -343,7 +349,30 @@ defmodule CliSubprocessCore.Session do
       safe_close_transport(Transport, state.transport_pid)
     end
 
+    # Covers a normal stop, an error stop, an interrupt, and an explicit close.
+    # A brutally killed session never reaches here; `EphemeralFiles` monitors
+    # this process and removes the same resources then.
+    run_teardown(state)
+  end
+
+  defp run_teardown(%__MODULE__{teardown: teardown}) when is_function(teardown, 0) do
+    teardown.()
     :ok
+  end
+
+  defp run_teardown(_state), do: :ok
+
+  # A session that never starts its transport still materialized whatever the
+  # profile created for it.
+  defp validate_built_invocation(invocation, teardown) do
+    case ProviderProfile.validate_invocation(invocation) do
+      :ok ->
+        :ok
+
+      {:error, _reason} = error ->
+        teardown.()
+        error
+    end
   end
 
   defp resolve_profile(%Options{profile: profile}) when is_atom(profile) and not is_nil(profile),

@@ -26,9 +26,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
     :stderr_callback,
     :close_stdin_on_start?
   ]
+  # `transport_headless_timeout_ms` is the declared orphan-reap window. Without
+  # this alias it never reaches the transport, which then falls back to its own
+  # 30 s default — a subprocess outliving its owner by 25 s longer than the
+  # contract says it may.
   @transport_option_aliases %{
     max_stdout_buffer_bytes: :max_buffer_size,
-    max_stderr_buffer_bytes: :max_stderr_buffer_size
+    max_stderr_buffer_bytes: :max_stderr_buffer_size,
+    transport_headless_timeout_ms: :headless_timeout_ms
   }
 
   @normalized_kinds %{
@@ -215,6 +220,17 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
 
   defp payload_env_overrides?(_payload), do: false
 
+  @doc """
+  Whether the caller asked for a completion-only invocation.
+
+  A completion-only invocation exposes no tools, no MCP servers, no hooks or
+  skills, and no host-write capability. Each provider profile encodes that with
+  its own native controls; this only reads the intent.
+  """
+  @spec completion_only?(keyword()) :: boolean()
+  def completion_only?(opts) when is_list(opts),
+    do: Keyword.get(opts, :completion_only, false) == true
+
   @spec transport_options(keyword()) :: keyword()
   def transport_options(opts) when is_list(opts) do
     direct_options = Keyword.take(opts, @transport_option_keys)
@@ -374,7 +390,9 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
           Payload.Result.new(
             status: :completed,
             stop_reason: exit.reason,
-            output: %{code: exit.code, signal: exit.signal}
+            output: %{code: exit.code, signal: exit.signal},
+            # A synthetic exit result never carries a provider object.
+            object: nil
           )
 
         emit_single(:result, payload, %{exit: exit}, mark_result_emitted(state))

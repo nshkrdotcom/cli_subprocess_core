@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "catalog_version": "2026-07-06",
+  "catalog_version": "2026-07-25",
   "remote_default": "sonnet",
   "models": [
     {
@@ -56,6 +56,7 @@
     {
       "id": "opus",
       "aliases": [
+        "claude-opus-5",
         "claude-opus-4-8",
         "claude-opus-4-7"
       ],
@@ -69,7 +70,7 @@
         "max"
       ],
       "metadata": {
-        "display_name": "Opus 4.8",
+        "display_name": "Opus 5",
         "description": "Most capable Opus-tier Claude model for complex, long-horizon work.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
@@ -80,6 +81,7 @@
     {
       "id": "opus[1m]",
       "aliases": [
+        "claude-opus-5",
         "claude-opus-4-8[1m]",
         "claude-opus-4-7[1m]"
       ],
@@ -93,8 +95,8 @@
         "max"
       ],
       "metadata": {
-        "display_name": "Opus 4.8 (1M context)",
-        "description": "Opus 4.8 with 1M context.",
+        "display_name": "Opus 5 (1M context)",
+        "description": "Compatibility alias for Opus 5, which is itself a 1M-context model.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 5,

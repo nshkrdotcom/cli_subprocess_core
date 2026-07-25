@@ -106,6 +106,14 @@ Common examples:
 - `CliSubprocessCore.Payload.ApprovalRequested` and
   `CliSubprocessCore.Payload.ApprovalResolved` represent human approval flow.
 - `CliSubprocessCore.Payload.CostUpdate` carries token and cost accounting.
+- `CliSubprocessCore.Payload.Result` carries the terminal outcome. Its
+  `:object` field holds a provider-returned structured object when the run
+  requested one and the provider actually returned it, and stays `nil`
+  otherwise. Nothing reconstructs an object from prose: the Claude profile
+  reads the result frame's `structured_output`, the Codex profile decodes the
+  schema-constrained final agent message only when a schema was requested, and
+  the remaining profiles leave it explicitly empty because no structured-output
+  surface is proven for them.
 - `CliSubprocessCore.Payload.Error` uses the normalized shared severity lane:
   `:info`, `:warning`, `:error`, or terminal `:fatal`.
 - `CliSubprocessCore.Payload.Raw` retains unnormalized material when a provider

@@ -331,18 +331,27 @@ defmodule CliSubprocessCore.Payload.Result do
   alias CliSubprocessCore.Schema.Conventions
 
   use CliSubprocessCore.Payload,
-    defaults: [status: nil, stop_reason: nil, output: nil, metadata: %{}],
+    defaults: [status: nil, stop_reason: nil, output: nil, object: nil, metadata: %{}],
     schema_fields: %{
       status: Conventions.optional_any(),
       stop_reason: Conventions.optional_any(),
       output: Conventions.optional_any(),
+      object: Conventions.optional_any(),
       metadata: Conventions.metadata()
     }
 
+  @typedoc """
+  Terminal result of a provider CLI run.
+
+  `:object` carries a provider-returned structured object when the run
+  requested one and the provider actually returned it. It stays `nil`
+  otherwise; nothing here reconstructs or guesses an object from prose.
+  """
   @type t :: %__MODULE__{
           status: term(),
           stop_reason: term(),
           output: term(),
+          object: term(),
           metadata: map(),
           extra: map()
         }

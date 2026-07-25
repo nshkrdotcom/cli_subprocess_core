@@ -70,6 +70,14 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:claude, "claude-opus-4-8", allow_unknown: true)
 
       assert payload.resolved_model == "opus"
+
+      assert {:ok, %Selection{} = current} =
+               ModelRegistry.resolve(:claude, "claude-opus-5", allow_unknown: true)
+
+      # `claude-opus-5` is an alias of both `opus` and the retained `opus[1m]`
+      # compatibility choice; catalog order makes `opus` the resolved entry.
+      assert current.resolved_model == "opus"
+      refute Map.get(current.extra, "unregistered")
       refute Map.get(payload.extra, "unregistered")
     end
 

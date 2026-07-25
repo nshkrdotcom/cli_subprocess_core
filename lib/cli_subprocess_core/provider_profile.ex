@@ -17,6 +17,23 @@ defmodule CliSubprocessCore.ProviderProfile do
   @typedoc "Event decode result returned by parser callbacks."
   @type decode_result :: {[Event.t()], parser_state()}
 
+  @typedoc """
+  Releases resources an invocation needed on disk or in memory for the lifetime
+  of the run. Idempotent, bounded, and safe to call from any process.
+  """
+  @type teardown :: (-> :ok)
+
+  @typedoc """
+  What `build_invocation/1` returns.
+
+  A profile that materializes a resource for the run — a Codex output-schema
+  file is the shipped example — returns it with a teardown the run's owner is
+  responsible for calling. Owner death is covered independently by
+  `CliSubprocessCore.EphemeralFiles`.
+  """
+  @type build_result ::
+          {:ok, invocation()} | {:ok, invocation(), teardown()} | {:error, term()}
+
   @type callback_spec ::
           {:id, 0}
           | {:capabilities, 0}
@@ -29,7 +46,7 @@ defmodule CliSubprocessCore.ProviderProfile do
 
   @callback id() :: id()
   @callback capabilities() :: [atom()]
-  @callback build_invocation(keyword()) :: {:ok, invocation()} | {:error, term()}
+  @callback build_invocation(keyword()) :: build_result()
   @callback init_parser_state(keyword()) :: parser_state()
   @callback decode_stdout(binary(), parser_state()) :: decode_result()
   @callback decode_stderr(binary(), parser_state()) :: decode_result()
@@ -90,6 +107,25 @@ defmodule CliSubprocessCore.ProviderProfile do
   def validate_invocation(%Command{} = invocation) do
     Command.validate(invocation)
   end
+
+  @doc """
+  Normalizes a `build_invocation/1` return into `{invocation, teardown}`.
+
+  A profile that materializes nothing returns the two-element form, and gets a
+  no-op teardown, so every caller can use one shape.
+  """
+  @spec normalize_build_result(build_result()) ::
+          {:ok, invocation(), teardown()} | {:error, term()}
+  def normalize_build_result({:ok, %Command{} = invocation}),
+    do: {:ok, invocation, fn -> :ok end}
+
+  def normalize_build_result({:ok, %Command{} = invocation, teardown})
+      when is_function(teardown, 0),
+      do: {:ok, invocation, teardown}
+
+  def normalize_build_result({:error, _reason} = error), do: error
+
+  def normalize_build_result(other), do: {:error, {:invalid_build_invocation, other}}
 
   defp missing_callbacks(module) do
     Enum.reject(@required_callbacks, fn {name, arity} ->

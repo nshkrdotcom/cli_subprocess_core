@@ -125,10 +125,17 @@ defmodule CliSubprocessCore.Command do
   def run(opts) when is_list(opts) do
     case Options.new(opts) do
       {:ok, options} ->
-        with {:ok, invocation} <- resolve_invocation(options) do
-          invocation
-          |> do_run(options)
-          |> sanitize_governed_outcome(options.governed_authority)
+        with {:ok, invocation, teardown} <- resolve_invocation(options) do
+          # The teardown releases whatever the profile materialized for this
+          # run. It fires on a normal result, an error, and an exception alike;
+          # owner death is covered independently by `EphemeralFiles`.
+          try do
+            invocation
+            |> do_run(options)
+            |> sanitize_governed_outcome(options.governed_authority)
+          after
+            teardown.()
+          end
         end
 
       {:error, reason} ->
@@ -233,13 +240,26 @@ defmodule CliSubprocessCore.Command do
   end
 
   defp build_invocation(profile, provider_options, provider, %Options{} = options) do
-    with {:ok, invocation} <- profile.build_invocation(provider_options),
-         :ok <- ProviderProfile.validate_invocation(invocation),
-         :ok <- GovernedAuthority.enforce_invocation(invocation, options.governed_authority) do
-      {:ok, invocation}
+    with {:ok, invocation, teardown} <-
+           ProviderProfile.normalize_build_result(profile.build_invocation(provider_options)),
+         :ok <- validate_built_invocation(invocation, options, teardown) do
+      {:ok, invocation, teardown}
     else
       {:error, reason} ->
         {:error, Error.command_plan_failed(reason, %{provider: provider, profile: profile})}
+    end
+  end
+
+  # A rejected invocation still materialized whatever the profile created for
+  # it, so the teardown runs before the error propagates.
+  defp validate_built_invocation(invocation, %Options{} = options, teardown) do
+    with :ok <- ProviderProfile.validate_invocation(invocation),
+         :ok <- GovernedAuthority.enforce_invocation(invocation, options.governed_authority) do
+      :ok
+    else
+      {:error, _reason} = error ->
+        teardown.()
+        error
     end
   end
 

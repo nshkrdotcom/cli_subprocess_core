@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Payload.Result.object` carries a provider-returned structured object. The
+  Claude profile lifts `structured_output` off the result frame; the Codex
+  profile decodes the schema-constrained final agent message, and only when the
+  run actually requested a schema. A reply that is not JSON leaves the field
+  `nil` rather than manufacturing an object. Amp, Cursor, and the synthetic exit
+  result declare the field explicitly empty because no structured-output
+  surface is proven for them.
+- `CliSubprocessCore.OutputSchemaFile` and `CliSubprocessCore.EphemeralFiles`:
+  an owner-monitored lifecycle for temporary files an invocation needs on disk.
+  `ProviderProfile.build_invocation/1` may now return
+  `{:ok, invocation, teardown}`; `Command.run/1` and `Session` run that teardown
+  on a normal result, an error, an interrupt, and a close, while
+  `EphemeralFiles` removes the file when the owning process is killed
+  untrappably and never gets to run it.
+- A completion-only invocation profile (`completion_only: true`). Claude
+  receives an empty tool set, plan permission mode, no settings sources, and
+  strict MCP config; Codex receives a read-only sandbox and an
+  `approval_policy="never"` config override. Both replace, rather than merge
+  with, a caller-supplied permission mode.
+
+### Fixed
+
+- `--output-schema` now receives a **file path**. `codex exec` types the flag as
+  a path and exits non-zero when it cannot read the file, so the previous inline
+  JSON encoding was a hard failure rather than a degraded mode.
+- `transport_headless_timeout_ms` reaches the transport. Without the alias the
+  declared orphan-reap window was silently replaced by the transport's own 30 s
+  default, letting a subprocess outlive its owner by 25 s longer than the
+  contract allows.
+
+### Changed
+
+- The shared Claude catalog advertises **Opus 5**. Both `opus` and the retained
+  compatibility choice `opus[1m]` list `claude-opus-5`; Opus 5 is itself a
+  1M-context model, so no suffixed provider id is invented. Prior full ids
+  (`claude-opus-4-8`, `claude-opus-4-7`) remain resolvable, matching how the
+  Sonnet entry retains `claude-sonnet-4-6`.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added

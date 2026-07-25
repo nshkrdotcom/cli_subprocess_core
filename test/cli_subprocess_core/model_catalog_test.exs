@@ -78,7 +78,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert claude_catalog.catalog_version == "2026-07-06"
+      assert claude_catalog.catalog_version == "2026-07-25"
       assert claude_catalog.remote_default == "sonnet"
 
       assert Enum.map(claude_catalog.models, & &1.id) == [
@@ -91,6 +91,23 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                "legacy-sonnet"
              ]
 
+      assert Enum.any?(claude_catalog.models, fn model ->
+               model.id == "opus" and "claude-opus-5" in model.aliases and
+                 model.metadata["display_name"] == "Opus 5"
+             end)
+
+      # `opus[1m]` is retained only as a compatibility choice. Opus 5 is itself
+      # a 1M-context model, so there is no separate suffixed provider id.
+      assert Enum.any?(claude_catalog.models, fn model ->
+               model.id == "opus[1m]" and "claude-opus-5" in model.aliases
+             end)
+
+      refute Enum.any?(claude_catalog.models, fn model ->
+               "claude-opus-5[1m]" in model.aliases
+             end)
+
+      # Prior full ids stay resolvable, matching how the Sonnet entry retains
+      # `claude-sonnet-4-6`.
       assert Enum.any?(claude_catalog.models, fn model ->
                model.id == "opus" and "claude-opus-4-8" in model.aliases
              end)

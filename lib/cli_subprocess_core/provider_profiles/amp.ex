@@ -257,7 +257,10 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
             input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
             output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
           }
-        }
+        },
+        # No structured-output surface is proven for this provider, so the
+        # field stays explicitly empty rather than guessed at.
+        object: nil
       ),
       raw,
       state

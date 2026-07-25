@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   @behaviour CliSubprocessCore.ProviderProfile
 
+  alias CliSubprocessCore.OutputSchemaFile
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
@@ -35,13 +36,21 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   @impl true
   def build_invocation(opts) when is_list(opts) do
     with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
-         {:ok, command_spec} <- Shared.resolve_command_spec(opts, :codex, "codex") do
+         {:ok, command_spec} <- Shared.resolve_command_spec(opts, :codex, "codex"),
+         {:ok, schema_path, teardown} <-
+           OutputSchemaFile.create(Keyword.get(opts, :output_schema)) do
       args =
         @required_flags ++
-          option_flags(opts) ++
+          option_flags(opts, schema_path) ++
           [prompt]
 
-      {:ok, Shared.command(command_spec, args, opts)}
+      invocation = Shared.command(command_spec, args, opts)
+
+      if is_nil(schema_path) do
+        {:ok, invocation}
+      else
+        {:ok, invocation, teardown}
+      end
     end
   end
 
@@ -66,12 +75,15 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     |> Keyword.put(:close_stdin_on_start?, true)
   end
 
-  defp option_flags(opts) do
+  defp option_flags(opts, schema_path) do
     []
     |> Shared.maybe_add_pair("--model", model_value(opts))
     |> Shared.maybe_add_repeat("--config", config_values(opts))
     |> Shared.maybe_add_flag("--skip-git-repo-check", Keyword.get(opts, :skip_git_repo_check))
-    |> Shared.maybe_add_json_pair("--output-schema", Keyword.get(opts, :output_schema))
+    # `codex exec` types --output-schema as a path and exits non-zero when it
+    # cannot read the file, so the schema is written to disk and the path is
+    # what reaches argv. Inline JSON here is a hard failure, not a degradation.
+    |> Shared.maybe_add_pair("--output-schema", schema_path)
     |> Kernel.++(permission_flags(opts))
   end
 
@@ -133,7 +145,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       |> List.wrap()
       |> Enum.filter(&(is_binary(&1) and &1 != ""))
 
-    (local_model_provider_config_values(opts) ++
+    (completion_only_config_values(opts) ++
+       local_model_provider_config_values(opts) ++
        reasoning_config_values(opts) ++ Keyword.get(opts, :config_values, []) ++ payload_values)
     |> Enum.uniq()
   end
@@ -153,8 +166,20 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     end
   end
 
+  # D-19: a completion is not a coding agent. `codex exec` has no
+  # --ask-for-approval flag, so the never-approval posture is expressed through
+  # the config override the CLI does accept. Both replace any caller-supplied
+  # permission mode rather than merging with it.
   defp permission_flags(opts) do
-    ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
+    if Shared.completion_only?(opts) do
+      ["--sandbox", "read-only"]
+    else
+      ProviderFeatures.permission_args(id(), Shared.permission_mode(opts))
+    end
+  end
+
+  defp completion_only_config_values(opts) do
+    if Shared.completion_only?(opts), do: [~s(approval_policy="never")], else: []
   end
 
   defp decode_event(raw, state) do
@@ -221,7 +246,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
         model: Shared.fetch_any(raw, [:model, "model"])
       ),
       raw,
-      state
+      remember_final_message(state, raw)
     )
   end
 
@@ -233,7 +258,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
         model: Shared.fetch_any(item, [:model, "model"])
       ),
       raw,
-      state
+      remember_final_message(state, item)
     )
   end
 
@@ -319,11 +344,40 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
             total_tokens: Shared.int_value(usage, [:total_tokens, "total_tokens"])
           }
         },
+        object: structured_object(state),
         metadata: Shared.fetch_any(raw, [:metadata, "metadata"])
       ),
       raw,
       state
     )
+  end
+
+  # `codex exec` returns a schema-constrained reply as the final agent message,
+  # so the object is that message decoded as JSON. It is only attempted when the
+  # run actually requested a schema, and a reply that is not JSON leaves
+  # `:object` nil rather than manufacturing one.
+  defp remember_final_message(state, raw) do
+    case Shared.fetch_any(raw, [:text, "text"]) do
+      text when is_binary(text) -> Map.put(state, :codex_final_message, text)
+      _other -> state
+    end
+  end
+
+  defp structured_object(state) do
+    with true <- output_schema_requested?(state),
+         text when is_binary(text) <- Map.get(state, :codex_final_message),
+         {:ok, object} <- Jason.decode(text) do
+      object
+    else
+      _other -> nil
+    end
+  end
+
+  defp output_schema_requested?(state) do
+    state
+    |> Map.get(:options, %{})
+    |> Map.get(:output_schema)
+    |> then(&(not is_nil(&1)))
   end
 
   defp error_event(raw, state) do

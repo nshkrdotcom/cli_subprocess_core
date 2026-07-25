@@ -9,6 +9,7 @@ defmodule CliSubprocessCore.Application do
   def start(_type, _args) do
     children = [
       {Task.Supervisor, name: CliSubprocessCore.TaskSupervisor},
+      CliSubprocessCore.EphemeralFiles,
       {CliSubprocessCore.ProviderRegistry,
        name: CliSubprocessCore.ProviderRegistry,
        profile_modules: CliSubprocessCore.built_in_profile_modules()}
