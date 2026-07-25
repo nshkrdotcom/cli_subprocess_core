@@ -32,6 +32,9 @@ defmodule CliSubprocessCore.Command.Options do
     :observability,
     :governed_authority
   ]
+  # Caller-supplied option keys that must never reach a governed launch. This is
+  # a denylist of key NAMES; no value for any of them is ever stored on this
+  # struct, so there is nothing here for `Inspect` to redact.
   @governed_smuggling_keys [
     :command,
     :executable,
@@ -51,16 +54,20 @@ defmodule CliSubprocessCore.Command.Options do
     :config_values,
     :provider_runtime_profile_ref,
     :access_token,
+    # secret-safe: denied key name, never a stored value
     :api_key,
+    # secret-safe: denied key name, never a stored value
     :auth_token,
     :authorization,
     :bearer_token,
     :client_secret,
+    # secret-safe: denied key name, never a stored value
     :credential,
     :credential_material,
     :headers,
     :home,
     :http_headers,
+    # secret-safe: denied key name, never a stored value
     :password,
     :private_key,
     :proxy,
@@ -69,7 +76,9 @@ defmodule CliSubprocessCore.Command.Options do
     :refresh_token,
     :route,
     :routing,
+    # secret-safe: denied key name, never a stored value
     :secret,
+    # secret-safe: denied key name, never a stored value
     :token,
     :url
   ]

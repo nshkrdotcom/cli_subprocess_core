@@ -133,12 +133,10 @@ defmodule CliSubprocessCore.GovernedSecurity do
     Enum.find_value(value, fn {key, nested} ->
       normalized = normalize_key(key)
 
-      cond do
-        supplementation_key?(normalized) ->
-          Enum.reverse([normalized | path])
-
-        true ->
-          do_find_supplementation(nested, [normalized | path])
+      if supplementation_key?(normalized) do
+        Enum.reverse([normalized | path])
+      else
+        do_find_supplementation(nested, [normalized | path])
       end
     end)
   end

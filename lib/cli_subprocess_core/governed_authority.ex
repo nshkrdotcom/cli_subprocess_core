@@ -182,7 +182,8 @@ defmodule CliSubprocessCore.GovernedAuthority do
   end
 
   @doc false
-  @spec reject_supplementation(term()) :: :ok | {:error, {:governed_launch_smuggling, term()}}
+  @spec reject_supplementation(term()) ::
+          :ok | {:error, {:governed_launch_smuggling, {:supplemental_material, [term()]}}}
   def reject_supplementation(value) do
     case CliSubprocessCore.GovernedSecurity.find_supplementation(value) do
       nil -> :ok

@@ -77,12 +77,12 @@ defmodule CliSubprocessCore.RuntimeGateway.Support do
 
   defp safe_scalar?(_value), do: true
 
+  # Both call sites are already guarded by `is_binary/1`, so there is no
+  # non-binary clause to write.
   defp absolute_path?(value) when is_binary(value) do
     String.starts_with?(value, ["/", "~/"]) or
       String.match?(value, ~r/\A[A-Za-z]:[\\\/]/)
   end
-
-  defp absolute_path?(_value), do: false
 end
 
 defmodule CliSubprocessCore.RuntimeGateway.Error do
@@ -112,11 +112,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Error do
       evidence_ref: S.value(attrs, :evidence_ref)
     }
 
-    if S.known_fields?(attrs, @fields) and S.safe_input?(attrs) and
-         error.category in @categories and S.reason_code?(error.reason_code) and
-         is_boolean(error.retryable) and is_boolean(error.ambiguous) and
-         optional_ref?(error.evidence_ref) and
-         error.ambiguous == (error.category == "ambiguous") do
+    if valid?(attrs, error) do
       {:ok, error}
     else
       {:error, :invalid_runtime_gateway_error}
@@ -124,6 +120,19 @@ defmodule CliSubprocessCore.RuntimeGateway.Error do
   end
 
   def new(_attrs), do: {:error, :invalid_runtime_gateway_error}
+
+  defp valid?(attrs, error) do
+    Enum.all?([
+      S.known_fields?(attrs, @fields),
+      S.safe_input?(attrs),
+      error.category in @categories,
+      S.reason_code?(error.reason_code),
+      is_boolean(error.retryable),
+      is_boolean(error.ambiguous),
+      optional_ref?(error.evidence_ref),
+      error.ambiguous == (error.category == "ambiguous")
+    ])
+  end
 
   defp optional_ref?(nil), do: true
   defp optional_ref?(value), do: S.ref?(value)
@@ -183,10 +192,7 @@ defmodule CliSubprocessCore.RuntimeGateway.StartRequest do
       request.operation_ref
     ]
 
-    if S.known_fields?(attrs, @fields) and S.safe_input?(attrs) and
-         request.contract_version == 1 and Enum.all?(refs, &S.ref?/1) and
-         S.positive_integer?(request.generation) and S.digest?(request.command_digest) and
-         is_struct(request.deadline_at, DateTime) and S.non_negative_integer?(request.fence) do
+    if valid?(attrs, request, refs) do
       {:ok, request}
     else
       {:error, :invalid_runtime_gateway_start_request}
@@ -194,6 +200,19 @@ defmodule CliSubprocessCore.RuntimeGateway.StartRequest do
   end
 
   def new(_attrs), do: {:error, :invalid_runtime_gateway_start_request}
+
+  defp valid?(attrs, request, refs) do
+    Enum.all?([
+      S.known_fields?(attrs, @fields),
+      S.safe_input?(attrs),
+      request.contract_version == 1,
+      Enum.all?(refs, &S.ref?/1),
+      S.positive_integer?(request.generation),
+      S.digest?(request.command_digest),
+      is_struct(request.deadline_at, DateTime),
+      S.non_negative_integer?(request.fence)
+    ])
+  end
 
   def new!(attrs) do
     case new(attrs) do
@@ -229,10 +248,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Session do
       fence: S.value(attrs, :fence)
     }
 
-    if S.known_fields?(attrs, @fields) and S.safe_input?(attrs) and
-         session.contract_version == 1 and S.ref?(session.session_ref) and
-         S.positive_integer?(session.generation) and S.ref?(session.execution_ref) and
-         session.state in @states and S.non_negative_integer?(session.fence) do
+    if valid?(attrs, session) do
       {:ok, session}
     else
       {:error, :invalid_runtime_gateway_session}
@@ -240,6 +256,19 @@ defmodule CliSubprocessCore.RuntimeGateway.Session do
   end
 
   def new(_attrs), do: {:error, :invalid_runtime_gateway_session}
+
+  defp valid?(attrs, session) do
+    Enum.all?([
+      S.known_fields?(attrs, @fields),
+      S.safe_input?(attrs),
+      session.contract_version == 1,
+      S.ref?(session.session_ref),
+      S.positive_integer?(session.generation),
+      S.ref?(session.execution_ref),
+      session.state in @states,
+      S.non_negative_integer?(session.fence)
+    ])
+  end
 
   def new!(attrs) do
     case new(attrs) do
@@ -297,12 +326,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Status do
 
     terminal_coherent? = terminal_coherent?(status, terminal?)
 
-    if Support.known_fields?(attrs, @fields) and Support.safe_input?(attrs) and
-         Support.ref?(status.session_ref) and Support.positive_integer?(status.generation) and
-         status.state in Session.states() and Support.non_negative_integer?(status.sequence) and
-         is_boolean(status.input_open) and is_boolean(status.output_open) and
-         optional_ref?(status.receipt_ref) and optional_ref?(status.error_ref) and
-         optional_exit_status?(status.exit_status) and terminal_coherent? do
+    if valid?(attrs, status, terminal_coherent?) do
       {:ok, status}
     else
       {:error, :invalid_runtime_gateway_status}
@@ -310,6 +334,23 @@ defmodule CliSubprocessCore.RuntimeGateway.Status do
   end
 
   def new(_attrs), do: {:error, :invalid_runtime_gateway_status}
+
+  defp valid?(attrs, status, terminal_coherent?) do
+    Enum.all?([
+      Support.known_fields?(attrs, @fields),
+      Support.safe_input?(attrs),
+      Support.ref?(status.session_ref),
+      Support.positive_integer?(status.generation),
+      status.state in Session.states(),
+      Support.non_negative_integer?(status.sequence),
+      is_boolean(status.input_open),
+      is_boolean(status.output_open),
+      optional_ref?(status.receipt_ref),
+      optional_ref?(status.error_ref),
+      optional_exit_status?(status.exit_status),
+      terminal_coherent?
+    ])
+  end
 
   defp optional_ref?(nil), do: true
   defp optional_ref?(value), do: Support.ref?(value)
