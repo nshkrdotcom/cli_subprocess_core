@@ -169,8 +169,8 @@ defmodule CliSubprocessCore.MixProject do
     DependencySources.dep(:execution_plane_jsonrpc, __DIR__)
   end
 
-  # The generated Execution Plane artifact declares ordinary Hex Ground
-  # dependencies. Until those parents are published, local and projection
+  # The Execution Plane core package declares ordinary Hex Ground
+  # dependencies. Until those parents are published, local and source
   # consumers override them at the top level. Hex mode omits these entries, so
   # they never enter the published CLI package dependency surface.
   defp local_ground_overrides({:execution_plane, opts}) when is_list(opts) do

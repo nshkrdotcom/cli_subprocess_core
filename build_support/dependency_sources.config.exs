@@ -7,7 +7,7 @@
         branch: "main",
         subdir: "core/execution_plane"
       },
-      hex: "~> 0.1.0",
+      hex: "~> 0.2.0",
       default_order: [:path, :github, :hex],
       publish_order: [:hex]
     },

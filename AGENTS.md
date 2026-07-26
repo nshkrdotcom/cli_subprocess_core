@@ -27,22 +27,22 @@ Use the local model-selection script for workflow validation:
   Hex-only and must fail with exact blockers if an internal dep is unavailable
   on Hex.
 - Dependency source selection must not use environment variables.
-- Weld owns the upstream generated artifact and durable projection branch.
-  This consumer keeps its dependency-source helper thin and must not add a
-  second projection mechanism.
-- Do not point `:execution_plane` at the generated
-  `../execution_plane/dist/monolith/execution_plane` artifact. `mix` unifies
-  dependencies by APP NAME, and `:execution_plane` names two different
-  packages: the core-only component, and that monolith which bundles core +
-  process + JSON-RPC under the same name. Every sibling repository that
-  declares Execution Plane — `jido_integration`, `citadel`, `pristine`,
-  `llama_cpp_sdk`, `mezzanine`, `switchyard`, `reqllm_next`, `jido_hive`,
-  `self_hosted_inference_core` — pins the canonical components, so a graph
-  containing this package and any of them resolves only if this package pins
-  them too. Choosing the monolith makes `mix deps.get` refuse the combined
-  graph; and `ExecutionPlane.Process.Transport.Surface`, which
-  `execution_surface.ex` calls at compile time, then resolves against a
-  core-only package that does not contain it.
+- Weld reproduces only the historical `execution_plane 0.1.0` monolith; it is
+  not the publication source for 0.2.0 or later. The current public topology is
+  core-only `execution_plane` plus the independently published process and
+  JSON-RPC components.
+- Do not point `:execution_plane` at
+  `../execution_plane/dist/monolith/execution_plane`. That historical 0.1.0
+  package bundles process and JSON-RPC modules under the `:execution_plane`
+  app and cannot coexist cleanly with the separate components. Every sibling
+  repository that declares Execution Plane — `jido_integration`, `citadel`,
+  `pristine`, `llama_cpp_sdk`, `mezzanine`, `switchyard`, `reqllm_next`,
+  `jido_hive`, `self_hosted_inference_core` — pins the canonical core,
+  process, and JSON-RPC package graph.
+- Hex publication order is core `execution_plane 0.2.0`, then process and
+  JSON-RPC `0.1.0`, then `cli_subprocess_core 0.3.0`. After the core lands,
+  refresh locks and prove the two components from clean standalone,
+  Hex-resolved checkouts before publishing this package.
 - Do not point `:execution_plane` at the sibling source repo root.
 - Runtime application code under `lib/**` must not call direct OS env APIs such
   as `System.get_env`, `System.fetch_env`, `System.put_env`, or

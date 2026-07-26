@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Publish preflight now requires the exact sibling version developed against
+  to exist on Hex. An older package release can no longer mask a missing
+  current release, as the historical `execution_plane 0.1.0` monolith did for
+  the core-only `execution_plane 0.2.0`. Nested package tasks resolve the
+  helper-owning repository, and a manifest self-entry is not treated as a
+  circular prerequisite.
 - `--output-schema` now receives a **file path**. `codex exec` types the flag as
   a path and exits non-zero when it cannot read the file, so the previous inline
   JSON encoding was a hard failure rather than a degraded mode.
@@ -47,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Require the core-only `execution_plane ~> 0.2.0`; the historical 0.1.0 Hex
+  package bundled the same process and JSON-RPC modules now supplied by the
+  canonical component dependencies.
 - Refreshed the `zoi` lock from 0.18.5 to 0.18.7.
 - The shared Claude catalog advertises **Opus 5**. Both `opus` and the retained
   compatibility choice `opus[1m]` list `claude-opus-5`; Opus 5 is itself a

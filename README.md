@@ -57,7 +57,8 @@ The shared model catalog (`priv/models/*.json`) ships from this package.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. The release order is the three Execution Plane packages, then
+Hex consumers. The release order is core-only `execution_plane 0.2.0`, then
+`execution_plane_process 0.1.0` and `execution_plane_jsonrpc 0.1.0`, then
 `cli_subprocess_core`, then the provider/ASM consumers, so every published
 version sees both its lower runtime and the current catalog. Consumers
 switching between `:path` and `:github`/`:hex`
@@ -71,8 +72,11 @@ isolated builds.
 
 For the covered runtime slice:
 
-- `execution_plane` owns execution-surface validation, capability lookup,
-  lower transport dispatch, and the local/non-local raw process substrate
+- `execution_plane` owns shared execution contracts, execution-surface
+  validation, capability vocabulary, and placement descriptors
+- `execution_plane_process` owns lower transport dispatch and the
+  local/non-local raw process substrate
+- `execution_plane_jsonrpc` owns JSON-RPC framing and correlation
 - `cli_subprocess_core` owns provider planning, normalized command/session
   APIs, and event projection above that lower owner
 

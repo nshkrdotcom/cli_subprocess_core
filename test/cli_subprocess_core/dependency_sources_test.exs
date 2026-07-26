@@ -6,16 +6,21 @@ defmodule CliSubprocessCore.DependencySourcesTest do
 
   # The ecosystem convention, and the reason it is not negotiable here: `mix`
   # unifies dependencies by APP NAME, and `:execution_plane` names two
-  # different packages — `core/execution_plane` (core only) and the generated
-  # `dist/monolith/execution_plane` (core + process + jsonrpc). Every sibling
-  # repository that declares Execution Plane pins the canonical component
-  # paths, so a graph containing this package and any of them can only resolve
-  # if this package pins them too. Pointing `:execution_plane` at the monolith
-  # makes `mix deps.get` refuse the combined graph outright.
+  # different release shapes — `core/execution_plane` (core only) and the
+  # historical `execution_plane 0.1.0` monolith (core + process + jsonrpc).
+  # Every sibling repository that declares Execution Plane pins the canonical
+  # component paths, so a graph containing this package and any of them can
+  # resolve only if this package pins them too. Pointing `:execution_plane` at
+  # the historical monolith creates duplicate process and JSON-RPC modules.
   @canonical_components %{
     execution_plane: "core/execution_plane",
     execution_plane_process: "runtimes/execution_plane_process",
     execution_plane_jsonrpc: "protocols/execution_plane_jsonrpc"
+  }
+  @hex_requirements %{
+    execution_plane: "~> 0.2.0",
+    execution_plane_process: "~> 0.1.0",
+    execution_plane_jsonrpc: "~> 0.1.0"
   }
 
   setup do
@@ -48,13 +53,13 @@ defmodule CliSubprocessCore.DependencySourcesTest do
 
       assert dep.github.repo == "nshkrdotcom/execution_plane"
       assert dep.github.subdir == subdir
-      assert dep.hex == "~> 0.1.0"
+      assert dep.hex == Map.fetch!(@hex_requirements, app)
       assert dep.default_order == [:path, :github, :hex]
       assert dep.publish_order == [:hex]
     end
   end
 
-  test "no component points at the generated monolith artifact" do
+  test "no component points at the historical monolith artifact" do
     config = DependencySources.config!(@repo_root)
 
     paths =
@@ -96,8 +101,8 @@ defmodule CliSubprocessCore.DependencySourcesTest do
   test "publish mode resolves every component from Hex" do
     deps = DependencySources.deps(@repo_root, publish?: true, notify?: false)
 
-    for {app, _subdir} <- @canonical_components do
-      assert {^app, "~> 0.1.0"} = List.keyfind(deps, app, 0)
+    for {app, requirement} <- @hex_requirements do
+      assert {^app, ^requirement} = List.keyfind(deps, app, 0)
     end
 
     refute String.contains?(inspect(deps), "path:")
