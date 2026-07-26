@@ -5,7 +5,7 @@ end
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -35,7 +35,7 @@ defmodule CliSubprocessCore.MixProject do
   defp docs do
     [
       main: "overview",
-      source_ref: "v0.2.0",
+      source_ref: "v#{@version}",
       homepage_url: @homepage_url,
       assets: %{"assets" => "assets"},
       logo: "assets/cli_subprocess_core.svg",

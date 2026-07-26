@@ -19,16 +19,16 @@ shaping, model policy helpers, and the built-in first-party profiles for
 Claude, Codex, Cursor, Amp, and Antigravity.
 
 The covered one-shot local process lane and the local session-bearing process
-lane run on the single `execution_plane` package. `cli_subprocess_core` keeps one public
+lane compose the canonical `execution_plane`, `execution_plane_process`, and
+`execution_plane_jsonrpc` packages. `cli_subprocess_core` keeps one public
 placement seam, `execution_surface`, while the shared lower substrate for
-local and non-local runtime execution now lives in `execution_plane`.
+local and non-local runtime execution lives in those lower owners.
 
 Downstream provider SDKs get this default local CLI execution path by depending
 on `cli_subprocess_core`; they do not need to declare Execution Plane packages
-manually for ordinary subprocess use. The separate
-`execution_plane_jsonrpc` and `execution_plane_process` source components are
-not public dependencies: core, JSON-RPC, and process runtime modules ship in
-the one generated `execution_plane` package.
+manually for ordinary subprocess use. `cli_subprocess_core` declares the three
+canonical lower packages itself, and Hex publication follows that dependency
+order.
 
 For downstream packages that still type against the historical module name,
 `CliSubprocessCore.ExecutionSurface` remains available as a compatibility
@@ -57,7 +57,7 @@ The shared model catalog (`priv/models/*.json`) ships from this package.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-hex consumers. The release order is `execution_plane`, then
+Hex consumers. The release order is the three Execution Plane packages, then
 `cli_subprocess_core`, then the provider/ASM consumers, so every published
 version sees both its lower runtime and the current catalog. Consumers
 switching between `:path` and `:github`/`:hex`
@@ -81,7 +81,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.2.0"}
+    {:cli_subprocess_core, "~> 0.3.0"}
   ]
 end
 ```

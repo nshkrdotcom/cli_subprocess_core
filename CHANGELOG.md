@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-25
+
 ### Added
 
 - `Payload.Result.object` carries a provider-returned structured object. The
@@ -25,9 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   untrappably and never gets to run it.
 - A completion-only invocation profile (`completion_only: true`). Claude
   receives an empty tool set, plan permission mode, no settings sources, and
-  strict MCP config; Codex receives a read-only sandbox and an
+  strict MCP config. Codex receives a read-only sandbox, ephemeral operation,
+  no user config or rules, disabled web search and skills, and an
   `approval_policy="never"` config override. Both replace, rather than merge
-  with, a caller-supplied permission mode.
+  with, caller-supplied permission state.
 
 ### Fixed
 
@@ -38,9 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared orphan-reap window was silently replaced by the transport's own 30 s
   default, letting a subprocess outlive its owner by 25 s longer than the
   contract allows.
+- Output-schema files use an OS-process-qualified, exclusive 0600 namespace,
+  reject cross-owner tracking collisions, and are proven to disappear through
+  every public command/session terminal path.
 
 ### Changed
 
+- Refreshed the `zoi` lock from 0.18.5 to 0.18.7.
 - The shared Claude catalog advertises **Opus 5**. Both `opus` and the retained
   compatibility choice `opus[1m]` list `claude-opus-5`; Opus 5 is itself a
   1M-context model, so no suffixed provider id is invented. Prior full ids

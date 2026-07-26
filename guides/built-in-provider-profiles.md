@@ -116,9 +116,12 @@ anyway if the owning process dies before running it.
 
 `:completion_only` selects a completion-only invocation: Claude receives an
 empty tool set, plan permission mode, no settings sources, and strict MCP
-config; Codex receives a read-only sandbox and an `approval_policy="never"`
-config override. In both cases it replaces, rather than merges with, a
-caller-supplied permission mode.
+config. Codex receives a read-only sandbox, ephemeral operation, no user
+config or rules, disabled web search and skills, and an
+`approval_policy="never"` override. Caller/payload config overrides are
+discarded in this mode, so they cannot re-enable an MCP server or another
+agent surface. In both cases the completion posture replaces, rather than
+merges with, caller-supplied authority.
 
 The Codex profile does not own model or backend policy.
 

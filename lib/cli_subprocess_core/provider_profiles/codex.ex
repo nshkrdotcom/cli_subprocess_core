@@ -84,6 +84,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     # cannot read the file, so the schema is written to disk and the path is
     # what reaches argv. Inline JSON here is a hard failure, not a degradation.
     |> Shared.maybe_add_pair("--output-schema", schema_path)
+    |> Kernel.++(completion_only_runtime_flags(opts))
     |> Kernel.++(permission_flags(opts))
   end
 
@@ -145,9 +146,15 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       |> List.wrap()
       |> Enum.filter(&(is_binary(&1) and &1 != ""))
 
+    caller_values =
+      if Shared.completion_only?(opts) do
+        []
+      else
+        Keyword.get(opts, :config_values, []) ++ payload_values
+      end
+
     (completion_only_config_values(opts) ++
-       local_model_provider_config_values(opts) ++
-       reasoning_config_values(opts) ++ Keyword.get(opts, :config_values, []) ++ payload_values)
+       local_model_provider_config_values(opts) ++ reasoning_config_values(opts) ++ caller_values)
     |> Enum.uniq()
   end
 
@@ -166,10 +173,23 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     end
   end
 
-  # D-19: a completion is not a coding agent. `codex exec` has no
-  # --ask-for-approval flag, so the never-approval posture is expressed through
-  # the config override the CLI does accept. Both replace any caller-supplied
-  # permission mode rather than merging with it.
+  # D-19: a completion is not a coding agent. Suppress persisted sessions,
+  # user/project trust configuration, and executable policy rules before
+  # applying the read-only sandbox. Ignoring user config preserves CODEX_HOME
+  # authentication while removing its configured MCP servers and hooks; without
+  # the user's project-trust entries, project-local config and hooks remain
+  # disabled too.
+  defp completion_only_runtime_flags(opts) do
+    if Shared.completion_only?(opts) do
+      ["--ephemeral", "--ignore-user-config", "--ignore-rules"]
+    else
+      []
+    end
+  end
+
+  # `codex exec` has no --ask-for-approval flag, so the never-approval posture
+  # is expressed through the config override the CLI does accept. Both replace
+  # any caller-supplied permission mode rather than merging with it.
   defp permission_flags(opts) do
     if Shared.completion_only?(opts) do
       ["--sandbox", "read-only"]
@@ -179,7 +199,16 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   end
 
   defp completion_only_config_values(opts) do
-    if Shared.completion_only?(opts), do: [~s(approval_policy="never")], else: []
+    if Shared.completion_only?(opts) do
+      [
+        ~s(approval_policy="never"),
+        ~s(web_search="disabled"),
+        "skills.include_instructions=false",
+        "skills.bundled.enabled=false"
+      ]
+    else
+      []
+    end
   end
 
   defp decode_event(raw, state) do

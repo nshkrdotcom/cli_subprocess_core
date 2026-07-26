@@ -1,5 +1,5 @@
 defmodule CliSubprocessCore.CompletionContractTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.EphemeralFiles
@@ -7,6 +7,7 @@ defmodule CliSubprocessCore.CompletionContractTest do
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor}
+  alias CliSubprocessCore.Session
 
   @schema %{
     "type" => "object",
@@ -173,6 +174,14 @@ defmodule CliSubprocessCore.CompletionContractTest do
   end
 
   describe "the schema file has an owner that outlives a brutal kill (D-17)" do
+    test "the file name is namespaced across BEAM VMs and is owner-only" do
+      assert {:ok, path, teardown} = OutputSchemaFile.create(@schema)
+      assert Path.basename(path) =~ "_#{System.pid()}_"
+      assert {:ok, stat} = File.stat(path)
+      assert Bitwise.band(stat.mode, 0o777) == 0o600
+      assert teardown.() == :ok
+    end
+
     test "the file is removed when its owner dies without running teardown" do
       parent = self()
 
@@ -206,6 +215,68 @@ defmodule CliSubprocessCore.CompletionContractTest do
       refute EphemeralFiles.tracked?(path)
       assert teardown.() == :ok
     end
+
+    test "the tracker rejects a path already owned by another process" do
+      tracker = :"ephemeral_files_#{System.unique_integer([:positive])}"
+      start_supervised!({EphemeralFiles, name: tracker})
+
+      owner =
+        spawn(fn ->
+          receive do
+            :stop -> :ok
+          end
+        end)
+
+      path =
+        Path.join(
+          System.tmp_dir!(),
+          "ephemeral_files_duplicate_#{System.unique_integer([:positive])}"
+        )
+
+      assert :ok = EphemeralFiles.track(path, owner, tracker)
+      assert {:error, :path_already_tracked} = EphemeralFiles.track(path, self(), tracker)
+
+      send(owner, :stop)
+    end
+
+    test "the command API removes schema files after success and transport error" do
+      success = create_test_script("exit 0")
+
+      assert {:ok, result} =
+               Command.run(
+                 provider: :codex,
+                 command: success,
+                 prompt: "hi",
+                 output_schema: @schema
+               )
+
+      success_path = output_schema_path(result.invocation.args)
+      refute File.exists?(success_path)
+      refute EphemeralFiles.tracked?(success_path)
+
+      missing_cwd = temp_path!("missing_cwd")
+
+      assert {:error, error} =
+               Command.run(
+                 provider: :codex,
+                 command: success,
+                 cwd: missing_cwd,
+                 prompt: "hi",
+                 output_schema: @schema
+               )
+
+      failure_path = output_schema_path(error.context.invocation.args)
+      refute File.exists?(failure_path)
+      refute EphemeralFiles.tracked?(failure_path)
+    end
+
+    test "the session API removes schema files on result, error, interrupt, close, and kill" do
+      assert_session_schema_cleanup(:result)
+      assert_session_schema_cleanup(:error)
+      assert_session_schema_cleanup(:interrupt)
+      assert_session_schema_cleanup(:close)
+      assert_session_schema_cleanup(:kill)
+    end
   end
 
   describe "completion-only invocation (D-19)" do
@@ -237,7 +308,7 @@ defmodule CliSubprocessCore.CompletionContractTest do
       refute "bypassPermissions" in command.args
     end
 
-    test "Codex receives a read-only sandbox and never approvals" do
+    test "Codex receives an isolated read-only, tool-free configuration" do
       assert {:ok, %Command{} = command} =
                Codex.build_invocation(
                  command: "codex-bin",
@@ -246,7 +317,13 @@ defmodule CliSubprocessCore.CompletionContractTest do
                )
 
       assert ["--sandbox", "read-only"] == arg_pair(command.args, "--sandbox")
+      assert "--ephemeral" in command.args
+      assert "--ignore-user-config" in command.args
+      assert "--ignore-rules" in command.args
       assert ~s(approval_policy="never") in command.args
+      assert ~s(web_search="disabled") in command.args
+      assert "skills.include_instructions=false" in command.args
+      assert "skills.bundled.enabled=false" in command.args
       refute "--full-auto" in command.args
       refute "--dangerously-bypass-approvals-and-sandbox" in command.args
     end
@@ -261,7 +338,41 @@ defmodule CliSubprocessCore.CompletionContractTest do
                )
 
       assert ["--sandbox", "read-only"] == arg_pair(command.args, "--sandbox")
+      assert "--ephemeral" in command.args
+      assert "--ignore-user-config" in command.args
+      assert "--ignore-rules" in command.args
       refute "--dangerously-bypass-approvals-and-sandbox" in command.args
+    end
+
+    test "Codex completion-only discards caller and payload config overrides" do
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 command: "codex-bin",
+                 prompt: "return an object",
+                 completion_only: true,
+                 config_values: [
+                   ~s(approval_policy="on-request"),
+                   ~s(web_search="live"),
+                   "skills.include_instructions=true",
+                   "mcp_servers.host.command=\"unsafe\""
+                 ],
+                 backend_payload: %{
+                   "config_values" => [
+                     "skills.bundled.enabled=true",
+                     "mcp_servers.payload.command=\"unsafe\""
+                   ]
+                 }
+               )
+
+      config_values = repeated_values(command.args, "--config")
+
+      assert ~s(approval_policy="never") in config_values
+      assert ~s(web_search="disabled") in config_values
+      assert "skills.include_instructions=false" in config_values
+      assert "skills.bundled.enabled=false" in config_values
+      refute Enum.any?(config_values, &String.contains?(&1, "unsafe"))
+      refute ~s(approval_policy="on-request") in config_values
+      refute ~s(web_search="live") in config_values
     end
 
     test "ordinary invocations are unchanged" do
@@ -303,6 +414,101 @@ defmodule CliSubprocessCore.CompletionContractTest do
       nil -> nil
       index -> Enum.slice(args, index, 2)
     end
+  end
+
+  defp repeated_values(args, flag) do
+    args
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.flat_map(fn
+      [^flag, value] -> [value]
+      _other -> []
+    end)
+  end
+
+  defp assert_session_schema_cleanup(terminal_path) do
+    gate = temp_path!("schema_cleanup_gate")
+    ready = temp_path!("schema_cleanup_ready")
+
+    terminal_command =
+      case terminal_path do
+        :result -> ~s(printf '{"type":"turn.completed"}\\n')
+        :error -> "exit 23"
+        path when path in [:interrupt, :close, :kill] -> "sleep 60"
+      end
+
+    script =
+      create_test_script("""
+      touch "#{ready}"
+      while [ ! -f "#{gate}" ]; do sleep 0.01; done
+      #{terminal_command}
+      """)
+
+    assert {:ok, session, info} =
+             Session.start_session(
+               provider: :codex,
+               command: script,
+               prompt: "hi",
+               output_schema: @schema
+             )
+
+    path = output_schema_path(info.invocation.args)
+    assert File.regular?(path)
+    assert EphemeralFiles.tracked?(path)
+    assert eventually(fn -> File.exists?(ready) end, 1_000)
+
+    monitor = Process.monitor(session)
+
+    case terminal_path do
+      path when path in [:result, :error] ->
+        File.write!(gate, "go")
+
+      :interrupt ->
+        File.write!(gate, "go")
+        assert :ok = Session.interrupt(session)
+
+      :close ->
+        assert :ok = Session.close(session)
+
+      :kill ->
+        Process.exit(session, :kill)
+    end
+
+    expected_reason = if terminal_path == :kill, do: :killed, else: :normal
+    assert_receive {:DOWN, ^monitor, :process, ^session, ^expected_reason}, 10_000
+    assert eventually(fn -> not File.exists?(path) end)
+    refute EphemeralFiles.tracked?(path)
+  end
+
+  defp output_schema_path(args) do
+    args
+    |> arg_pair("--output-schema")
+    |> List.last()
+  end
+
+  defp create_test_script(body) do
+    dir = temp_path!("completion_contract")
+    File.mkdir_p!(dir)
+    path = Path.join(dir, "fixture.sh")
+
+    File.write!(path, """
+    #!/usr/bin/env bash
+    set -euo pipefail
+    #{body}
+    """)
+
+    File.chmod!(path, 0o755)
+    path
+  end
+
+  defp temp_path!(name) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "#{name}_#{System.pid()}_#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    on_exit(fn -> File.rm_rf!(path) end)
+    path
   end
 
   defp eventually(fun, attempts \\ 50) do

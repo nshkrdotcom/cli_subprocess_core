@@ -51,12 +51,25 @@ defmodule CliSubprocessCore.OutputSchemaFile do
     path =
       Path.join(
         System.tmp_dir!(),
-        @prefix <> "_" <> Integer.to_string(System.unique_integer([:positive])) <> ".json"
+        Enum.join(
+          [@prefix, System.pid(), System.unique_integer([:positive, :monotonic])],
+          "_"
+        ) <> ".json"
       )
 
-    case File.write(path, encoded) do
-      :ok -> {:ok, path}
-      {:error, reason} -> {:error, {:output_schema_write_failed, reason}}
+    case File.write(path, encoded, [:exclusive]) do
+      :ok ->
+        case File.chmod(path, 0o600) do
+          :ok ->
+            {:ok, path}
+
+          {:error, reason} ->
+            _ = File.rm(path)
+            {:error, {:output_schema_write_failed, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:output_schema_write_failed, reason}}
     end
   end
 

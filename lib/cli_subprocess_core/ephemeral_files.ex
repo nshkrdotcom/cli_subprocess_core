@@ -32,7 +32,8 @@ defmodule CliSubprocessCore.EphemeralFiles do
   Tracks `path` on behalf of `owner`. When `owner` exits for any reason the
   file is removed.
   """
-  @spec track(path(), pid(), GenServer.server()) :: :ok | {:error, :tracker_unavailable}
+  @spec track(path(), pid(), GenServer.server()) ::
+          :ok | {:error, :path_already_tracked | :tracker_unavailable}
   def track(path, owner \\ self(), server \\ __MODULE__)
       when is_binary(path) and is_pid(owner) do
     GenServer.call(server, {:track, path, owner})
@@ -67,7 +68,16 @@ defmodule CliSubprocessCore.EphemeralFiles do
 
   @impl GenServer
   def handle_call({:track, path, owner}, _from, state) do
-    {:reply, :ok, put_path(state, path, owner)}
+    case Map.fetch(state.owner_of, path) do
+      :error ->
+        {:reply, :ok, put_path(state, path, owner)}
+
+      {:ok, ^owner} ->
+        {:reply, :ok, state}
+
+      {:ok, _other_owner} ->
+        {:reply, {:error, :path_already_tracked}, state}
+    end
   end
 
   def handle_call({:release, path}, _from, state) do
@@ -94,17 +104,13 @@ defmodule CliSubprocessCore.EphemeralFiles do
   def handle_info(_message, state), do: {:noreply, state}
 
   defp put_path(state, path, owner) do
-    if Map.has_key?(state.owner_of, path) do
-      state
-    else
-      {ref, paths} = Map.get_lazy(state.owners, owner, fn -> {Process.monitor(owner), []} end)
+    {ref, paths} = Map.get_lazy(state.owners, owner, fn -> {Process.monitor(owner), []} end)
 
-      %{
-        state
-        | owner_of: Map.put(state.owner_of, path, owner),
-          owners: Map.put(state.owners, owner, {ref, [path | paths]})
-      }
-    end
+    %{
+      state
+      | owner_of: Map.put(state.owner_of, path, owner),
+        owners: Map.put(state.owners, owner, {ref, [path | paths]})
+    }
   end
 
   defp drop_path(state, path) do
