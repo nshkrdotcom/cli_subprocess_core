@@ -23,7 +23,21 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
-    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+    with :ok <-
+           ProviderFeatures.require_option(
+             id(),
+             :structured_output,
+             :output_schema,
+             Keyword.get(opts, :output_schema)
+           ),
+         :ok <-
+           ProviderFeatures.require_option(
+             id(),
+             :completion_only,
+             :completion_only,
+             Keyword.get(opts, :completion_only, false)
+           ),
+         {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
          {:ok, command_spec} <-
            Shared.resolve_command_spec(opts, :antigravity, "agy", [:cli_path]) do
       args = ["--print", prompt] ++ option_flags(opts)
@@ -36,17 +50,15 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
 
   @impl true
   def decode_stdout(line, state) when is_binary(line) and is_map(state) do
-    case String.trim(line) do
-      "" ->
-        {[], state}
-
-      content ->
-        Shared.emit_single(
-          :assistant_delta,
-          Payload.AssistantDelta.new(content: content),
-          line,
-          state
-        )
+    if String.trim(line) == "" do
+      {[], state}
+    else
+      Shared.emit_single(
+        :assistant_delta,
+        Payload.AssistantDelta.new(content: line),
+        line,
+        state
+      )
     end
   end
 

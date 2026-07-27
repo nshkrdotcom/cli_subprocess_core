@@ -337,7 +337,6 @@ defmodule CliSubprocessCore.GovernedAuthority do
 
   defp normalize_env_part(value) when is_binary(value), do: value
   defp normalize_env_part(value) when is_atom(value), do: Atom.to_string(value)
-  defp normalize_env_part(value) when is_boolean(value), do: to_string(value)
   defp normalize_env_part(value) when is_integer(value), do: Integer.to_string(value)
   defp normalize_env_part(value) when is_float(value), do: Float.to_string(value)
   defp normalize_env_part(value), do: value

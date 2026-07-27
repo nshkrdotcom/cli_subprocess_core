@@ -184,6 +184,11 @@ defmodule CliSubprocessCore.ModelRegistry do
 
   @spec validate(atom(), String.t() | atom() | keyword() | map() | nil) ::
           {:ok, Model.t()} | {:error, resolution_error()}
+  def validate(provider, nil) do
+    {:error,
+     {:empty_or_invalid_model, "requested model is missing", normalize_provider(provider)}}
+  end
+
   def validate(provider, requested_model)
       when is_binary(requested_model) or is_atom(requested_model) do
     provider = normalize_provider(provider)
@@ -199,11 +204,6 @@ defmodule CliSubprocessCore.ModelRegistry do
     with {:ok, validation_request} <- parse_validation_request(request, provider) do
       do_validate(provider, validation_request)
     end
-  end
-
-  def validate(provider, nil) do
-    {:error,
-     {:empty_or_invalid_model, "requested model is missing", normalize_provider(provider)}}
   end
 
   defp do_validate(:claude, %{provider_backend: :ollama} = request) do

@@ -114,6 +114,12 @@ An invocation carrying a schema returns `{:ok, invocation, teardown}`; the
 teardown removes the file, and `CliSubprocessCore.EphemeralFiles` removes it
 anyway if the owning process dies before running it.
 
+`CliSubprocessCore.EphemeralFile` is the provider-neutral primitive underneath
+that lifecycle. It accepts already encoded iodata, creates one exclusive
+`0600` file in the OS temporary directory, and tracks that file against the
+run owner. Provider-specific helpers retain responsibility for encoding and
+validation.
+
 `:completion_only` selects a completion-only invocation: Claude receives an
 empty tool set, plan permission mode, no settings sources, and strict MCP
 config. Codex receives a read-only sandbox, ephemeral operation, no user
@@ -174,6 +180,11 @@ Common Cursor options:
 - `:headers`
 - `:permission_mode`
 - `:provider_permission_mode`
+- `:output_schema` (explicitly unsupported)
+- `:completion_only` (explicitly unsupported)
+
+Cursor declares structured-output and completion-only unsupported in the
+common feature manifest.
 
 Cursor reads `model_payload.resolved_model` before falling back to `:model`.
 When `:cwd` is supplied, the profile uses it as the process working directory
@@ -207,6 +218,12 @@ Common Amp options:
 - `:include_thinking`
 - `:permission_mode`
 - `:provider_permission_mode`
+- `:output_schema` (explicitly unsupported)
+- `:completion_only` (explicitly unsupported)
+
+Amp rejects structured-output and completion-only intent with
+`CliSubprocessCore.ProviderFeatures.Error` before command resolution. Ordinary
+Amp invocations are unchanged.
 
 ## Antigravity
 
@@ -237,10 +254,16 @@ Common Antigravity options:
 - `:log_file`
 - `:permission_mode`
 - `:provider_permission_mode`
+- `:output_schema` (explicitly unsupported)
+- `:completion_only` (explicitly unsupported)
 
 `--add-dir` is repeatable and is never comma-delimited. `permission_mode:
 :bypass` renders `--dangerously-skip-permissions` unless that flag was already
 provided explicitly.
+
+Antigravity rejects structured-output and completion-only intent with the same
+typed error before command resolution. `--sandbox` and strict permissions are
+not documented as no-tool completion controls.
 
 ## How To Read These Knobs
 

@@ -14,7 +14,7 @@ defmodule CliSubprocessCore.OutputSchemaFile do
   it.
   """
 
-  alias CliSubprocessCore.EphemeralFiles
+  alias CliSubprocessCore.EphemeralFile
 
   @prefix "cli_subprocess_core_output_schema"
 
@@ -34,10 +34,24 @@ defmodule CliSubprocessCore.OutputSchemaFile do
   def create(nil, _owner), do: {:ok, nil, fn -> :ok end}
 
   def create(schema, owner) when is_pid(owner) do
-    with {:ok, encoded} <- encode(schema),
-         {:ok, path} <- write(encoded),
-         :ok <- track(path, owner) do
-      {:ok, path, fn -> EphemeralFiles.release(path) end}
+    with {:ok, encoded} <- encode(schema) do
+      case EphemeralFile.create(encoded,
+             owner: owner,
+             prefix: @prefix,
+             suffix: ".json"
+           ) do
+        {:ok, path, teardown} ->
+          {:ok, path, teardown}
+
+        {:error, {:ephemeral_file_write_failed, reason}} ->
+          {:error, {:output_schema_write_failed, reason}}
+
+        {:error, {:ephemeral_file_untrackable, reason}} ->
+          {:error, {:output_schema_untrackable, reason}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
@@ -45,42 +59,5 @@ defmodule CliSubprocessCore.OutputSchemaFile do
     Jason.encode(schema)
   rescue
     error -> {:error, {:invalid_output_schema, error}}
-  end
-
-  defp write(encoded) do
-    path =
-      Path.join(
-        System.tmp_dir!(),
-        Enum.join(
-          [@prefix, System.pid(), System.unique_integer([:positive, :monotonic])],
-          "_"
-        ) <> ".json"
-      )
-
-    case File.write(path, encoded, [:exclusive]) do
-      :ok ->
-        case File.chmod(path, 0o600) do
-          :ok ->
-            {:ok, path}
-
-          {:error, reason} ->
-            _ = File.rm(path)
-            {:error, {:output_schema_write_failed, reason}}
-        end
-
-      {:error, reason} ->
-        {:error, {:output_schema_write_failed, reason}}
-    end
-  end
-
-  defp track(path, owner) do
-    case EphemeralFiles.track(path, owner) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        _ = File.rm(path)
-        {:error, {:output_schema_untrackable, reason}}
-    end
   end
 end

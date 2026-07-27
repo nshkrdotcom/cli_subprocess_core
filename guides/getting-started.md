@@ -15,7 +15,7 @@ surfaces route through `ExecutionPlane.Process.Transport`.
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.3.0"}
+    {:cli_subprocess_core, "~> 0.4.0"}
   ]
 end
 ```

@@ -2,11 +2,13 @@ defmodule CliSubprocessCore.CompletionContractTest do
   use ExUnit.Case, async: false
 
   alias CliSubprocessCore.Command
+  alias CliSubprocessCore.EphemeralFile
   alias CliSubprocessCore.EphemeralFiles
   alias CliSubprocessCore.OutputSchemaFile
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderFeatures
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor}
+  alias CliSubprocessCore.ProviderFeatures.Error, as: ProviderFeatureError
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Antigravity, Claude, Codex, Cursor}
   alias CliSubprocessCore.Session
 
   @schema %{
@@ -167,13 +169,85 @@ defmodule CliSubprocessCore.CompletionContractTest do
       assert codex.compatibility.cli_flag == "--output-schema"
     end
 
-    test "a provider with no structured-output evidence declares none" do
-      assert :error = ProviderFeatures.partial_feature(:cursor, :structured_output)
-      assert :error = ProviderFeatures.partial_feature(:amp, :structured_output)
+    test "every built-in provider declares structured-output support explicitly" do
+      for provider <- [:amp, :antigravity, :claude, :codex, :cursor] do
+        assert {:ok, %{supported?: supported?}} =
+                 ProviderFeatures.partial_feature(provider, :structured_output)
+
+        assert is_boolean(supported?)
+      end
+
+      refute ProviderFeatures.partial_feature!(:cursor, :structured_output).supported?
+      refute ProviderFeatures.partial_feature!(:amp, :structured_output).supported?
+      refute ProviderFeatures.partial_feature!(:antigravity, :structured_output).supported?
+    end
+
+    test "Amp and Antigravity reject schema intent with a typed error before resolution" do
+      for profile <- [Amp, Antigravity] do
+        assert {:error,
+                %ProviderFeatureError{
+                  feature: :structured_output,
+                  option: :output_schema,
+                  support_state: :unsupported
+                }} =
+                 profile.build_invocation(
+                   command: "/definitely/not/a/provider",
+                   prompt: "hi",
+                   output_schema: @schema
+                 )
+      end
     end
   end
 
   describe "the schema file has an owner that outlives a brutal kill (D-17)" do
+    test "the generic primitive writes one exclusive owner-only file" do
+      assert {:ok, path, teardown} =
+               EphemeralFile.create(["encoded", "-", "settings"],
+                 prefix: "amp_sdk_settings",
+                 suffix: ".json"
+               )
+
+      assert Path.dirname(path) == System.tmp_dir!()
+      assert Path.basename(path) =~ "amp_sdk_settings_"
+      assert String.ends_with?(path, ".json")
+      assert File.read!(path) == "encoded-settings"
+      assert {:ok, stat} = File.stat(path)
+      assert Bitwise.band(stat.mode, 0o777) == 0o600
+      assert EphemeralFiles.tracked?(path)
+
+      assert teardown.() == :ok
+      assert teardown.() == :ok
+      refute File.exists?(path)
+      refute EphemeralFiles.tracked?(path)
+    end
+
+    test "the generic primitive rejects path-like names" do
+      assert {:error, :invalid_ephemeral_file_name} =
+               EphemeralFile.create("payload", prefix: "../directory")
+
+      assert {:error, :invalid_ephemeral_file_name} =
+               EphemeralFile.create("payload", suffix: "/settings.json")
+    end
+
+    test "the generic primitive removes its file when the owner is killed" do
+      parent = self()
+
+      owner =
+        spawn(fn ->
+          {:ok, path, _teardown} = EphemeralFile.create("settings", prefix: "owner_kill")
+          send(parent, {:generic_path, path})
+          Process.sleep(:infinity)
+        end)
+
+      assert_receive {:generic_path, path}, 10_000
+      assert File.regular?(path)
+
+      ref = Process.monitor(owner)
+      Process.exit(owner, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^owner, :killed}, 10_000
+      assert eventually(fn -> not File.exists?(path) end)
+    end
+
     test "the file name is namespaced across BEAM VMs and is owner-only" do
       assert {:ok, path, teardown} = OutputSchemaFile.create(@schema)
       assert Path.basename(path) =~ "_#{System.pid()}_"
@@ -280,6 +354,40 @@ defmodule CliSubprocessCore.CompletionContractTest do
   end
 
   describe "completion-only invocation (D-19)" do
+    test "every built-in provider declares completion-only support explicitly" do
+      for provider <- [:amp, :antigravity, :claude, :codex, :cursor] do
+        assert {:ok, %{supported?: supported?}} =
+                 ProviderFeatures.partial_feature(provider, :completion_only)
+
+        assert is_boolean(supported?)
+      end
+
+      assert ProviderFeatures.partial_feature!(:claude, :completion_only).supported?
+      assert ProviderFeatures.partial_feature!(:codex, :completion_only).supported?
+      refute ProviderFeatures.partial_feature!(:cursor, :completion_only).supported?
+      refute ProviderFeatures.partial_feature!(:amp, :completion_only).supported?
+      refute ProviderFeatures.partial_feature!(:antigravity, :completion_only).supported?
+    end
+
+    test "Amp and Antigravity reject completion-only intent before resolution" do
+      for profile <- [Amp, Antigravity] do
+        assert {:error,
+                %ProviderFeatureError{
+                  provider: provider,
+                  feature: :completion_only,
+                  option: :completion_only,
+                  support_state: :unsupported
+                }} =
+                 profile.build_invocation(
+                   command: "/definitely/not/a/provider",
+                   prompt: "hi",
+                   completion_only: true
+                 )
+
+        assert provider == profile.id()
+      end
+    end
+
     test "Claude receives an empty tool set, plan mode, no settings and no MCP" do
       assert {:ok, %Command{} = command} =
                Claude.build_invocation(

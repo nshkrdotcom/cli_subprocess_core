@@ -10,6 +10,8 @@ PACKAGES=(
   ground_plane_contracts
   ground_plane_persistence_policy
   execution_plane
+  execution_plane_process
+  execution_plane_jsonrpc
   cli_subprocess_core
   codex_sdk
   claude_agent_sdk
@@ -24,16 +26,18 @@ PACKAGES=(
 VERSIONS=(
   0.1.0
   0.1.0
-  0.1.0
   0.2.0
-  0.17.0
+  0.1.0
+  0.1.0
+  0.4.0
   0.18.0
-  0.6.0
-  0.1.0
-  0.1.0
-  0.10.0
+  0.19.0
   0.7.0
-  0.1.0
+  0.2.0
+  0.2.0
+  0.12.0
+  0.7.0
+  0.2.0
 )
 
 usage() {
@@ -70,7 +74,9 @@ WORKSPACE_ROOT="$(cd "$WORKSPACE_ROOT" && pwd -P)"
 PROJECT_PATHS=(
   "$WORKSPACE_ROOT/ground_plane/core/ground_plane_contracts"
   "$WORKSPACE_ROOT/ground_plane/core/persistence_policy"
-  "$WORKSPACE_ROOT/execution_plane/dist/monolith/execution_plane"
+  "$WORKSPACE_ROOT/execution_plane/core/execution_plane"
+  "$WORKSPACE_ROOT/execution_plane/runtimes/execution_plane_process"
+  "$WORKSPACE_ROOT/execution_plane/protocols/execution_plane_jsonrpc"
   "$WORKSPACE_ROOT/cli_subprocess_core"
   "$WORKSPACE_ROOT/codex_sdk"
   "$WORKSPACE_ROOT/claude_agent_sdk"
@@ -85,7 +91,9 @@ PROJECT_PATHS=(
 SOURCE_PATHS=(
   "$WORKSPACE_ROOT/ground_plane/core/ground_plane_contracts"
   "$WORKSPACE_ROOT/ground_plane/core/persistence_policy"
-  "$WORKSPACE_ROOT/execution_plane/dist/monolith/execution_plane"
+  "$WORKSPACE_ROOT/execution_plane/core/execution_plane"
+  "$WORKSPACE_ROOT/execution_plane/runtimes/execution_plane_process"
+  "$WORKSPACE_ROOT/execution_plane/protocols/execution_plane_jsonrpc"
   "$WORKSPACE_ROOT/cli_subprocess_core"
   "$WORKSPACE_ROOT/codex_sdk"
   "$WORKSPACE_ROOT/claude_agent_sdk"
@@ -100,6 +108,8 @@ SOURCE_PATHS=(
 SOURCE_REPOS=(
   "$WORKSPACE_ROOT/ground_plane"
   "$WORKSPACE_ROOT/ground_plane"
+  "$WORKSPACE_ROOT/execution_plane"
+  "$WORKSPACE_ROOT/execution_plane"
   "$WORKSPACE_ROOT/execution_plane"
   "$WORKSPACE_ROOT/cli_subprocess_core"
   "$WORKSPACE_ROOT/codex_sdk"
@@ -172,6 +182,8 @@ write_fixture_config() {
       ground_plane_contracts
       ground_plane_persistence_policy
       execution_plane
+      execution_plane_process
+      execution_plane_jsonrpc
       cli_subprocess_core
       codex_sdk
       claude_agent_sdk

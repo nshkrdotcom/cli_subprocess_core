@@ -16,3 +16,7 @@ The runner executes two variants:
 
 Both variants are offline with respect to provider services and credentials.
 They exercise only bounded local subprocesses.
+
+The graph uses the canonical core-only `execution_plane`,
+`execution_plane_process`, and `execution_plane_jsonrpc` packages. The retired
+generated monolith is not a fixture source.

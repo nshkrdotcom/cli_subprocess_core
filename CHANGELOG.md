@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-27
+
+### Added
+
+- Total `:structured_output` and `:completion_only` feature manifests for all
+  built-in providers plus `ProviderFeatures.Error`, whose provider, feature,
+  option, and support state are pattern-matchable.
+- `CliSubprocessCore.EphemeralFile`, a provider-neutral exclusive `0600`
+  temporary-file primitive with owner monitoring and idempotent bounded
+  teardown.
+- Dependency-source helper v6 release edges from `antigravity_cli_sdk` and
+  `amp_sdk` to `cli_subprocess_core`.
+
+### Changed
+
+- Amp and Antigravity now reject unsupported schema and completion-only intent
+  before resolving or starting their CLIs. Ordinary invocations are unchanged.
+- `OutputSchemaFile` delegates secure materialization to the generic primitive
+  while preserving its JSON validation and public error contract.
+- Amp result projection preserves provider result text, status/subtype,
+  durations, turns, usage totals, cost, and permission denials. Antigravity
+  keeps non-empty provider output byte-faithful.
+
+### Fixed
+
+- Removed redundant clauses diagnosed by Elixir 1.20 so the
+  warnings-as-errors build remains green on the current release toolchain.
+
 ## [0.3.0] - 2026-07-27
 
 ### Added
@@ -117,3 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Governed CLI launch authority for command, cwd, env, config-root, auth-root,
   base-URL, target, and clear-env materialization without ambient provider CLI
   env discovery.
+
+[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/nshkrdotcom/cli_subprocess_core/releases/tag/v0.1.0

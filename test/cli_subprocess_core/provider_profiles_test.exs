@@ -748,7 +748,10 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Result{
                status: :completed,
                stop_reason: "done",
-               output: %{duration_ms: 300, usage: %{input_tokens: 7, output_tokens: 9}}
+               output: %{
+                 duration_ms: 300,
+                 usage: %{input_tokens: 7, output_tokens: 9, total_tokens: 16}
+               }
              } = Enum.at(events, 7).payload
 
       assert [stderr] = decode_stderr(Amp, "amp warning")
@@ -776,10 +779,49 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Result{
                status: :completed,
                stop_reason: "success",
-               output: %{duration_ms: 1074, usage: %{input_tokens: 10, output_tokens: 13}}
+               output: %{
+                 result: "OK",
+                 duration_ms: 1074,
+                 usage: %{input_tokens: 10, output_tokens: 13, total_tokens: 23}
+               },
+               object: nil,
+               metadata: %{subtype: "success"}
              } = Enum.at(events, 2).payload
 
       assert Enum.at(events, 2).provider_session_id == "amp-session-2"
+    end
+
+    test "Amp preserves error result status and official result fields" do
+      raw =
+        Jason.encode!(%{
+          "type" => "result",
+          "subtype" => "error",
+          "result" => "provider failed",
+          "duration_ms" => 91,
+          "duration_api_ms" => 70,
+          "num_turns" => 2,
+          "cost_usd" => 0.04,
+          "permission_denials" => [%{"tool" => "bash"}],
+          "usage" => %{"input_tokens" => 3, "output_tokens" => 4, "total_tokens" => 7}
+        })
+
+      assert {[event], _state} = Amp.decode_stdout(raw, Amp.init_parser_state([]))
+
+      assert %Payload.Result{
+               status: :error,
+               stop_reason: "error",
+               output: %{
+                 result: "provider failed",
+                 duration_ms: 91,
+                 duration_api_ms: 70,
+                 num_turns: 2,
+                 cost_usd: 0.04,
+                 permission_denials: [%{"tool" => "bash"}],
+                 usage: %{input_tokens: 3, output_tokens: 4, total_tokens: 7}
+               },
+               object: nil,
+               metadata: %{subtype: "error"}
+             } = event.payload
     end
 
     test "Cursor decodes its JSONL fixture into normalized events" do
@@ -913,7 +955,7 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
     {events, _state} =
       fixture_path
-      |> File.stream!([], :line)
+      |> File.stream!(:line, [])
       |> Enum.map(&String.trim_trailing(&1, "\n"))
       |> Enum.reduce({[], profile.init_parser_state([])}, fn line, {acc, state} ->
         {decoded, next_state} = profile.decode_stdout(line, state)

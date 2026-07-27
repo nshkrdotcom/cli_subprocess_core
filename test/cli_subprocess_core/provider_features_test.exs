@@ -72,6 +72,16 @@ defmodule CliSubprocessCore.ProviderFeaturesTest do
     assert antigravity.supported? == false
   end
 
+  test "common completion and structured-output vocabulary is total" do
+    for provider <- [:amp, :antigravity, :claude, :codex, :cursor],
+        feature <- [:completion_only, :structured_output] do
+      assert {:ok, manifest} = ProviderFeatures.partial_feature(provider, feature)
+      assert is_boolean(manifest.supported?)
+      assert manifest.activation.option in [:completion_only, :output_schema]
+      assert [_note | _rest] = manifest.notes
+    end
+  end
+
   test "tool capability metadata separates observation from host execution" do
     for provider <- [:amp, :antigravity, :claude, :codex, :cursor] do
       tool_capabilities = ProviderFeatures.tool_capabilities!(provider)

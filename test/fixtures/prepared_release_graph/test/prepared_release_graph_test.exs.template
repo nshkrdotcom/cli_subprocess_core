@@ -7,6 +7,8 @@ defmodule PreparedReleaseGraphTest do
     :ground_plane_contracts,
     :ground_plane_persistence_policy,
     :execution_plane,
+    :execution_plane_process,
+    :execution_plane_jsonrpc,
     :cli_subprocess_core,
     :codex_sdk,
     :claude_agent_sdk,
@@ -19,8 +21,6 @@ defmodule PreparedReleaseGraphTest do
   ]
 
   @phantom_apps [
-    :execution_plane_jsonrpc,
-    :execution_plane_process,
     :gemini_cli_sdk
   ]
 
@@ -64,16 +64,11 @@ defmodule PreparedReleaseGraphTest do
     end)
   end
 
-  test "generated Execution Plane starts its supervision tree exactly once" do
-    assert_single_registered(ExecutionPlane.Application.Supervisor)
+  test "component Execution Plane starts its process supervision tree exactly once" do
     assert_single_registered(ExecutionPlane.Process.Supervisor)
     assert_single_registered(ExecutionPlane.TaskSupervisor)
     assert_single_registered(ExecutionPlane.Process.TransportSupervisor)
 
-    assert [{_id, process_supervisor, :supervisor, _modules}] =
-             Supervisor.which_children(ExecutionPlane.Application.Supervisor)
-
-    assert process_supervisor == Process.whereis(ExecutionPlane.Process.Supervisor)
     assert length(Supervisor.which_children(ExecutionPlane.Process.Supervisor)) == 2
   end
 

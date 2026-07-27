@@ -13,9 +13,9 @@ knowledge in separate lookup tables.
 - rendered CLI args for those permission modes
 - partial feature manifests for built-in providers
 
-Today the partial-feature manifest covers Ollama-backed model routing and the
-permission metadata covers each first-party provider's native permission
-terminology.
+The partial-feature manifest covers Ollama-backed model routing, structured
+output, and completion-only invocation. Permission metadata covers each
+first-party provider's native permission terminology.
 
 ## Permission Metadata
 
@@ -111,6 +111,45 @@ acceptance rule separately:
 - acceptance: any Ollama model that passes runtime validation
 - validated default: `gpt-oss:20b`
 - non-default models: allowed, but may run with upstream fallback metadata
+
+## Structured output and completion-only
+
+Every built-in provider has an explicit manifest entry for
+`:structured_output` and `:completion_only`; absence is never interpreted as
+support.
+
+| Provider | Structured output | Completion-only |
+| --- | --- | --- |
+| Claude | supported, inline JSON schema | supported |
+| Codex | supported, owner-tracked schema file | supported |
+| Cursor | unsupported | unsupported |
+| Amp | unsupported | unsupported |
+| Antigravity | unsupported | unsupported |
+
+Amp and Antigravity remain ordinary coding-agent providers. Their
+completion-only entries are unsupported because no verified provider posture
+proves the absence of tools, MCP, prompt extensions, and writes. Antigravity
+`--sandbox` or strict permissions alone do not establish that stronger
+contract.
+
+Provider profiles call `require_option/4` before command resolution when one
+of these common options is requested:
+
+```elixir
+{:error,
+ %CliSubprocessCore.ProviderFeatures.Error{
+   provider: :amp,
+   feature: :structured_output,
+   option: :output_schema,
+   support_state: :unsupported
+ }} =
+  CliSubprocessCore.ProviderProfiles.Amp.build_invocation(
+    prompt: "return JSON",
+    output_schema: %{"type" => "object"}
+  )
+```
+
+This failure is typed and occurs before a provider process is started.
 
 ## Design Rule
 

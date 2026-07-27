@@ -10,6 +10,8 @@ defmodule CliSubprocessCore.ProviderFeatures do
     unadmitted host execution
   """
 
+  alias CliSubprocessCore.ProviderFeatures.Error
+
   @type permission_manifest :: %{
           native_mode: atom(),
           cli_args: [String.t()],
@@ -92,6 +94,23 @@ defmodule CliSubprocessCore.ProviderFeatures do
           model_strategy: nil,
           compatibility: nil,
           notes: ["Amp does not expose an Ollama backend through the common CLI surface."]
+        },
+        structured_output: %{
+          supported?: false,
+          activation: %{option: :output_schema},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["No Amp CLI structured-output contract has been verified."]
+        },
+        completion_only: %{
+          supported?: false,
+          activation: %{option: :completion_only},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: [
+            "No installed and authenticated Amp CLI was available for the required adversarial no-tool/no-write proof.",
+            "Ordinary Amp execution remains supported; completion-only intent fails closed."
+          ]
         }
       },
       tool_capabilities:
@@ -124,6 +143,23 @@ defmodule CliSubprocessCore.ProviderFeatures do
           model_strategy: nil,
           compatibility: nil,
           notes: ["Antigravity does not expose an Ollama backend through the common CLI surface."]
+        },
+        structured_output: %{
+          supported?: false,
+          activation: %{option: :output_schema},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["agy --print exposes plain-text output, not a verified schema contract."]
+        },
+        completion_only: %{
+          supported?: false,
+          activation: %{option: :completion_only},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: [
+            "Antigravity sandbox and strict permission flags do not prove that provider tools, MCP, prompts, and writes are absent.",
+            "Ordinary Antigravity execution remains supported; completion-only intent fails closed."
+          ]
         }
       },
       tool_capabilities:
@@ -192,6 +228,15 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "The Claude CLI takes the schema as inline JSON on --json-schema.",
             "A schema-conforming reply arrives as structured_output on the result frame and is lifted onto Payload.Result.object."
           ]
+        },
+        completion_only: %{
+          supported?: true,
+          activation: %{option: :completion_only},
+          model_strategy: nil,
+          compatibility: %{posture: :empty_tools_plan_no_settings_strict_mcp},
+          notes: [
+            "Claude completion-only replaces caller permission and settings state with the verified isolated invocation posture."
+          ]
         }
       },
       tool_capabilities:
@@ -245,6 +290,15 @@ defmodule CliSubprocessCore.ProviderFeatures do
             "codex exec types --output-schema as a path and exits non-zero when it cannot read the file, so the schema is materialized on disk.",
             "A schema-constrained reply arrives as the final agent message and is decoded onto Payload.Result.object."
           ]
+        },
+        completion_only: %{
+          supported?: true,
+          activation: %{option: :completion_only},
+          model_strategy: nil,
+          compatibility: %{posture: :ephemeral_read_only_no_approval},
+          notes: [
+            "Codex completion-only replaces caller permission and config state with the verified isolated invocation posture."
+          ]
         }
       },
       tool_capabilities:
@@ -277,6 +331,20 @@ defmodule CliSubprocessCore.ProviderFeatures do
           model_strategy: nil,
           compatibility: nil,
           notes: ["Cursor does not expose an Ollama backend through the common CLI surface."]
+        },
+        structured_output: %{
+          supported?: false,
+          activation: %{option: :output_schema},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["Cursor has no structured-output contract in the common profile."]
+        },
+        completion_only: %{
+          supported?: false,
+          activation: %{option: :completion_only},
+          model_strategy: nil,
+          compatibility: nil,
+          notes: ["Cursor has no verified no-tool completion-only profile."]
         }
       },
       tool_capabilities:
@@ -355,6 +423,44 @@ defmodule CliSubprocessCore.ProviderFeatures do
       :error ->
         raise ArgumentError,
               "unknown partial feature #{inspect(feature)} for #{inspect(provider)}"
+    end
+  end
+
+  @doc """
+  Requires a built-in provider feature when its activating option is requested.
+
+  `nil` and `false` are not requests. Unsupported and unknown feature states
+  return a typed `CliSubprocessCore.ProviderFeatures.Error`.
+  """
+  @spec require_option(atom(), atom(), atom(), term()) ::
+          :ok | {:error, Error.t()}
+  def require_option(_provider, _feature, _option, requested)
+      when requested in [nil, false],
+      do: :ok
+
+  def require_option(provider, feature, option, _requested)
+      when is_atom(provider) and is_atom(feature) and is_atom(option) do
+    case partial_feature(provider, feature) do
+      {:ok, %{supported?: true}} ->
+        :ok
+
+      {:ok, %{supported?: false}} ->
+        {:error,
+         %Error{
+           provider: canonical_provider(provider),
+           feature: feature,
+           option: option,
+           support_state: :unsupported
+         }}
+
+      :error ->
+        {:error,
+         %Error{
+           provider: canonical_provider(provider),
+           feature: feature,
+           option: option,
+           support_state: :unknown
+         }}
     end
   end
 

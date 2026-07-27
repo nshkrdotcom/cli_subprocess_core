@@ -269,9 +269,6 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   def maybe_add_pair(args, flag, value) when is_float(value),
     do: maybe_add_pair(args, flag, Float.to_string(value))
 
-  def maybe_add_pair(args, flag, value) when is_boolean(value),
-    do: args ++ [flag, to_string(value)]
-
   def maybe_add_pair(_args, flag, value),
     do: raise(ArgumentError, "invalid #{inspect(flag)} value #{inspect(value)}")
 
@@ -390,9 +387,13 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
           Payload.Result.new(
             status: :completed,
             stop_reason: exit.reason,
-            output: %{code: exit.code, signal: exit.signal},
+            output: %{code: exit.code, signal: exit.signal, reason: exit.reason},
             # A synthetic exit result never carries a provider object.
-            object: nil
+            object: nil,
+            metadata: %{
+              synthetic: true,
+              provider_session_id: Map.get(state, :provider_session_id)
+            }
           )
 
         emit_single(:result, payload, %{exit: exit}, mark_result_emitted(state))

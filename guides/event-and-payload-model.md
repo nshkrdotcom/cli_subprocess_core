@@ -113,7 +113,9 @@ Common examples:
   reads the result frame's `structured_output`, the Codex profile decodes the
   schema-constrained final agent message only when a schema was requested, and
   the remaining profiles leave it explicitly empty because no structured-output
-  surface is proven for them.
+  surface is proven for them. Amp terminal frames preserve provider result
+  text, duration, turn count, usage totals, cost, permission denials, subtype,
+  and truthful failure status when those fields are present.
 - `CliSubprocessCore.Payload.Error` uses the normalized shared severity lane:
   `:info`, `:warning`, `:error`, or terminal `:fatal`.
 - `CliSubprocessCore.Payload.Raw` retains unnormalized material when a provider

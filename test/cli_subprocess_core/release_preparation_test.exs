@@ -1,12 +1,12 @@
 defmodule CliSubprocessCore.ReleasePreparationTest do
   use ExUnit.Case, async: true
 
-  test "0.3.0 release metadata and Elixir floor are frozen" do
+  test "0.4.0 release metadata and Elixir floor are frozen" do
     project = Mix.Project.config()
 
-    assert project[:version] == "0.3.0"
+    assert project[:version] == "0.4.0"
     assert project[:elixir] == "~> 1.18"
-    assert project[:docs][:source_ref] == "v0.3.0"
+    assert project[:docs][:source_ref] == "v0.4.0"
   end
 
   test "package includes consumer documentation without release tooling" do

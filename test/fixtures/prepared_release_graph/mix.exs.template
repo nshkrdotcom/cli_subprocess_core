@@ -18,6 +18,8 @@ defmodule PreparedReleaseGraph.MixProject do
     :ground_plane_contracts,
     :ground_plane_persistence_policy,
     :execution_plane,
+    :execution_plane_process,
+    :execution_plane_jsonrpc,
     :cli_subprocess_core,
     :codex_sdk,
     :claude_agent_sdk,

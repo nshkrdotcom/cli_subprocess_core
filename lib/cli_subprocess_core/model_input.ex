@@ -427,6 +427,7 @@ defmodule CliSubprocessCore.ModelInput do
   defp normalize_map(_other), do: %{}
 
   defp normalize_string(nil), do: nil
+  defp normalize_string(value) when is_boolean(value), do: to_string(value)
   defp normalize_string(value) when is_atom(value), do: Atom.to_string(value)
 
   defp normalize_string(value) when is_binary(value) do
@@ -437,7 +438,6 @@ defmodule CliSubprocessCore.ModelInput do
   end
 
   defp normalize_string(value) when is_number(value), do: to_string(value)
-  defp normalize_string(value) when is_boolean(value), do: to_string(value)
   defp normalize_string(_other), do: nil
 
   defp normalize_reasoning_value(nil), do: nil

@@ -41,7 +41,21 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
-    with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+    with :ok <-
+           ProviderFeatures.require_option(
+             id(),
+             :structured_output,
+             :output_schema,
+             Keyword.get(opts, :output_schema)
+           ),
+         :ok <-
+           ProviderFeatures.require_option(
+             id(),
+             :completion_only,
+             :completion_only,
+             Keyword.get(opts, :completion_only, false)
+           ),
+         {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
          {:ok, command_spec} <- Shared.resolve_command_spec(opts, :amp, "amp") do
       args = ["--execute", prompt] ++ output_flags(opts) ++ option_flags(opts)
       {:ok, Shared.command(command_spec, args, opts)}
@@ -245,22 +259,52 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
     usage = Shared.fetch_any(raw, [:token_usage, "token_usage", :usage, "usage", :stats, "stats"])
     usage = if is_map(usage), do: usage, else: Map.get(state, :amp_last_usage, %{})
     stop_reason = result_stop_reason(raw, state)
+    input_tokens = Shared.int_value(usage, [:input_tokens, "input_tokens"])
+    output_tokens = Shared.int_value(usage, [:output_tokens, "output_tokens"])
+    subtype = Shared.fetch_any(raw, [:subtype, "subtype"])
+    provider_status = Shared.fetch_any(raw, [:status, "status"])
 
     Shared.emit_single(
       :result,
       Payload.Result.new(
-        status: :completed,
+        status: result_status(raw),
         stop_reason: stop_reason,
         output: %{
+          result:
+            Shared.fetch_any(raw, [
+              :result,
+              "result",
+              :output,
+              "output",
+              :text,
+              "text",
+              :content,
+              "content"
+            ]),
           duration_ms: Shared.fetch_any(raw, [:duration_ms, "duration_ms"]),
+          duration_api_ms: Shared.fetch_any(raw, [:duration_api_ms, "duration_api_ms"]),
+          num_turns: Shared.fetch_any(raw, [:num_turns, "num_turns"]),
           usage: %{
-            input_tokens: Shared.int_value(usage, [:input_tokens, "input_tokens"]),
-            output_tokens: Shared.int_value(usage, [:output_tokens, "output_tokens"])
-          }
+            input_tokens: input_tokens,
+            output_tokens: output_tokens,
+            total_tokens:
+              Shared.fetch_any(usage, [:total_tokens, "total_tokens"]) ||
+                input_tokens + output_tokens
+          },
+          cost_usd: Shared.fetch_any(raw, [:cost_usd, "cost_usd"]),
+          permission_denials:
+            Shared.fetch_any(raw, [:permission_denials, "permission_denials"]) || []
         },
         # No structured-output surface is proven for this provider, so the
         # field stays explicitly empty rather than guessed at.
-        object: nil
+        object: nil,
+        metadata:
+          %{
+            subtype: subtype,
+            provider_status: provider_status
+          }
+          |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+          |> Map.new()
       ),
       raw,
       state
@@ -335,5 +379,14 @@ defmodule CliSubprocessCore.ProviderProfiles.Amp do
       :subtype,
       "subtype"
     ]) || Map.get(state, :amp_last_stop_reason) || :unknown
+  end
+
+  defp result_status(raw) do
+    case Shared.fetch_any(raw, [:status, "status", :subtype, "subtype"]) do
+      value when value in [:error, "error", :failed, "failed", :failure, "failure"] -> :error
+      value when value in [:cancelled, "cancelled", :canceled, "canceled"] -> :cancelled
+      value when value in [:success, "success", :completed, "completed", nil] -> :completed
+      value -> value
+    end
   end
 end

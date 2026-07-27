@@ -50,6 +50,11 @@ facade over `ExecutionPlane.Process.Transport.Surface`.
   responses that contain no executable host callbacks.
 - `CliSubprocessCore.ModelRegistry`, `CliSubprocessCore.ModelInput`, and
   related catalog helpers for centralized model policy.
+- `CliSubprocessCore.ProviderFeatures` and
+  `CliSubprocessCore.ProviderFeatures.Error` for explicit common-feature
+  support and typed fail-closed rejection.
+- `CliSubprocessCore.EphemeralFile` for exclusive, owner-only, owner-tracked
+  provider invocation files.
 
 ### Registry ownership and hex publish-ordering
 
@@ -85,7 +90,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.3.0"}
+    {:cli_subprocess_core, "~> 0.4.0"}
   ]
 end
 ```
