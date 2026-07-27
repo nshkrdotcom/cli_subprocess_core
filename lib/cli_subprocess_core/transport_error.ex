@@ -29,7 +29,7 @@ defmodule CliSubprocessCore.TransportError do
   Returns true when `term` is the transport-error representation used by the core.
   """
   @spec match?(term()) :: boolean()
-  def match?(%RuntimeTransportError{}), do: true
+  def match?(term) when is_map(term), do: Map.get(term, :__struct__) == RuntimeTransportError
   def match?(_term), do: false
 
   @doc """

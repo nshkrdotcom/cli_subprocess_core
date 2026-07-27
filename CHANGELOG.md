@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed redundant clauses diagnosed by Elixir 1.20 so the
   warnings-as-errors build remains green on the current release toolchain.
+- Keep the opaque transport-error matcher dynamically callable after a
+  downstream function has excluded generic exceptions. This prevents Elixir
+  1.20 from over-refining valid facade calls to an always-false branch while
+  preserving the lower transport struct boundary.
 
 ## [0.3.0] - 2026-07-27
 
