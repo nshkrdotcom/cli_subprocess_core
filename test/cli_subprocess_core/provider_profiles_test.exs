@@ -74,6 +74,34 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
              }
     end
 
+    test "Claude builds the effort flag from the normalized model payload" do
+      assert {:ok, %Command{} = command} =
+               Claude.build_invocation(
+                 command: "claude-bin",
+                 prompt: "solve this",
+                 model_payload: %{
+                   provider: :claude,
+                   requested_model: "opus",
+                   resolved_model: "opus",
+                   reasoning: "xhigh"
+                 }
+               )
+
+      assert command.args == [
+               "--output-format",
+               "stream-json",
+               "--verbose",
+               "--print",
+               "--model",
+               "opus",
+               "--effort",
+               "xhigh",
+               "--permission-mode",
+               "default",
+               "solve this"
+             ]
+    end
+
     test "Codex builds the expected CLI invocation" do
       schema = %{"type" => "object", "properties" => %{"answer" => %{"type" => "string"}}}
 

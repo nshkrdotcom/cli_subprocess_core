@@ -68,6 +68,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   defp option_flags(opts) do
     []
     |> Shared.maybe_add_pair("--model", model_value(opts))
+    |> Shared.maybe_add_pair("--effort", reasoning_value(opts))
     |> Shared.maybe_add_pair("--max-turns", Keyword.get(opts, :max_turns))
     |> Shared.maybe_add_pair("--append-system-prompt", Keyword.get(opts, :append_system_prompt))
     |> Shared.maybe_add_pair("--system-prompt", Keyword.get(opts, :system_prompt))
@@ -106,7 +107,12 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     |> model_payload_value(:resolved_model)
   end
 
-  defp model_payload_value(%{resolved_model: value}, _key), do: value
+  defp reasoning_value(opts) do
+    Keyword.get(opts, :model_payload, %{})
+    |> model_payload_value(:reasoning)
+  end
+
+  defp model_payload_value(%{resolved_model: value}, :resolved_model), do: value
 
   defp model_payload_value(payload, key) when is_map(payload),
     do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))

@@ -73,6 +73,7 @@ Common Claude options:
 - `:command` or `:path_to_claude_code_executable`
 - `:model`
 - `:model_payload`
+- `:reasoning_effort`
 - `:max_turns`
 - `:append_system_prompt`
 - `:system_prompt`
@@ -83,10 +84,11 @@ Common Claude options:
 
 The Claude profile does not own model policy.
 
-It reads `model_payload.resolved_model` for `--model` and merges any
-core-owned `model_payload.env_overrides` into the final CLI invocation. That is
-what allows the same Claude profile to run either the native Anthropic backend
-or an Anthropic-compatible Ollama backend without a second model-selection path
+It reads `model_payload.resolved_model` for `--model`,
+`model_payload.reasoning` for `--effort`, and merges any core-owned
+`model_payload.env_overrides` into the final CLI invocation. That is what
+allows the same Claude profile to run either the native Anthropic backend or
+an Anthropic-compatible Ollama backend without a second model-selection path
 inside the profile.
 
 ## Codex

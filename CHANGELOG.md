@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-27
+
+### Fixed
+
+- The Claude profile now emits `--effort` from the shared model registry's
+  normalized `model_payload.reasoning`. Previously Claude effort was validated
+  and preserved in the payload, then silently dropped by the direct CLI lane.
+
 ## [0.4.0] - 2026-07-27
 
 ### Added
@@ -150,7 +158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base-URL, target, and clear-env materialization without ambient provider CLI
   env discovery.
 
-[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.1.0...v0.2.0
