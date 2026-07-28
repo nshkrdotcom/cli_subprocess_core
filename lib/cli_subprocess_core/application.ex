@@ -10,6 +10,8 @@ defmodule CliSubprocessCore.Application do
     children = [
       {Task.Supervisor, name: CliSubprocessCore.TaskSupervisor},
       CliSubprocessCore.EphemeralFiles,
+      CliSubprocessCore.RuntimeGateway.Local.SessionSupervisor,
+      CliSubprocessCore.RuntimeGateway.Local,
       {CliSubprocessCore.ProviderRegistry,
        name: CliSubprocessCore.ProviderRegistry,
        profile_modules: CliSubprocessCore.built_in_profile_modules()}
