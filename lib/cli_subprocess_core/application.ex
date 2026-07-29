@@ -12,6 +12,7 @@ defmodule CliSubprocessCore.Application do
       CliSubprocessCore.EphemeralFiles,
       CliSubprocessCore.RuntimeGateway.Local.SessionSupervisor,
       CliSubprocessCore.RuntimeGateway.Local,
+      CliSubprocessCore.RuntimeGateway.RuntimeClient,
       {CliSubprocessCore.ProviderRegistry,
        name: CliSubprocessCore.ProviderRegistry,
        profile_modules: CliSubprocessCore.built_in_profile_modules()}

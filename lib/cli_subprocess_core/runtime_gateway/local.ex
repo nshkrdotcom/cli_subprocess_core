@@ -30,6 +30,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
   alias CliSubprocessCore.Event
   alias CliSubprocessCore.GovernedAuthority
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.RuntimeGateway.CommandBinding
   alias CliSubprocessCore.RuntimeGateway.Error
   alias CliSubprocessCore.RuntimeGateway.Session, as: GatewaySession
   alias CliSubprocessCore.RuntimeGateway.StartRequest
@@ -62,6 +63,23 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
   end
 
   @doc """
+  Returns the placement mode implemented by this gateway.
+
+  Local sessions enter the supervised process transport directly and are not
+  Runtime Client-admitted executions.
+  """
+  @spec execution_mode() :: :local
+  def execution_mode, do: :local
+
+  @doc "Returns the stable tag used for incremental CLI gateway events."
+  @spec event_message_tag() :: :cli_subprocess_core_runtime_gateway_event
+  def event_message_tag, do: @event_message
+
+  @doc "Returns the stable tag used for terminal CLI gateway status."
+  @spec terminal_message_tag() :: :cli_subprocess_core_runtime_gateway_terminal
+  def terminal_message_tag, do: @terminal_message
+
+  @doc """
   Binds a frozen start request to one exact governed local launch.
 
   Only the binding process may consume the binding. A binding disappears when
@@ -79,18 +97,7 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
 
   @doc "Returns the digest required in `StartRequest.command_digest`."
   @spec command_digest(GovernedAuthority.t()) :: String.t()
-  def command_digest(%GovernedAuthority{} = authority) do
-    material = [
-      authority.command,
-      authority.cwd || "",
-      authority.clear_env?,
-      authority.env |> Map.keys() |> Enum.sort()
-    ]
-
-    "sha256:" <>
-      (:crypto.hash(:sha256, :erlang.term_to_binary(material, [:deterministic]))
-       |> Base.encode16(case: :lower))
-  end
+  defdelegate command_digest(authority), to: CommandBinding, as: :digest
 
   @impl true
   def start_session(%StartRequest{} = request), do: call({:start_session, request})
