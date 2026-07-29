@@ -5,6 +5,7 @@ defmodule CliSubprocessCore.RuntimeClientGatewayTest do
   alias CliSubprocessCore.Event
   alias CliSubprocessCore.GovernedAuthority
   alias CliSubprocessCore.Payload
+  alias CliSubprocessCore.ProviderProfiles.Codex
   alias CliSubprocessCore.RuntimeGateway.Local
   alias CliSubprocessCore.RuntimeGateway.RuntimeClient
   alias CliSubprocessCore.RuntimeGateway.{Error, Session, StartRequest, Status}
@@ -508,6 +509,40 @@ defmodule CliSubprocessCore.RuntimeClientGatewayTest do
     assert :ok = RuntimeClient.cancel(session_two, :test_cleanup)
     assert %Status{state: "cancelled"} = await_terminal(session_one.session_ref)
     assert %Status{state: "cancelled"} = await_terminal(session_two.session_ref)
+  end
+
+  test "runtime binding derives the same exact Codex resume argv as the shared profile" do
+    {request, _authority, session_opts} = launch("codex-resume")
+    prompt = "continue through runtime; no shell"
+    resume_target = "codex-thread-123"
+
+    session_opts =
+      session_opts
+      |> Keyword.put(:provider, :codex)
+      |> Keyword.put(:profile, Codex)
+      |> Keyword.put(:prompt, prompt)
+      |> Keyword.put(:resume, resume_target)
+      |> Keyword.delete(:test_pid)
+
+    assert :ok = bind_runtime(request, session_opts, admission(request))
+    assert {:ok, session} = RuntimeClient.start_session(request)
+
+    assert_receive {:fake_runtime_start,
+                    %AdmissionRequest{
+                      payload: %ProcessRequest{
+                        arguments: [
+                          "exec",
+                          "resume",
+                          "--json",
+                          ^resume_target,
+                          ^prompt
+                        ]
+                      }
+                    }, %ActiveExecution{}}
+
+    assert :ok = RuntimeClient.subscribe(session, self())
+    assert :ok = RuntimeClient.cancel(session, :test_cleanup)
+    assert %Status{state: "cancelled"} = await_terminal(session.session_ref)
   end
 
   test "cancel and terminate reach the same lower cancellation with distinct CLI terminals" do

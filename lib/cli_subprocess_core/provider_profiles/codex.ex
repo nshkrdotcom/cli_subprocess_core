@@ -10,7 +10,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   alias CliSubprocessCore.ProviderFeatures
   alias CliSubprocessCore.ProviderProfiles.Shared
 
-  @required_flags ["exec", "--json"]
+  @exec_prefix ["exec"]
+  @json_flag "--json"
   @event_handlers %{
     "assistant_delta" => :assistant_delta,
     "assistant_message" => :assistant_message,
@@ -30,19 +31,21 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
 
   @impl true
   def capabilities do
-    [:interrupt, :plan, :reasoning, :streaming, :structured_output, :tools]
+    [:interrupt, :plan, :reasoning, :resume, :streaming, :structured_output, :tools]
   end
 
   @impl true
   def build_invocation(opts) when is_list(opts) do
     with {:ok, prompt} <- Shared.required_binary_option(opts, :prompt),
+         {:ok, resume_target} <- resume_target(opts),
          {:ok, command_spec} <- Shared.resolve_command_spec(opts, :codex, "codex"),
          {:ok, schema_path, teardown} <-
            OutputSchemaFile.create(Keyword.get(opts, :output_schema)) do
       args =
-        @required_flags ++
+        command_prefix(resume_target) ++
+          [@json_flag] ++
           option_flags(opts, schema_path) ++
-          [prompt]
+          positional_args(resume_target, prompt)
 
       invocation = Shared.command(command_spec, args, opts)
 
@@ -53,6 +56,41 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
       end
     end
   end
+
+  # `resume` is a subcommand of `codex exec`, not an option on `codex exec`.
+  # Keep the target and prompt as distinct argv entries after every option so
+  # neither a shell nor provider-side option reordering can change their
+  # meaning. Only an exact target is accepted; selecting ambient history with
+  # `--last` belongs to a separate, explicit continuation contract.
+  defp resume_target(opts) do
+    case Keyword.get_values(opts, :resume) do
+      [] ->
+        {:ok, nil}
+
+      [nil] ->
+        {:ok, nil}
+
+      [target] when is_binary(target) ->
+        if valid_resume_target?(target),
+          do: {:ok, target},
+          else: {:error, {:invalid_option, :resume}}
+
+      _invalid ->
+        {:error, {:invalid_option, :resume}}
+    end
+  end
+
+  defp valid_resume_target?(target) do
+    byte_size(target) <= 512 and String.valid?(target) and target != "" and
+      String.trim(target) == target and not String.starts_with?(target, "-") and
+      not String.match?(target, ~r/[\x00-\x1f\x7f]/)
+  end
+
+  defp command_prefix(nil), do: @exec_prefix
+  defp command_prefix(_resume_target), do: @exec_prefix ++ ["resume"]
+
+  defp positional_args(nil, prompt), do: [prompt]
+  defp positional_args(resume_target, prompt), do: [resume_target, prompt]
 
   @impl true
   def init_parser_state(opts), do: Shared.init_parser_state(id(), opts)

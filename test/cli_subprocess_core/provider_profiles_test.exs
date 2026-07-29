@@ -153,6 +153,62 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert teardown.() == :ok
     end
 
+    test "Codex resumes one exact session with fail-closed argv ordering" do
+      prompt = "continue this; printf must-not-be-a-command"
+      resume_target = "thread name with argv-safe spaces"
+
+      assert {:ok, %Command{} = command} =
+               Codex.build_invocation(
+                 command: "codex-bin",
+                 prompt: prompt,
+                 resume: resume_target,
+                 model_payload: %{
+                   resolved_model: "gpt-5.3-codex",
+                   reasoning: "high"
+                 },
+                 skip_git_repo_check: true,
+                 permission_mode: :yolo
+               )
+
+      assert command.command == "codex-bin"
+
+      assert command.args == [
+               "exec",
+               "resume",
+               "--json",
+               "--model",
+               "gpt-5.3-codex",
+               "--config",
+               ~s(model_reasoning_effort="high"),
+               "--skip-git-repo-check",
+               "--dangerously-bypass-approvals-and-sandbox",
+               resume_target,
+               prompt
+             ]
+
+      assert Enum.at(command.args, -2) == resume_target
+      assert List.last(command.args) == prompt
+    end
+
+    test "Codex rejects ambiguous or malformed resume targets" do
+      for invalid <- ["", "  ", "--last", "line\nbreak", :last, 42] do
+        assert {:error, {:invalid_option, :resume}} =
+                 Codex.build_invocation(
+                   command: "codex-bin",
+                   prompt: "continue",
+                   resume: invalid
+                 )
+      end
+
+      assert {:error, {:invalid_option, :resume}} =
+               Codex.build_invocation(
+                 command: "codex-bin",
+                 prompt: "continue",
+                 resume: "thread-one",
+                 resume: "thread-two"
+               )
+    end
+
     test "Codex invocation preserves materializer-owned clear_env flag" do
       assert {:ok, %Command{} = command} =
                Codex.build_invocation(
