@@ -176,10 +176,8 @@ defmodule CliSubprocessCore.MixProject do
   defp local_ground_overrides({:execution_plane, opts}) when is_list(opts) do
     if local_ground_paths_available?() do
       [
-        {:ground_plane_contracts,
-         path: "../ground_plane/core/ground_plane_contracts", override: true},
-        {:ground_plane_persistence_policy,
-         path: "../ground_plane/core/persistence_policy", override: true}
+        DependencySources.dep(:ground_plane_contracts, __DIR__, override: true),
+        DependencySources.dep(:ground_plane_persistence_policy, __DIR__, override: true)
       ]
     else
       []

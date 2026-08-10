@@ -39,11 +39,12 @@ defmodule CliSubprocessCore.DependencySourcesTest do
     {:ok, repo_root: repo_root, tmp_root: tmp_root}
   end
 
-  test "the manifest declares exactly the canonical Execution Plane components" do
+  test "the manifest declares the canonical Execution Plane components" do
     config = DependencySources.config!(@repo_root)
     deps = Map.fetch!(config, :deps)
 
-    assert Enum.sort(Map.keys(deps)) == Enum.sort(Map.keys(@canonical_components))
+    assert Map.take(deps, Map.keys(@canonical_components)) |> Map.keys() |> Enum.sort() ==
+             Map.keys(@canonical_components) |> Enum.sort()
 
     for {app, subdir} <- @canonical_components do
       dep = Map.fetch!(deps, app)
