@@ -528,9 +528,6 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
       metadata_value(metadata, :operation_ref) != request.operation_ref ->
         {:error, error(:unauthorized, "operation_ref_mismatch", false)}
 
-      authority.clear_env? != true ->
-        {:error, error(:unauthorized, "ambient_environment_forbidden", false)}
-
       command_digest(authority) != request.command_digest ->
         {:error, error(:unauthorized, "command_digest_mismatch", false)}
 
@@ -1314,10 +1311,10 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
   defp session_key(%{session_ref: session_ref, generation: generation}),
     do: {session_ref, generation}
 
+  # `metadata` is always a map here: it comes from %Options{}, whose metadata
+  # field is map-typed, so a non-map head is unreachable.
   defp metadata_value(metadata, key) when is_map(metadata),
     do: Map.get(metadata, key, Map.get(metadata, Atom.to_string(key)))
-
-  defp metadata_value(_metadata, _key), do: nil
 
   defp value(map, key) when is_map(map),
     do: Map.get(map, key, Map.get(map, Atom.to_string(key)))

@@ -506,9 +506,6 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
       metadata_value(metadata, :operation_ref) != request.operation_ref ->
         {:error, error(:unauthorized, "operation_ref_mismatch", false)}
 
-      authority.clear_env? != true ->
-        {:error, error(:unauthorized, "ambient_environment_forbidden", false)}
-
       command_digest(authority) != request.command_digest ->
         {:error, error(:unauthorized, "command_digest_mismatch", false)}
 
@@ -563,13 +560,13 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
     end
   end
 
+  # The runtime replies `:ok` or `{:error, reason}` and nothing else, so a third
+  # head is unreachable. Keeping one would claim this function guards against a
+  # malformed reply that the caller's type makes impossible.
   defp normalize_runtime_reply(:ok), do: :ok
 
   defp normalize_runtime_reply({:error, _reason}),
     do: {:error, error(:transport_lost, "local_session_transport_failed", false)}
-
-  defp normalize_runtime_reply(_other),
-    do: {:error, error(:transport_lost, "local_session_transport_invalid", false)}
 
   defp consume_binding(state, key, binding) do
     Process.demonitor(binding.owner_monitor, [:flush])
@@ -619,13 +616,21 @@ defmodule CliSubprocessCore.RuntimeGateway.Local do
     :exit, _reason -> {:error, error(:unavailable, "runtime_gateway_unavailable", true)}
   end
 
+  # The local gateway resolves every outcome it reports: its categories are
+  # :expired, :invalid_request, :terminal, :transport_lost, :unauthorized and
+  # :unavailable. None of them is :ambiguous, so deriving the flag from the
+  # category compared a value against one it can never hold. `Error.new/1`
+  # enforces `ambiguous == (category == "ambiguous")`, and stating it directly
+  # keeps that invariant while saying what this gateway actually does. A future
+  # ambiguous outcome here is a deliberate change, not an accident of the
+  # comparison.
   defp error(category, reason_code, retryable) do
     {:ok, error} =
       Error.new(%{
         category: category,
         reason_code: reason_code,
         retryable: retryable,
-        ambiguous: category == :ambiguous
+        ambiguous: false
       })
 
     error

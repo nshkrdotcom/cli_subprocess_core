@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-10
+
+Two provider profiles were written against event schemas their CLIs do not
+produce. Neither failed loudly; both simply reported that nothing happened.
+
+### Changed
+
+- **The Antigravity profile now requests `--output-format stream-json`.** It
+  previously ran `agy --print`, whose plain-text output was normalized one line
+  at a time into assistant deltas — so a run produced text and nothing else: no
+  tool calls, no token usage, no terminal result. `agy` reports a run as
+  numbered steps that go `ACTIVE` then `DONE`, which supplies both halves of a
+  tool call. A stdout line that is not JSON is still emitted as an assistant
+  delta, so `output_format: "text"` and older CLIs keep working.
+- Codex and Antigravity tool names and parameter keys are translated to the
+  spellings consumers already use for other providers: a shell command is
+  `Bash` carrying a `command`, a file edit is `Edit` carrying a `file_path`.
+  Renderers and tool allowlists both key off these names, so a
+  provider-specific spelling renders correctly while silently matching no
+  allowlist entry.
+
+### Added
+
+- The Codex profile decodes the item types `codex exec --json` actually emits:
+  `command_execution`, `file_change`, `mcp_tool_call`, `web_search` and
+  `todo_list`. It previously looked for item types named `tool_call` and
+  `tool_result`, which the CLI has never emitted, so every tool call fell
+  through to `:raw` and no consumer could see that the model had done anything.
+  The older names are still accepted.
+- `item.started` is decoded as `tool_use`, giving a live signal that a tool has
+  begun rather than only that it finished. Both halves carry the item's `id`,
+  which is what pairs a call with its result.
+
+### Fixed
+
+- `turn.failed` is decoded, emitting both an error and a terminal result. It
+  was previously unmapped, so a failed Codex turn produced no stop reason at
+  all and a consumer waiting on one waited indefinitely.
+- `normalize_session_id/1` treated `nil` as an atom — which it is — and
+  returned the string `"nil"`. That value then overwrote the real provider
+  session id on every event that did not carry one, so only the first event of
+  a run held it. Every resume path reads that id back, and would have resumed a
+  thread named `"nil"`.
+- The local runtime gateway derived an error's `ambiguous` flag by comparing its
+  category against `:ambiguous`, a value that category can never hold — the
+  gateway resolves every outcome it reports. `Error.new/1` enforces
+  `ambiguous == (category == "ambiguous")`, so the flag is now stated directly.
+
+### Removed
+
+- Unreachable clauses in the runtime gateways, each proved dead by the type
+  rather than by inspection: the `clear_env?` guard in both `Local` and
+  `RuntimeClient` session-binding validation, since `GovernedAuthority` types
+  that field as the literal `true` and enforces it in `validate_clear_env/1`; a
+  non-map head of `metadata_value/2` whose argument comes from a map-typed
+  `%Options{}` field; and a third `normalize_runtime_reply/1` head for a reply
+  shape the runtime does not produce.
+
+The package is Dialyzer- and Credo-clean with no ignore entries.
+
 ## [0.4.1] - 2026-07-27
 
 ### Fixed

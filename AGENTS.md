@@ -75,3 +75,18 @@ Use the local model-selection script for workflow validation:
   the CLI core and defeats the isolation goal. If publish-time decoupling from
   the plane is ever required, do it via an optional dep + explicit fallback
   transport, not by copying the mechanics.
+
+## Static analysis
+
+Dialyzer and Credo findings are fixed at the **root cause**. No
+`.dialyzer_ignore.exs` entries, no `# credo:disable-for-*` comments, no specs
+widened purely to silence a warning, no checks skipped to make a gate pass.
+
+If a finding looks like a false positive, either the code or the type is wrong
+— fix it so the truth is expressible. A finding you do not have the design
+knowledge to fix is reported, not suppressed.
+
+These tools find real defects. `normalize_session_id/1` returning the string
+`"nil"` for `nil`, and `Surface.capabilities/1` accepting a `nil` surface kind
+through an `is_atom/1` guard, were both found this way.
+
