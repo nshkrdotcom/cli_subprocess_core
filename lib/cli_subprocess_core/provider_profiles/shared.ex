@@ -623,6 +623,11 @@ defmodule CliSubprocessCore.ProviderProfiles.Shared do
   end
 
   defp normalize_session_id(value) when is_binary(value) and value != "", do: value
+  # `nil` is an atom. Without this clause the atom branch turns "this event
+  # carries no session id" into the string "nil", which then overwrites the real
+  # id captured from the session-announcing event -- leaving every later event,
+  # and anything resuming from one, pointing at a thread named "nil".
+  defp normalize_session_id(nil), do: nil
   defp normalize_session_id(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_session_id(_value), do: nil
 

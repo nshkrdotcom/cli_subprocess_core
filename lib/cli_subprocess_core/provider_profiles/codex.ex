@@ -17,13 +17,27 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     "assistant_message" => :assistant_message,
     "error" => :error_event,
     "item.completed" => :completed_item,
+    "item.started" => :started_item,
     "response.output_text.delta" => :assistant_delta,
     "response.output_text.done" => :assistant_message,
     "result" => {:result, :unknown},
     "tool_call" => :tool_use,
     "tool_result" => :tool_result,
     "tool_use" => :tool_use,
-    "turn.completed" => {:result, :end_turn}
+    "turn.completed" => {:result, :end_turn},
+    "turn.failed" => :turn_failed
+  }
+
+  # The item variants `codex exec --json` tags with `type`, and the tool name
+  # each is rendered under. The names are deliberately the ones consumers
+  # already know from other providers -- a shell command is "bash" whether it
+  # came from Codex or Claude -- so a renderer needs no per-provider table.
+  @tool_item_names %{
+    "command_execution" => "bash",
+    "file_change" => "Edit",
+    "mcp_tool_call" => "mcp",
+    "web_search" => "WebSearch",
+    "todo_list" => "TodoWrite"
   }
 
   @impl true
@@ -258,6 +272,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   defp dispatch_event(:assistant_delta, raw, state), do: assistant_delta(raw, state)
   defp dispatch_event(:assistant_message, raw, state), do: assistant_message(raw, state)
   defp dispatch_event(:completed_item, raw, state), do: completed_item(raw, state)
+  defp dispatch_event(:started_item, raw, state), do: started_item(raw, state)
+  defp dispatch_event(:turn_failed, raw, state), do: turn_failed(raw, state)
   defp dispatch_event(:tool_use, raw, state), do: tool_use(raw, state)
   defp dispatch_event(:tool_result, raw, state), do: tool_result(raw, state)
   defp dispatch_event(:error_event, raw, state), do: error_event(raw, state)
@@ -269,29 +285,212 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
     Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
   end
 
-  defp completed_item(raw, state) do
-    case Shared.fetch_any(raw, [:item, "item"]) do
-      item when is_map(item) ->
-        case Shared.fetch_any(item, [:type, "type"]) do
-          "agent_message" ->
-            emit_completed_assistant_message(item, raw, state)
+  # `item.started` announces work beginning. Only tool items are worth
+  # surfacing: text items are emitted whole on completion, so announcing them
+  # twice would double every assistant message.
+  defp started_item(raw, state), do: with_item(raw, state, &started_item_type(&1, &2, &3))
 
-          "reasoning" ->
-            emit_completed_thinking(item, raw, state)
-
-          "tool_call" ->
-            emit_completed_tool_use(item, raw, state)
-
-          "tool_result" ->
-            emit_completed_tool_result(item, raw, state)
-
-          _ ->
-            Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
-        end
-
-      _other ->
-        Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+  defp started_item_type(item, raw, state) do
+    case item_type(item) do
+      type when is_map_key(@tool_item_names, type) -> emit_tool_use(item, type, raw, state)
+      _ -> {[], state}
     end
+  end
+
+  defp completed_item(raw, state), do: with_item(raw, state, &completed_item_type(&1, &2, &3))
+
+  defp completed_item_type(item, raw, state) do
+    case item_type(item) do
+      "agent_message" ->
+        emit_completed_assistant_message(item, raw, state)
+
+      "reasoning" ->
+        emit_completed_thinking(item, raw, state)
+
+      # Retained for older Codex builds and for hand-rolled fixtures; the
+      # shipping CLI tags tool items with the names in @tool_item_names.
+      "tool_call" ->
+        emit_completed_tool_use(item, raw, state)
+
+      "tool_result" ->
+        emit_completed_tool_result(item, raw, state)
+
+      type when is_map_key(@tool_item_names, type) ->
+        emit_tool_item_result(item, type, raw, state)
+
+      _ ->
+        emit_raw(raw, state)
+    end
+  end
+
+  defp with_item(raw, state, fun) do
+    case Shared.fetch_any(raw, [:item, "item"]) do
+      item when is_map(item) -> fun.(item, raw, state)
+      _other -> emit_raw(raw, state)
+    end
+  end
+
+  defp item_type(item), do: Shared.fetch_any(item, [:type, "type"])
+
+  defp emit_raw(raw, state) do
+    Shared.emit_single(:raw, Payload.Raw.new(stream: :stdout, content: raw), raw, state)
+  end
+
+  # `item.started` and `item.completed` carry the same item `id`, which is what
+  # lets a consumer pair the call with its result.
+  defp item_id(item), do: Shared.fetch_any(item, [:id, "id"])
+
+  defp emit_tool_use(item, type, raw, state) do
+    Shared.emit_single(
+      :tool_use,
+      Payload.ToolUse.new(
+        tool_name: tool_item_name(item, type),
+        tool_call_id: item_id(item),
+        input: tool_item_input(item, type)
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp emit_tool_item_result(item, type, raw, state) do
+    exit_code = Shared.fetch_any(item, [:exit_code, "exit_code"])
+
+    Shared.emit_single(
+      :tool_result,
+      Payload.ToolResult.new(
+        tool_call_id: item_id(item),
+        content: tool_item_output(item, type),
+        is_error: tool_item_error?(item, exit_code)
+      ),
+      raw,
+      state
+    )
+  end
+
+  # An MCP call is named for the tool it invoked rather than the generic
+  # "mcp", which would render every server's calls identically.
+  defp tool_item_name(item, "mcp_tool_call") do
+    server = Shared.fetch_any(item, [:server, "server"])
+    tool = Shared.fetch_any(item, [:tool, "tool", :name, "name"])
+
+    case {server, tool} do
+      {nil, nil} -> "mcp"
+      {nil, tool} -> to_string(tool)
+      {server, nil} -> to_string(server)
+      {server, tool} -> "#{server}.#{tool}"
+    end
+  end
+
+  defp tool_item_name(_item, type), do: Map.fetch!(@tool_item_names, type)
+
+  # Input keys match what renderers already look for per tool name: "command"
+  # for bash, "file_path" for an edit, "query" for a search.
+  defp tool_item_input(item, "command_execution") do
+    drop_nil(%{"command" => command_text(item)})
+  end
+
+  defp tool_item_input(item, "file_change") do
+    changes = Shared.fetch_any(item, [:changes, "changes"]) || []
+    drop_nil(%{"file_path" => first_change_path(changes), "changes" => changes})
+  end
+
+  defp tool_item_input(item, "web_search") do
+    drop_nil(%{"query" => Shared.fetch_any(item, [:query, "query"])})
+  end
+
+  defp tool_item_input(item, "mcp_tool_call") do
+    drop_nil(%{"arguments" => Shared.fetch_any(item, [:arguments, "arguments"])})
+  end
+
+  defp tool_item_input(item, "todo_list") do
+    drop_nil(%{"items" => Shared.fetch_any(item, [:items, "items"])})
+  end
+
+  defp tool_item_output(item, "command_execution") do
+    Shared.fetch_any(item, [:aggregated_output, "aggregated_output", :stdout, "stdout"])
+  end
+
+  defp tool_item_output(item, "web_search") do
+    Shared.fetch_any(item, [:query, "query"])
+  end
+
+  defp tool_item_output(item, _type) do
+    Shared.fetch_any(item, [:result, "result", :output, "output", :content, "content"])
+  end
+
+  # `status` is Codex's own verdict; a non-zero exit is the shell's. Either one
+  # alone is enough to render the call as failed.
+  defp tool_item_error?(item, exit_code) do
+    status = Shared.fetch_any(item, [:status, "status"])
+
+    status in ["failed", "errored", "interrupted", "not_found"] or
+      (is_integer(exit_code) and exit_code != 0)
+  end
+
+  defp command_text(item) do
+    case Shared.fetch_any(item, [:command, "command"]) do
+      command when is_list(command) -> Enum.join(command, " ")
+      command when is_binary(command) -> command
+      _ -> nil
+    end
+  end
+
+  defp first_change_path([change | _]) when is_map(change),
+    do: Shared.fetch_any(change, [:path, "path"])
+
+  defp first_change_path(_), do: nil
+
+  defp drop_nil(map) do
+    map
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  # A failed turn is terminal. Without both an error and a result the run has
+  # no stop reason at all, and a consumer waiting on one waits forever.
+  defp turn_failed(raw, state) do
+    message = turn_failure_message(raw)
+
+    {error_events, state} =
+      Shared.emit_single(
+        :error,
+        Shared.error_payload(:codex,
+          code: "turn_failed",
+          message: message,
+          metadata: Shared.normalize_map(raw)
+        ),
+        raw,
+        state
+      )
+
+    {result_events, state} =
+      Shared.emit_single(
+        :result,
+        Payload.Result.new(
+          status: :failed,
+          stop_reason: :error,
+          output: %{error: message},
+          object: structured_object(state)
+        ),
+        raw,
+        state
+      )
+
+    {error_events ++ result_events, state}
+  end
+
+  defp turn_failure_message(raw) do
+    error = Shared.fetch_any(raw, [:error, "error"])
+
+    message =
+      case error do
+        error when is_map(error) -> Shared.fetch_any(error, [:message, "message"])
+        error when is_binary(error) -> error
+        _ -> Shared.fetch_any(raw, [:message, "message"])
+      end
+
+    message || "Codex turn failed"
   end
 
   defp assistant_delta(raw, state) do
