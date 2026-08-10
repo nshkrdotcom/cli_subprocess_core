@@ -33,7 +33,7 @@ defmodule CliSubprocessCore.ProviderProfiles.CodexTest do
       assert event.kind == :tool_use
 
       assert %Payload.ToolUse{
-               tool_name: "bash",
+               tool_name: "Bash",
                tool_call_id: "item_3",
                input: %{"command" => "bash -lc mix test"}
              } = event.payload

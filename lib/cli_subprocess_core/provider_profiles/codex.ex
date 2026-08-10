@@ -32,8 +32,12 @@ defmodule CliSubprocessCore.ProviderProfiles.Codex do
   # each is rendered under. The names are deliberately the ones consumers
   # already know from other providers -- a shell command is "bash" whether it
   # came from Codex or Claude -- so a renderer needs no per-provider table.
+  # Capitalized deliberately. These are the names the rest of the ecosystem
+  # already uses -- renderers fold "Bash" to "bash" themselves, and tool
+  # allowlists are written in this spelling -- so emitting the lowercase
+  # provider spelling would render the same but silently miss every allowlist.
   @tool_item_names %{
-    "command_execution" => "bash",
+    "command_execution" => "Bash",
     "file_change" => "Edit",
     "mcp_tool_call" => "mcp",
     "web_search" => "WebSearch",
