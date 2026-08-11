@@ -169,7 +169,7 @@ defmodule CliSubprocessCore.MixProject do
   defp execution_plane_dep, do: workspace_dep(:execution_plane, "~> 0.3.0")
 
   defp execution_plane_process_dep,
-    do: workspace_dep(:execution_plane_process, "~> 0.2.0")
+    do: workspace_dep(:execution_plane_process, "~> 0.3.0")
 
   defp execution_plane_jsonrpc_dep,
     do: workspace_dep(:execution_plane_jsonrpc, "~> 0.2.0")

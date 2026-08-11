@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Require `execution_plane_process ~> 0.3.0`, the first process-lane release
+  with strict transient systemd-user containment.
 - Classify exhausted provider credits and quota as the terminal
   `provider_quota_exhausted` recovery class, even when a CLI labels the error
   `unknown`. These failures cannot be repaired by another prompt or by an

@@ -18,7 +18,7 @@
         branch: "main",
         subdir: "runtimes/execution_plane_process"
       },
-      hex: "~> 0.2.0",
+      hex: "~> 0.3.0",
       default_order: [:path, :github, :hex],
       publish_order: [:hex]
     },
