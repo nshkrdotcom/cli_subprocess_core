@@ -68,6 +68,40 @@ defmodule CliSubprocessCore.RecoveryEnvelopeTest do
            } = RecoveryEnvelope.from_payload_error(:codex, payload)
   end
 
+  test "classifies exhausted provider credits as terminal even when the code is unknown" do
+    payload =
+      Payload.Error.new(
+        message: "Your workspace is out of credits. Ask your workspace owner to refill.",
+        code: "unknown",
+        severity: :error
+      )
+
+    assert %{
+             "origin" => "remote_provider",
+             "class" => "provider_quota_exhausted",
+             "provider_code" => "quota_exhausted",
+             "retryable?" => false,
+             "repairable?" => false,
+             "remote_claim?" => true
+           } = RecoveryEnvelope.from_payload_error(:codex, payload)
+  end
+
+  test "classifies explicit insufficient quota codes as terminal" do
+    payload =
+      Payload.Error.new(
+        message: "Provider rejected the request",
+        code: "insufficient_quota",
+        severity: :fatal
+      )
+
+    assert %{
+             "class" => "provider_quota_exhausted",
+             "retryable?" => false,
+             "repairable?" => false,
+             "severity" => "fatal"
+           } = RecoveryEnvelope.from_payload_error(:codex, payload)
+  end
+
   test "classifies transport timeouts as resumeable" do
     transport_error = TransportError.transport_error(:timeout)
 

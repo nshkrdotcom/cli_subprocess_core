@@ -103,10 +103,17 @@ defmodule CliSubprocessCore.RecoveryEnvelope do
     end
   end
 
-  defp classify_payload_error(_provider, %Payload.Error{code: code, severity: severity}) do
-    code
-    |> normalize_code()
-    |> payload_error_envelope(severity)
+  defp classify_payload_error(
+         _provider,
+         %Payload.Error{code: code, message: message, severity: severity}
+       ) do
+    normalized_code = normalize_code(code)
+
+    if quota_exhausted?(normalized_code, message) do
+      quota_exhausted_envelope(severity)
+    else
+      payload_error_envelope(normalized_code, severity)
+    end
   end
 
   defp transport_error_envelope({:command_not_found, _command}), do: cli_missing_envelope()
@@ -166,6 +173,19 @@ defmodule CliSubprocessCore.RecoveryEnvelope do
 
   defp payload_error_envelope(code, severity),
     do: remote_claim_envelope("provider_runtime_claim", severity, code)
+
+  defp quota_exhausted_envelope(severity) do
+    base_envelope("remote_provider", "provider_quota_exhausted",
+      retryable?: false,
+      repairable?: false,
+      resumeable?: false,
+      local_deterministic?: false,
+      remote_claim?: true,
+      severity: severity_label(severity),
+      phase: "stream",
+      provider_code: "quota_exhausted"
+    )
+  end
 
   defp cli_missing_envelope do
     base_envelope("local_runtime", "cli_missing",
@@ -378,6 +398,34 @@ defmodule CliSubprocessCore.RecoveryEnvelope do
       normalized -> normalized
     end
   end
+
+  defp quota_exhausted?(code, message) do
+    code in [
+      "billing_hard_limit",
+      "credits_exhausted",
+      "insufficient_quota",
+      "quota_exceeded",
+      "quota_exhausted"
+    ] or quota_exhausted_message?(message)
+  end
+
+  defp quota_exhausted_message?(message) when is_binary(message) do
+    normalized = String.downcase(message)
+
+    Enum.any?(
+      [
+        "out of credits",
+        "credit balance",
+        "insufficient quota",
+        "quota exhausted",
+        "billing hard limit",
+        "workspace owner to refill"
+      ],
+      &String.contains?(normalized, &1)
+    )
+  end
+
+  defp quota_exhausted_message?(_message), do: false
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

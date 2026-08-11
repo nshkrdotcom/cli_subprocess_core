@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Classify exhausted provider credits and quota as the terminal
+  `provider_quota_exhausted` recovery class, even when a CLI labels the error
+  `unknown`. These failures cannot be repaired by another prompt or by an
+  immediate retry; ordinary `rate_limit` errors remain bounded and retryable.
 - Make the first-party model catalogs available from installed escripts.
   `ModelCatalog` previously read only `Application.app_dir/2` paths. Inside an
   escript that path traverses the archive as though it were a directory, so

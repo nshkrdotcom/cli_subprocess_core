@@ -52,6 +52,7 @@ Current keys:
 - `provider_auth_claim`
 - `provider_config_claim`
 - `provider_rate_limit`
+- `provider_quota_exhausted`
 - `provider_runtime_claim`
 - `approval_denied`
 - `guardrail_blocked`
@@ -59,6 +60,12 @@ Current keys:
 
 `cli_subprocess_core` may expand this set over time, but it should not emit
 ambiguous, provider-specific class names when a shared class already exists.
+
+`provider_rate_limit` is transient and carries a bounded retry suggestion.
+`provider_quota_exhausted` means the provider has explicitly reported that the
+account, workspace, or billing quota must be replenished. It is a remote claim,
+but it is neither retryable nor repairable: retrying immediately only repeats
+the charge-free rejection, and a repair prompt cannot change provider billing.
 
 ## Ownership Boundary
 
