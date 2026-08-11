@@ -20,20 +20,18 @@ defmodule CliSubprocessCore.ModelCatalog do
   @catalog_filename_suffix ".json"
   @default_catalog_version "2026-03-25"
   @catalog_directory Path.expand("../../priv/models", __DIR__)
-  @catalog_paths Path.wildcard(Path.join(@catalog_directory, "*#{@catalog_filename_suffix}"))
+  @catalog_providers [:amp, :antigravity, :claude, :codex, :cursor]
+  @catalog_paths Enum.map(@catalog_providers, fn provider ->
+                   Path.join(@catalog_directory, "#{provider}#{@catalog_filename_suffix}")
+                 end)
 
   for path <- @catalog_paths do
     @external_resource path
   end
 
-  @embedded_catalogs Map.new(@catalog_paths, fn path ->
-                       provider =
-                         path
-                         |> Path.basename(@catalog_filename_suffix)
-                         |> String.to_existing_atom()
-
-                       {provider, File.read!(path)}
-                     end)
+  @embedded_catalogs @catalog_providers
+                     |> Enum.zip(@catalog_paths)
+                     |> Map.new(fn {provider, path} -> {provider, File.read!(path)} end)
 
   @spec load(atom()) :: {:ok, t()} | {:error, load_error()}
   def load(provider) when is_atom(provider) do
