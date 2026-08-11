@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ProviderProfile.accepts_input_after_start?/1` no longer reports `claude` as
+  accepting live input. It derived the answer from `close_stdin_on_start?`
+  alone, and an open file descriptor is not a reader: `claude --print` takes
+  its prompt on argv, consumes stdin once while assembling it, and never reads
+  it again. A caller acting on that answer had its message silently swallowed
+  while every layer above reported success. The answer now requires both an
+  open stdin and a profile declaring `:incremental_input`. No shipped profile
+  declares it, so every lane is steered by interrupt and resume. Verified
+  against the shipping CLI: text piped before the turn changes the answer, the
+  same text written eight seconds in does not.
 - The Claude profile decodes tool calls. `claude --output-format stream-json`
   does not emit top-level `tool_use` or `tool_result` events — it emits
   Anthropic messages, with a `tool_use` block inside an `assistant` message's

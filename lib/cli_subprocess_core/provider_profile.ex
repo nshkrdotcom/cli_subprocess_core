@@ -97,23 +97,40 @@ defmodule CliSubprocessCore.ProviderProfile do
   @doc """
   Whether a lane can be given more input after its run has started.
 
-  A profile that sets `close_stdin_on_start?` has no channel back into a
-  running turn: `claude` leaves stdin open and takes more input on it, while
-  `codex`, `amp`, `cursor`, and `antigravity` close it and can only be
-  interrupted and resumed on the same thread.
-
   This is the fact a caller needs to decide *how* to say something to a session
-  already in flight. It is not `:interrupt` or `:resume` from `capabilities/0`
-  — every one of those profiles declares those, and they do not distinguish the
-  two mechanisms.
+  already in flight: write to it, or interrupt the turn and resume the thread.
+
+  Two conditions, and both are required. The transport must leave stdin open,
+  and the profile must declare `:incremental_input` — that it invokes the CLI
+  in a mode which keeps *reading* stdin once the turn is running.
+
+  An open file descriptor is not the same as a reader. `claude --print` takes
+  its prompt on argv, consumes stdin once while assembling that prompt, and
+  never reads it again; the descriptor stays open for the life of the process
+  and writing to it mid-turn reaches nobody. Deriving this from
+  `close_stdin_on_start?` alone therefore reported `claude` as accepting live
+  input, and a caller acting on that had its message silently swallowed while
+  every layer above reported success. Verified against the shipping CLI: text
+  piped before the turn changes the answer, and the same text written eight
+  seconds in does not.
+
+  No shipped profile declares `:incremental_input` today, so every lane is
+  steered by interrupt and resume. A profile that switches to a streaming input
+  mode declares it and changes this with it.
+
+  It is not `:interrupt` or `:resume` from `capabilities/0` — every profile
+  declares those, and they do not distinguish the two mechanisms.
   """
+  @incremental_input :incremental_input
+
   @spec accepts_input_after_start?(module()) :: boolean()
   def accepts_input_after_start?(module) when is_atom(module) do
-    if function_exported?(module, :transport_options, 1) or Code.ensure_loaded?(module) do
-      module.transport_options([]) |> Keyword.get(:close_stdin_on_start?, false) |> Kernel.not()
-    else
-      false
-    end
+    Code.ensure_loaded?(module) and stdin_stays_open?(module) and
+      @incremental_input in module.capabilities()
+  end
+
+  defp stdin_stays_open?(module) do
+    module.transport_options([]) |> Keyword.get(:close_stdin_on_start?, false) |> Kernel.not()
   end
 
   @doc """

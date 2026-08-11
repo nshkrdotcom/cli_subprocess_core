@@ -642,16 +642,26 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       refute Map.has_key?(state, :stderr_buffer)
     end
 
-    # The fact a caller needs to decide *how* to say something to a session
-    # already in flight. `capabilities/0` cannot answer it: every one of these
-    # profiles declares `:interrupt` and `:resume`.
-    test "only Claude accepts more input after its run has started" do
-      assert ProviderProfile.accepts_input_after_start?(Claude)
-
-      for profile <- [Codex, Amp, Cursor, Antigravity] do
+    # An open file descriptor is not a reader. `claude --print` consumes stdin
+    # once while assembling its prompt and never reads it again, so a mid-turn
+    # write reaches nobody — verified against the shipping CLI. No profile
+    # invokes a mode that keeps reading, so none accepts live input, and every
+    # lane is steered by interrupt and resume.
+    test "no profile accepts more input after its run has started" do
+      for profile <- [Claude, Codex, Amp, Cursor, Antigravity] do
         refute ProviderProfile.accepts_input_after_start?(profile),
-               "#{inspect(profile)} closes stdin on start"
+               "#{inspect(profile)} claims to read stdin mid-turn"
       end
+    end
+
+    test "accepting live input takes an open stdin and a declared reader, not either alone" do
+      # Claude has the open descriptor and not the declaration.
+      refute Claude.transport_options([])[:close_stdin_on_start?]
+      refute :incremental_input in Claude.capabilities()
+
+      # Codex has neither.
+      assert Codex.transport_options([])[:close_stdin_on_start?]
+      refute :incremental_input in Codex.capabilities()
     end
 
     test "Cursor closes stdin on start for headless print runs" do
