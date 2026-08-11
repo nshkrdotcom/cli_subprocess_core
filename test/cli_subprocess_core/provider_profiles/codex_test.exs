@@ -15,7 +15,8 @@ defmodule CliSubprocessCore.ProviderProfiles.CodexTest do
     Codex.decode_stdout(Jason.encode!(event), state || state())
   end
 
-  defp item(type, fields), do: %{"type" => "item.completed", "item" => Map.put(fields, "type", type)}
+  defp item(type, fields),
+    do: %{"type" => "item.completed", "item" => Map.put(fields, "type", type)}
 
   defp started(type, fields),
     do: %{"type" => "item.started", "item" => Map.put(fields, "type", type)}
@@ -135,7 +136,9 @@ defmodule CliSubprocessCore.ProviderProfiles.CodexTest do
 
     test "a failed status is an error even with no exit code" do
       for status <- ["failed", "errored", "interrupted", "not_found"] do
-        assert {[event], _state} = decode(item("mcp_tool_call", %{"id" => "i", "status" => status}))
+        assert {[event], _state} =
+                 decode(item("mcp_tool_call", %{"id" => "i", "status" => status}))
+
         assert %Payload.ToolResult{is_error: true} = event.payload
       end
     end

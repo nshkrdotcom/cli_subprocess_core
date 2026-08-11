@@ -710,6 +710,62 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert %Payload.Stderr{content: "claude warning"} = stderr.payload
     end
 
+    # The fixture above is the shape the profile was originally written for:
+    # top-level `tool_use` and `tool_result` events. `claude --output-format
+    # stream-json` emits neither. It emits Anthropic messages, with the tool
+    # call inside an `assistant` message's content and its result inside the
+    # next `user` message — so a run that edited a dozen files decoded as a
+    # dozen assistant messages with no text, and reported zero tools.
+    test "Claude decodes tool calls out of assistant and user messages" do
+      events = decode_fixture(Claude, "claude_messages")
+
+      assert Enum.map(events, & &1.kind) == [
+               :thinking,
+               :tool_use,
+               :tool_result,
+               :tool_use,
+               :tool_result,
+               :assistant_message
+             ]
+
+      assert %Payload.Thinking{content: "I should write the file first.", signature: "sig-abc"} =
+               Enum.at(events, 0).payload
+
+      assert %Payload.ToolUse{
+               tool_name: "Write",
+               tool_call_id: "toolu_01KWG17v6mzWkU85XPUbq8mZ",
+               input: %{"file_path" => "/tmp/demo/hello.txt", "content" => "hello\n"}
+             } = Enum.at(events, 1).payload
+
+      assert %Payload.ToolResult{
+               tool_call_id: "toolu_01KWG17v6mzWkU85XPUbq8mZ",
+               content: "File created successfully at: /tmp/demo/hello.txt",
+               is_error: false
+             } = Enum.at(events, 2).payload
+
+      assert %Payload.ToolUse{tool_name: "Read", tool_call_id: "toolu_01EBeTgT3ZaUu8ZaGwkgKppF"} =
+               Enum.at(events, 3).payload
+
+      # A structured tool result arrives as content blocks rather than a string.
+      assert %Payload.ToolResult{content: "File does not exist.", is_error: true} =
+               Enum.at(events, 4).payload
+
+      assert %Payload.AssistantMessage{
+               content: [%{"type" => "text", "text" => "Done."}],
+               model: "claude-haiku-4-5"
+             } = Enum.at(events, 5).payload
+
+      # The session id still rides on every event decoded after the frame that
+      # carried it.
+      assert Enum.at(events, 0).provider_session_id == "claude-session-9"
+    end
+
+    test "Claude emits no empty assistant message for a tool-only turn" do
+      events = decode_fixture(Claude, "claude_messages")
+
+      assert Enum.count(events, &(&1.kind == :assistant_message)) == 1
+    end
+
     test "Claude treats result frames with is_error=true as terminal auth errors" do
       state = Claude.init_parser_state([])
 

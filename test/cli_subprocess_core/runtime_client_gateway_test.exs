@@ -6,9 +6,16 @@ defmodule CliSubprocessCore.RuntimeClientGatewayTest do
   alias CliSubprocessCore.GovernedAuthority
   alias CliSubprocessCore.Payload
   alias CliSubprocessCore.ProviderProfiles.Codex
-  alias CliSubprocessCore.RuntimeGateway.Local
-  alias CliSubprocessCore.RuntimeGateway.RuntimeClient
-  alias CliSubprocessCore.RuntimeGateway.{Error, Session, StartRequest, Status}
+
+  alias CliSubprocessCore.RuntimeGateway.{
+    Error,
+    Local,
+    RuntimeClient,
+    Session,
+    StartRequest,
+    Status
+  }
+
   alias ExecutionPlane.ActiveExecution
   alias ExecutionPlane.Admission.Request, as: AdmissionRequest
   alias ExecutionPlane.Authority.Ref, as: AuthorityRef

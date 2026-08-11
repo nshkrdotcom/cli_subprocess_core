@@ -173,7 +173,12 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
   defp step_events("agent_response", _state_name, body, raw, state) do
     case Shared.fetch_any(body, [:text_delta, "text_delta"]) do
       delta when is_binary(delta) and delta != "" ->
-        Shared.emit_single(:assistant_delta, Payload.AssistantDelta.new(content: delta), raw, state)
+        Shared.emit_single(
+          :assistant_delta,
+          Payload.AssistantDelta.new(content: delta),
+          raw,
+          state
+        )
 
       _ ->
         {[], state}

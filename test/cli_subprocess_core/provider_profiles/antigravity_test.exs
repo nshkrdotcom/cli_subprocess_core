@@ -28,7 +28,13 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
                  dangerously_skip_permissions: true
                )
 
-      assert command.args == ["--print", "hello", "--output-format", "stream-json", "--dangerously-skip-permissions"]
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--dangerously-skip-permissions"
+             ]
     end
 
     test "adds dangerously skip permissions from provider permission mode" do
@@ -39,7 +45,13 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
                  permission_mode: :bypass
                )
 
-      assert command.args == ["--print", "hello", "--output-format", "stream-json", "--dangerously-skip-permissions"]
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--dangerously-skip-permissions"
+             ]
     end
 
     test "does not duplicate skip permissions when both aliases are set" do
@@ -51,7 +63,13 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
                  permission_mode: :bypass
                )
 
-      assert command.args == ["--print", "hello", "--output-format", "stream-json", "--dangerously-skip-permissions"]
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--dangerously-skip-permissions"
+             ]
     end
 
     test "adds one repeatable add-dir flag" do
@@ -62,7 +80,14 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
                  add_dirs: ["/workspace/one"]
                )
 
-      assert command.args == ["--print", "hello", "--output-format", "stream-json", "--add-dir", "/workspace/one"]
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--add-dir",
+               "/workspace/one"
+             ]
     end
 
     test "adds multiple repeatable add-dir flags without comma joining" do
@@ -94,7 +119,15 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
                  continue: true
                )
 
-      assert command.args == ["--print", "hello", "--output-format", "stream-json", "--conversation", "abc", "--continue"]
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--conversation",
+               "abc",
+               "--continue"
+             ]
     end
 
     test "adds optional print-timeout and log-file flags from the verified agy surface" do
@@ -259,7 +292,9 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
 
       assert {[event], _st} = decode(line)
       assert event.kind == :cost_update
-      assert %Payload.CostUpdate{input_tokens: 96, output_tokens: 3, total_tokens: 99} = event.payload
+
+      assert %Payload.CostUpdate{input_tokens: 96, output_tokens: 3, total_tokens: 99} =
+               event.payload
     end
 
     test "the result terminates the run and carries its usage" do
@@ -269,7 +304,7 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
       assert {[event], _st} = decode(line)
       assert event.kind == :result
       assert %Payload.Result{status: :completed, stop_reason: :end_turn} = event.payload
-      assert event.payload.output.usage.total_tokens == 18643
+      assert event.payload.output.usage.total_tokens == 18_643
     end
 
     test "a failed result is not reported as success" do
@@ -287,14 +322,14 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
 
       assert {[event], _st} =
                decode(
-                 step(~s({"step_index":2,"state":"ACTIVE","step_type":"agent_response","text_delta":"x"})),
+                 step(
+                   ~s({"step_index":2,"state":"ACTIVE","step_type":"agent_response","text_delta":"x"})
+                 ),
                  st
                )
 
       assert event.provider_session_id == "8f3aea78-f03c-4123-823f-62bd03840c84"
     end
-
-
 
     test "an unrecognized event is kept as raw rather than dropped" do
       assert {[event], _st} = decode(~s({"event":"something_new","something_new":{"a":1}}))

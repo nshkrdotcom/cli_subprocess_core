@@ -10,6 +10,13 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   @required_flags ["--output-format", "stream-json", "--verbose", "--print"]
+
+  # `claude --output-format stream-json` does not emit top-level `tool_use` or
+  # `tool_result` events. It emits Anthropic messages: a `tool_use` block sits
+  # inside an `assistant` message's content, and its result comes back as a
+  # `tool_result` block inside the *next* `user` message. The two top-level
+  # handlers below are kept for older builds and hand-written fixtures, but
+  # nothing the shipping CLI produces reaches them.
   @event_handlers %{
     "assistant" => :assistant_message,
     "assistant_delta" => :assistant_delta,
@@ -22,7 +29,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     "text_delta" => :assistant_delta,
     "thinking" => :thinking,
     "tool_result" => :tool_result,
-    "tool_use" => :tool_use
+    "tool_use" => :tool_use,
+    "user" => :user_message
   }
 
   @impl true
@@ -130,6 +138,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
 
   defp dispatch_event(:assistant_delta, raw, state), do: assistant_delta(raw, state)
   defp dispatch_event(:assistant_message, raw, state), do: assistant_message(raw, state)
+  defp dispatch_event(:user_message, raw, state), do: user_message(raw, state)
   defp dispatch_event(:thinking, raw, state), do: thinking(raw, state)
   defp dispatch_event(:tool_use, raw, state), do: tool_use(raw, state)
   defp dispatch_event(:tool_result, raw, state), do: tool_result(raw, state)
@@ -154,22 +163,134 @@ defmodule CliSubprocessCore.ProviderProfiles.Claude do
     )
   end
 
+  # One event per content block, in the order the block appeared. Emitting a
+  # single `assistant_message` carrying every block is what made Claude tool
+  # calls invisible: a message whose content was `[thinking, tool_use]` arrived
+  # downstream as an assistant message with no text, so a run that edited a
+  # dozen files rendered as a dozen blank lines and reported zero tools.
   defp assistant_message(raw, state) do
-    message =
-      case Shared.fetch_any(raw, [:message, "message"]) do
-        value when is_map(value) -> value
-        _ -> raw
-      end
+    message = message_map(raw)
+    model = Shared.fetch_any(message, [:model, "model"])
 
-    Shared.emit_single(
+    case Shared.content_blocks(message) do
+      [] -> emit_assistant_text([], model, raw, state)
+      blocks -> emit_blocks(blocks, raw, state, &assistant_block(&1, model, &2, &3))
+    end
+  end
+
+  defp assistant_block(block, model, raw, state) do
+    case block_type(block) do
+      "tool_use" -> emit_block_tool_use(block, raw, state)
+      "thinking" -> emit_block_thinking(block, raw, state)
+      _other -> emit_assistant_text([block], model, raw, state)
+    end
+  end
+
+  # The result of a `tool_use` block comes back as a `tool_result` block in the
+  # next `user` message, keyed by `tool_use_id`. Without this the whole reply
+  # half of every tool call was decoded as an unrecognized raw event.
+  defp user_message(raw, state) do
+    case raw |> message_map() |> Shared.content_blocks() do
+      [] -> emit_user_text([], raw, state)
+      blocks -> emit_blocks(blocks, raw, state, &user_block/3)
+    end
+  end
+
+  defp user_block(block, raw, state) do
+    case block_type(block) do
+      "tool_result" -> emit_block_tool_result(block, raw, state)
+      _other -> emit_user_text([block], raw, state)
+    end
+  end
+
+  defp emit_assistant_text(content, model, raw, state) do
+    Shared.emit_event(
       :assistant_message,
-      Payload.AssistantMessage.new(
-        content: Shared.content_blocks(message),
-        model: Shared.fetch_any(message, [:model, "model"])
+      Payload.AssistantMessage.new(content: content, model: model),
+      raw,
+      state
+    )
+  end
+
+  defp emit_user_text(content, raw, state) do
+    Shared.emit_event(:user_message, Payload.UserMessage.new(content: content), raw, state)
+  end
+
+  defp emit_block_tool_use(block, raw, state) do
+    Shared.emit_event(
+      :tool_use,
+      Payload.ToolUse.new(
+        tool_name: Shared.fetch_any(block, [:name, "name", :tool_name, "tool_name"]),
+        tool_call_id: Shared.fetch_any(block, [:id, "id", :tool_id, "tool_id"]),
+        input: Shared.tool_input(block)
       ),
       raw,
       state
     )
+  end
+
+  defp emit_block_thinking(block, raw, state) do
+    Shared.emit_event(
+      :thinking,
+      Payload.Thinking.new(
+        content: Shared.fetch_any(block, [:thinking, "thinking", :text, "text"]) || "",
+        signature: Shared.fetch_any(block, [:signature, "signature"])
+      ),
+      raw,
+      state
+    )
+  end
+
+  defp emit_block_tool_result(block, raw, state) do
+    Shared.emit_event(
+      :tool_result,
+      Payload.ToolResult.new(
+        tool_call_id:
+          Shared.fetch_any(block, [:tool_use_id, "tool_use_id", :tool_id, "tool_id", :id, "id"]),
+        content: tool_result_content(block),
+        is_error: Shared.truthy?(Shared.fetch_any(block, [:is_error, "is_error"]))
+      ),
+      raw,
+      state
+    )
+  end
+
+  # A tool result's content is a string for most tools and a list of content
+  # blocks for the ones that return structured output. Both have to reach a
+  # renderer as something it can print.
+  defp tool_result_content(block) do
+    case Shared.fetch_any(block, [:content, "content"]) do
+      value when is_binary(value) -> value
+      value when is_list(value) -> Enum.map_join(value, "\n", &block_text/1)
+      value -> value
+    end
+  end
+
+  defp block_text(block) when is_map(block) do
+    Shared.fetch_any(block, [:text, "text"]) || ""
+  end
+
+  defp block_text(block) when is_binary(block), do: block
+  defp block_text(_block), do: ""
+
+  defp block_type(block) when is_map(block), do: Shared.fetch_any(block, [:type, "type"])
+  defp block_type(_block), do: nil
+
+  defp message_map(raw) do
+    case Shared.fetch_any(raw, [:message, "message"]) do
+      value when is_map(value) -> value
+      _other -> raw
+    end
+  end
+
+  defp emit_blocks(blocks, raw, state, fun) do
+    {events, state} =
+      Enum.reduce(blocks, {[], state}, fn block, {acc, acc_state} ->
+        {event, next_state} = fun.(block, raw, acc_state)
+        {[event | acc], next_state}
+      end)
+
+    {Enum.reverse(events), state}
   end
 
   defp thinking(raw, state) do

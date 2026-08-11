@@ -123,8 +123,7 @@ defmodule CliSubprocessCore.MixProject do
     [
       name: "cli_subprocess_core",
       description: description(),
-      files:
-        ~w(lib priv/models guides examples mix.exs README* CHANGELOG* LICENSE* assets),
+      files: ~w(lib priv/models guides examples mix.exs README* CHANGELOG* LICENSE* assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -194,7 +193,11 @@ defmodule CliSubprocessCore.MixProject do
     if @workspace_checkout? and local_ground_paths_available?() do
       [
         apply(DependencySources, :dep, [:ground_plane_contracts, __DIR__, [override: true]]),
-        apply(DependencySources, :dep, [:ground_plane_persistence_policy, __DIR__, [override: true]])
+        apply(DependencySources, :dep, [
+          :ground_plane_persistence_policy,
+          __DIR__,
+          [override: true]
+        ])
       ]
     else
       []

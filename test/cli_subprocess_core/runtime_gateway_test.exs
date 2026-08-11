@@ -5,8 +5,7 @@ defmodule CliSubprocessCore.RuntimeGatewayTest do
   alias CliSubprocessCore.Event
   alias CliSubprocessCore.GovernedAuthority
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.RuntimeGateway.Local
-  alias CliSubprocessCore.RuntimeGateway.{Error, Session, StartRequest, Status}
+  alias CliSubprocessCore.RuntimeGateway.{Error, Local, Session, StartRequest, Status}
   alias ExecutionPlane.ProcessExit
 
   @digest "sha256:" <> String.duplicate("e", 64)

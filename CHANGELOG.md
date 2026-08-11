@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The Claude profile decodes tool calls. `claude --output-format stream-json`
+  does not emit top-level `tool_use` or `tool_result` events — it emits
+  Anthropic messages, with a `tool_use` block inside an `assistant` message's
+  content and its result inside the next `user` message. The profile handled
+  only the top-level shapes, which the shipping CLI never produces, and had no
+  handler for `user` at all. A Claude run that edited a dozen files therefore
+  decoded as a dozen assistant messages with empty content, reported zero
+  tools, and dropped every tool result as an unrecognized raw event.
+
+  An `assistant` message now emits one event per content block, in block order:
+  `tool_use` blocks become `:tool_use`, `thinking` blocks become `:thinking`,
+  and text blocks become `:assistant_message`. A `user` message emits
+  `:tool_result` per `tool_result` block, keyed by `tool_use_id`, with content
+  blocks flattened to text. The top-level handlers are kept for older builds
+  and hand-written fixtures.
+
+  Consumers should expect `:thinking` events from Claude where none arrived
+  before: they were previously swallowed inside the assistant message, not
+  absent.
+
 ## [0.5.1] - 2026-08-10
 
 ### Fixed
