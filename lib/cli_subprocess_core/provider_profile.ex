@@ -95,6 +95,28 @@ defmodule CliSubprocessCore.ProviderProfile do
   end
 
   @doc """
+  Whether a lane can be given more input after its run has started.
+
+  A profile that sets `close_stdin_on_start?` has no channel back into a
+  running turn: `claude` leaves stdin open and takes more input on it, while
+  `codex`, `amp`, `cursor`, and `antigravity` close it and can only be
+  interrupted and resumed on the same thread.
+
+  This is the fact a caller needs to decide *how* to say something to a session
+  already in flight. It is not `:interrupt` or `:resume` from `capabilities/0`
+  — every one of those profiles declares those, and they do not distinguish the
+  two mechanisms.
+  """
+  @spec accepts_input_after_start?(module()) :: boolean()
+  def accepts_input_after_start?(module) when is_atom(module) do
+    if function_exported?(module, :transport_options, 1) or Code.ensure_loaded?(module) do
+      module.transport_options([]) |> Keyword.get(:close_stdin_on_start?, false) |> Kernel.not()
+    else
+      false
+    end
+  end
+
+  @doc """
   Validates a normalized invocation returned by a provider profile.
   """
   @spec validate_invocation(invocation()) ::

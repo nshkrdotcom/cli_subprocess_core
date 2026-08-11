@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `CliSubprocessCore.ProviderProfile.accepts_input_after_start?/1`: whether a
+  lane can be handed more input once its run has started. `claude` leaves stdin
+  open; `codex`, `amp`, `cursor`, and `antigravity` close it and can only be
+  interrupted and resumed. `capabilities/0` cannot answer this — every one of
+  those profiles declares `:interrupt` and `:resume`, and they do not
+  distinguish the two mechanisms.
+
 ### Fixed
 
 - The Claude profile decodes tool calls. `claude --output-format stream-json`

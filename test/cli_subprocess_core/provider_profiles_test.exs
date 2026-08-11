@@ -3,7 +3,8 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
 
   alias CliSubprocessCore.Command
   alias CliSubprocessCore.Payload
-  alias CliSubprocessCore.ProviderProfiles.{Amp, Claude, Codex, Cursor}
+  alias CliSubprocessCore.ProviderProfile
+  alias CliSubprocessCore.ProviderProfiles.{Amp, Antigravity, Claude, Codex, Cursor}
   alias CliSubprocessCore.ProviderProfiles.Shared
 
   describe "build_invocation/1" do
@@ -639,6 +640,18 @@ defmodule CliSubprocessCore.ProviderProfilesTest do
       assert event.payload.metadata.line == malformed
       refute Map.has_key?(state, :stdout_buffer)
       refute Map.has_key?(state, :stderr_buffer)
+    end
+
+    # The fact a caller needs to decide *how* to say something to a session
+    # already in flight. `capabilities/0` cannot answer it: every one of these
+    # profiles declares `:interrupt` and `:resume`.
+    test "only Claude accepts more input after its run has started" do
+      assert ProviderProfile.accepts_input_after_start?(Claude)
+
+      for profile <- [Codex, Amp, Cursor, Antigravity] do
+        refute ProviderProfile.accepts_input_after_start?(profile),
+               "#{inspect(profile)} closes stdin on start"
+      end
     end
 
     test "Cursor closes stdin on start for headless print runs" do
