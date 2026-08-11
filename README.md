@@ -58,7 +58,13 @@ facade over `ExecutionPlane.Process.Transport.Surface`.
 
 ### Registry ownership and hex publish-ordering
 
-The shared model catalog (`priv/models/*.json`) ships from this package.
+The shared model catalog (`priv/models/*.json`) ships from this package and is
+also embedded in the catalog loader at compile time. Normal OTP releases read
+the packaged files; archive deployments such as escripts fall back to those
+same embedded bytes when the archive path is not directly readable. An
+installed consumer therefore resolves exactly the catalog that its compiled
+dependency shipped, without extracting files or depending on a source
+checkout.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
@@ -90,7 +96,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.6.0"}
+    {:cli_subprocess_core, "~> 0.7.0"}
   ]
 end
 ```

@@ -41,6 +41,13 @@ The model-selection internals live in:
 - `priv/models/claude.json`
 - `priv/models/amp.json`
 
+The JSON files are both packaged as ordinary OTP application resources and
+embedded into the internal model catalog module at compile time. The loader
+prefers the normal application path, then uses the embedded copy when an
+archive deployment makes that path unreadable. Keep catalog changes in the
+JSON source: the compiler tracks every file as an external resource and
+rebuilds the embedded copy automatically.
+
 ## What the Catalogs Contain
 
 Each provider catalog is a core-owned source of truth.

@@ -15,7 +15,7 @@ defmodule CliSubprocessCore.MixProject do
 
   @workspace_checkout? File.regular?(Path.expand("build_support/dependency_sources.exs", __DIR__))
 
-  @version "0.6.0"
+  @version "0.7.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"

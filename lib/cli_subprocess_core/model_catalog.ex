@@ -19,11 +19,30 @@ defmodule CliSubprocessCore.ModelCatalog do
 
   @catalog_filename_suffix ".json"
   @default_catalog_version "2026-03-25"
+  @catalog_directory Path.expand("../../priv/models", __DIR__)
+  @catalog_paths Path.wildcard(Path.join(@catalog_directory, "*#{@catalog_filename_suffix}"))
+
+  for path <- @catalog_paths do
+    @external_resource path
+  end
+
+  @embedded_catalogs Map.new(@catalog_paths, fn path ->
+                       provider =
+                         path
+                         |> Path.basename(@catalog_filename_suffix)
+                         |> String.to_existing_atom()
+
+                       {provider, File.read!(path)}
+                     end)
 
   @spec load(atom()) :: {:ok, t()} | {:error, load_error()}
   def load(provider) when is_atom(provider) do
-    path = catalog_path(provider)
+    load_from_path(provider, catalog_path(provider))
+  end
 
+  @doc false
+  @spec load_from_path(atom(), String.t()) :: {:ok, t()} | {:error, load_error()}
+  def load_from_path(provider, path) when is_atom(provider) and is_binary(path) do
     with {:ok, body} <- read_catalog(path, provider),
          {:ok, payload} <- decode_catalog(body, provider),
          {:ok, models} <- decode_models(payload, provider) do
@@ -48,8 +67,18 @@ defmodule CliSubprocessCore.ModelCatalog do
       {:ok, body} ->
         {:ok, body}
 
-      {:error, reason} ->
-        {:error, {:model_unavailable, provider, {:not_found, reason}}}
+      {:error, filesystem_reason} ->
+        read_embedded_catalog(provider, filesystem_reason)
+    end
+  end
+
+  defp read_embedded_catalog(provider, filesystem_reason) do
+    case Map.fetch(@embedded_catalogs, provider) do
+      {:ok, body} ->
+        {:ok, body}
+
+      :error ->
+        {:error, {:model_unavailable, provider, {:not_found, filesystem_reason}}}
     end
   end
 

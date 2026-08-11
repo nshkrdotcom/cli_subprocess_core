@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-10
+
+### Fixed
+
+- Make the first-party model catalogs available from installed escripts.
+  `ModelCatalog` previously read only `Application.app_dir/2` paths. Inside an
+  escript that path traverses the archive as though it were a directory, so
+  every provider failed before launch with `{:not_found, :enotdir}`. Catalog
+  JSON is now tracked and embedded at compile time, with filesystem-first
+  loading and an embedded fallback. A regression test exercises the exact
+  file-as-parent `:enotdir` shape while retaining the fail-closed error for an
+  unknown provider.
+
 ## [0.6.0] - 2026-08-10
 
 ### Added
@@ -282,7 +295,8 @@ The package is Dialyzer- and Credo-clean with no ignore entries.
   base-URL, target, and clear-env materialization without ambient provider CLI
   env discovery.
 
-[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.1...v0.5.0

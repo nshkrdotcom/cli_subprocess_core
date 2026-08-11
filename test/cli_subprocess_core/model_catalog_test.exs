@@ -168,5 +168,28 @@ defmodule CliSubprocessCore.ModelCatalogTest do
       assert {:error, {:model_unavailable, :missing_provider, _}} =
                ModelCatalog.load(:missing_provider)
     end
+
+    test "loads the embedded catalog when an archive path is not a directory" do
+      temp_root =
+        Path.join(
+          System.tmp_dir!(),
+          "cli-subprocess-catalog-#{System.unique_integer([:positive])}"
+        )
+
+      archive_path = Path.join(temp_root, "prompt_runner.escript")
+
+      :ok = File.mkdir_p(temp_root)
+      :ok = File.write(archive_path, "archive")
+
+      on_exit(fn -> File.rm_rf(temp_root) end)
+
+      assert {:ok, catalog} =
+               archive_path
+               |> Path.join("priv/models/codex.json")
+               |> then(&ModelCatalog.load_from_path(:codex, &1))
+
+      assert catalog.provider == :codex
+      assert catalog.remote_default == "gpt-5.6-sol"
+    end
   end
 end
