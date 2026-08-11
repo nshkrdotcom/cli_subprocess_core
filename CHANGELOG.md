@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-10
+
+### Fixed
+
+- Make the published package loadable by any consumer. `mix.exs` required
+  `build_support/dependency_sources.exs`, which the package does not ship, so
+  `mix compile` in a consuming project died while Mix loaded this dependency's
+  project. It now detects a source checkout by that file's presence: in a
+  checkout the registry resolves siblings path-first as before, and in a
+  published package the Hex requirements stated in `mix.exs` are the whole
+  answer. 0.5.0 is retired.
+
 ## [0.5.0] - 2026-08-10
 
 Two provider profiles were written against event schemas their CLIs do not

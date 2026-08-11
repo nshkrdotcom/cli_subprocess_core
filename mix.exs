@@ -1,11 +1,21 @@
-unless Code.ensure_loaded?(DependencySources) do
-  Code.require_file("build_support/dependency_sources.exs", __DIR__)
+# `build_support/` is not shipped in the published package, so its absence is
+# how this file knows it is running inside a consumer's deps/ rather than in a
+# source checkout. Guard on the file, not on a directory shape: a shape test
+# breaks when the repo is vendored at a different depth or used as a git dep
+# with :subdir.
+workspace_helper = Path.expand("build_support/dependency_sources.exs", __DIR__)
+workspace_checkout? = File.regular?(workspace_helper)
+
+if workspace_checkout? and not Code.ensure_loaded?(DependencySources) do
+  Code.require_file(workspace_helper)
 end
 
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @workspace_checkout? File.regular?(Path.expand("build_support/dependency_sources.exs", __DIR__))
+
+  @version "0.5.1"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -114,7 +124,7 @@ defmodule CliSubprocessCore.MixProject do
       name: "cli_subprocess_core",
       description: description(),
       files:
-        ~w(lib priv/models build_support guides examples mix.exs README* CHANGELOG* LICENSE* assets),
+        ~w(lib priv/models guides examples mix.exs README* CHANGELOG* LICENSE* assets),
       licenses: ["MIT"],
       maintainers: ["nshkrdotcom"],
       links: %{
@@ -157,16 +167,23 @@ defmodule CliSubprocessCore.MixProject do
       ]
   end
 
-  defp execution_plane_dep do
-    DependencySources.dep(:execution_plane, __DIR__)
-  end
+  defp execution_plane_dep, do: workspace_dep(:execution_plane, "~> 0.2.3")
 
-  defp execution_plane_process_dep do
-    DependencySources.dep(:execution_plane_process, __DIR__)
-  end
+  defp execution_plane_process_dep,
+    do: workspace_dep(:execution_plane_process, "~> 0.1.2")
 
-  defp execution_plane_jsonrpc_dep do
-    DependencySources.dep(:execution_plane_jsonrpc, __DIR__)
+  defp execution_plane_jsonrpc_dep,
+    do: workspace_dep(:execution_plane_jsonrpc, "~> 0.1.0")
+
+  # In a source checkout the registry decides the source (path first). In a
+  # published package there is no registry, and the requirement stated here is
+  # the whole answer.
+  defp workspace_dep(app, hex_requirement) do
+    if @workspace_checkout? do
+      apply(DependencySources, :dep, [app, __DIR__])
+    else
+      {app, hex_requirement}
+    end
   end
 
   # The Execution Plane core package declares ordinary Hex Ground
@@ -174,10 +191,10 @@ defmodule CliSubprocessCore.MixProject do
   # consumers override them at the top level. Hex mode omits these entries, so
   # they never enter the published CLI package dependency surface.
   defp local_ground_overrides({:execution_plane, opts}) when is_list(opts) do
-    if local_ground_paths_available?() do
+    if @workspace_checkout? and local_ground_paths_available?() do
       [
-        DependencySources.dep(:ground_plane_contracts, __DIR__, override: true),
-        DependencySources.dep(:ground_plane_persistence_policy, __DIR__, override: true)
+        apply(DependencySources, :dep, [:ground_plane_contracts, __DIR__, [override: true]]),
+        apply(DependencySources, :dep, [:ground_plane_persistence_policy, __DIR__, [override: true]])
       ]
     else
       []
