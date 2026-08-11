@@ -3,6 +3,8 @@
 `cli_subprocess_core` is the provider-facing runtime layer above the lower
 execution substrate.
 
+This guide targets `cli_subprocess_core ~> 0.6.0`.
+
 Use it when you want normalized provider commands, sessions, payloads, and
 events instead of working directly with the raw transport substrate.
 
@@ -15,7 +17,7 @@ surfaces route through `ExecutionPlane.Process.Transport`.
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.4.0"}
+    {:cli_subprocess_core, "~> 0.6.0"}
   ]
 end
 ```

@@ -15,7 +15,7 @@ defmodule CliSubprocessCore.MixProject do
 
   @workspace_checkout? File.regular?(Path.expand("build_support/dependency_sources.exs", __DIR__))
 
-  @version "0.5.1"
+  @version "0.6.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -166,10 +166,10 @@ defmodule CliSubprocessCore.MixProject do
       ]
   end
 
-  defp execution_plane_dep, do: workspace_dep(:execution_plane, "~> 0.2.3")
+  defp execution_plane_dep, do: workspace_dep(:execution_plane, "~> 0.3.0")
 
   defp execution_plane_process_dep,
-    do: workspace_dep(:execution_plane_process, "~> 0.1.2")
+    do: workspace_dep(:execution_plane_process, "~> 0.2.0")
 
   defp execution_plane_jsonrpc_dep,
     do: workspace_dep(:execution_plane_jsonrpc, "~> 0.1.0")

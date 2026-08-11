@@ -7,14 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-10
+
 ### Added
 
 - `CliSubprocessCore.ProviderProfile.accepts_input_after_start?/1`: whether a
-  lane can be handed more input once its run has started. `claude` leaves stdin
-  open; `codex`, `amp`, `cursor`, and `antigravity` close it and can only be
-  interrupted and resumed. `capabilities/0` cannot answer this — every one of
-  those profiles declares `:interrupt` and `:resume`, and they do not
-  distinguish the two mechanisms.
+  lane can actually be handed more input once its run has started. The answer
+  requires an open stdin and an explicit `:incremental_input` capability; no
+  shipped profile currently declares it, so current lanes interrupt and resume
+  instead. `capabilities/0` alone cannot distinguish the mechanisms.
 
 ### Changed
 
@@ -278,7 +279,10 @@ The package is Dialyzer- and Credo-clean with no ignore entries.
   base-URL, target, and clear-env materialization without ambient provider CLI
   env discovery.
 
-[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.2.0...v0.3.0

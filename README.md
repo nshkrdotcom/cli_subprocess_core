@@ -62,8 +62,8 @@ The shared model catalog (`priv/models/*.json`) ships from this package.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. The release order is core-only `execution_plane 0.2.0`, then
-`execution_plane_process 0.1.0` and `execution_plane_jsonrpc 0.1.0`, then
+Hex consumers. The release order is core-only `execution_plane 0.3.0`, then
+`execution_plane_process 0.2.0` and `execution_plane_jsonrpc 0.1.0`, then
 `cli_subprocess_core`, then the provider/ASM consumers, so every published
 version sees both its lower runtime and the current catalog. Consumers
 switching between `:path` and `:github`/`:hex`
@@ -90,7 +90,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.4.0"}
+    {:cli_subprocess_core, "~> 0.6.0"}
   ]
 end
 ```
