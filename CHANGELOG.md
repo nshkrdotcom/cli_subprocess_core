@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Require `execution_plane_jsonrpc ~> 0.2.0`, the first JSON-RPC component
+  release compatible with the core-only `execution_plane ~> 0.3.0` line.
+
 - `ProviderProfile.accepts_input_after_start?/1` no longer reports `claude` as
   accepting live input. It derived the answer from `close_stdin_on_start?`
   alone, and an open file descriptor is not a reader: `claude --print` takes

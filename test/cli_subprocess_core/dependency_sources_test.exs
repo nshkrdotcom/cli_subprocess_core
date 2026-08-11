@@ -20,7 +20,7 @@ defmodule CliSubprocessCore.DependencySourcesTest do
   @hex_requirements %{
     execution_plane: "~> 0.3.0",
     execution_plane_process: "~> 0.2.0",
-    execution_plane_jsonrpc: "~> 0.1.0"
+    execution_plane_jsonrpc: "~> 0.2.0"
   }
 
   setup do

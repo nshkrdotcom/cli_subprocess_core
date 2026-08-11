@@ -172,7 +172,7 @@ defmodule CliSubprocessCore.MixProject do
     do: workspace_dep(:execution_plane_process, "~> 0.2.0")
 
   defp execution_plane_jsonrpc_dep,
-    do: workspace_dep(:execution_plane_jsonrpc, "~> 0.1.0")
+    do: workspace_dep(:execution_plane_jsonrpc, "~> 0.2.0")
 
   # In a source checkout the registry decides the source (path first). In a
   # published package there is no registry, and the requirement stated here is
