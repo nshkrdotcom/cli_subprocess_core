@@ -311,30 +311,8 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
       )
       when is_binary(execution_ref) do
     case Map.fetch(state.executions, execution_ref) do
-      {:ok, key} ->
-        entry = Map.fetch!(state.sessions, key)
-
-        case consume_runtime_event(entry, execution_ref, runtime_event) do
-          {:ok, entry, events, terminal_status} ->
-            deliver_events(entry, events)
-            deliver_terminal(entry, terminal_status)
-
-            entry =
-              if terminal_status do
-                Process.send_after(self(), {:forget_terminal, key}, @terminal_retention_ms)
-                %{entry | subscribers: MapSet.new()}
-              else
-                entry
-              end
-
-            {:noreply, put_entry(state, key, entry)}
-
-          :ignore ->
-            {:noreply, state}
-        end
-
-      :error ->
-        {:noreply, state}
+      {:ok, key} -> {:noreply, dispatch_runtime_event(state, key, execution_ref, runtime_event)}
+      :error -> {:noreply, state}
     end
   end
 
@@ -500,41 +478,60 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
        ),
        do: {:error, error(:unauthorized, "governed_authority_required", false)}
 
+  # The refs the authority and the request have to agree on, each with the
+  # reason code a mismatch reports. A list rather than a `cond` chain because
+  # that is what it is: one comparison per row, and adding a ref should mean
+  # adding a row.
+  @authority_bindings [
+    {:authority_ref, "authority_ref_mismatch"},
+    {:target_ref, "target_ref_mismatch"},
+    {:command_ref, "command_ref_mismatch"}
+  ]
+
+  @metadata_bindings [
+    {:working_directory_ref, "working_directory_ref_mismatch"},
+    {:environment_materialization_ref, "environment_materialization_ref_mismatch"},
+    {:operation_ref, "operation_ref_mismatch"}
+  ]
+
+  @lifecycle_keys [:subscriber, :starter, :name]
+
   defp validate_session_binding(request, %Options{} = options, session_opts) do
     authority = options.governed_authority
-    metadata = options.metadata
 
-    cond do
-      Keyword.has_key?(session_opts, :subscriber) or Keyword.has_key?(session_opts, :starter) or
-          Keyword.has_key?(session_opts, :name) ->
-        {:error, error(:invalid_request, "gateway_owns_session_lifecycle", false)}
-
-      authority.authority_ref != request.authority_ref ->
-        {:error, error(:unauthorized, "authority_ref_mismatch", false)}
-
-      authority.target_ref != request.target_ref ->
-        {:error, error(:unauthorized, "target_ref_mismatch", false)}
-
-      authority.command_ref != request.command_ref ->
-        {:error, error(:unauthorized, "command_ref_mismatch", false)}
-
-      metadata_value(metadata, :working_directory_ref) != request.working_directory_ref ->
-        {:error, error(:unauthorized, "working_directory_ref_mismatch", false)}
-
-      metadata_value(metadata, :environment_materialization_ref) !=
-          request.environment_materialization_ref ->
-        {:error, error(:unauthorized, "environment_materialization_ref_mismatch", false)}
-
-      metadata_value(metadata, :operation_ref) != request.operation_ref ->
-        {:error, error(:unauthorized, "operation_ref_mismatch", false)}
-
-      command_digest(authority) != request.command_digest ->
-        {:error, error(:unauthorized, "command_digest_mismatch", false)}
-
-      true ->
-        :ok
+    with :ok <- validate_lifecycle_ownership(session_opts),
+         :ok <- validate_authority_refs(authority, request),
+         :ok <- validate_metadata_refs(options.metadata, request) do
+      hold(command_digest(authority) == request.command_digest, "command_digest_mismatch")
     end
   end
+
+  defp validate_lifecycle_ownership(session_opts) do
+    if Enum.any?(@lifecycle_keys, &Keyword.has_key?(session_opts, &1)) do
+      {:error, error(:invalid_request, "gateway_owns_session_lifecycle", false)}
+    else
+      :ok
+    end
+  end
+
+  defp validate_authority_refs(authority, request) do
+    Enum.find_value(@authority_bindings, :ok, fn {field, reason} ->
+      mismatch(Map.get(authority, field), Map.get(request, field), reason)
+    end)
+  end
+
+  defp validate_metadata_refs(metadata, request) do
+    Enum.find_value(@metadata_bindings, :ok, fn {field, reason} ->
+      mismatch(metadata_value(metadata, field), Map.get(request, field), reason)
+    end)
+  end
+
+  defp mismatch(left, right, reason) do
+    if left == right, do: nil, else: {:error, error(:unauthorized, reason, false)}
+  end
+
+  defp hold(true, _reason), do: :ok
+  defp hold(false, reason), do: {:error, error(:unauthorized, reason, false)}
 
   defp build_invocation(profile, options) do
     profile_opts = Options.provider_profile_options(options)
@@ -1233,23 +1230,24 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
     _kind, _reason -> {:error, :runtime_client_failure}
   end
 
-  defp runtime_error(%RuntimeError{} = runtime_error, reason_code) do
-    category =
-      case runtime_error.category do
-        "invalid_request" -> :invalid_request
-        "rejected" -> :unauthorized
-        "unavailable" -> :unavailable
-        "timeout" -> :timeout
-        "backpressure" -> :backpressure
-        "cancelled" -> :cancelled
-        "transport_lost" -> :transport_lost
-        "ambiguous" -> :ambiguous
-        "terminal" -> :terminal
-        _unknown -> :transport_lost
-      end
+  # An unrecognized category reads as a lost transport rather than as a
+  # specific failure: claiming to know which one it was would be a guess, and a
+  # retryable guess at that.
+  @runtime_error_categories %{
+    "invalid_request" => :invalid_request,
+    "rejected" => :unauthorized,
+    "unavailable" => :unavailable,
+    "timeout" => :timeout,
+    "backpressure" => :backpressure,
+    "cancelled" => :cancelled,
+    "transport_lost" => :transport_lost,
+    "ambiguous" => :ambiguous,
+    "terminal" => :terminal
+  }
 
+  defp runtime_error(%RuntimeError{} = runtime_error, reason_code) do
     error(
-      category,
+      Map.get(@runtime_error_categories, runtime_error.category, :transport_lost),
       "#{reason_code}_#{runtime_error.category}",
       runtime_error.retryable,
       runtime_error.evidence_ref
@@ -1258,6 +1256,30 @@ defmodule CliSubprocessCore.RuntimeGateway.RuntimeClient do
 
   defp runtime_error(_reason, reason_code),
     do: error(:unavailable, "#{reason_code}_unavailable", true)
+
+  # A terminal event stops delivery to this entry's subscribers and schedules
+  # the entry's own removal. Retention is not immediate: a subscriber that
+  # arrives just after the end still needs to be able to read how it ended.
+  defp dispatch_runtime_event(state, key, execution_ref, runtime_event) do
+    entry = Map.fetch!(state.sessions, key)
+
+    case consume_runtime_event(entry, execution_ref, runtime_event) do
+      {:ok, entry, events, terminal_status} ->
+        deliver_events(entry, events)
+        deliver_terminal(entry, terminal_status)
+        put_entry(state, key, retire_if_terminal(entry, key, terminal_status))
+
+      :ignore ->
+        state
+    end
+  end
+
+  defp retire_if_terminal(entry, _key, nil), do: entry
+
+  defp retire_if_terminal(entry, key, _terminal_status) do
+    Process.send_after(self(), {:forget_terminal, key}, @terminal_retention_ms)
+    %{entry | subscribers: MapSet.new()}
+  end
 
   defp deliver_events(entry, events) do
     Enum.each(entry.subscribers, fn subscriber ->

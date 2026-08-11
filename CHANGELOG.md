@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those profiles declares `:interrupt` and `:resume`, and they do not
   distinguish the two mechanisms.
 
+### Changed
+
+- The two governed-binding validators in `RuntimeGateway.Local` and
+  `RuntimeGateway.RuntimeClient` are ordered rule lists rather than duplicated
+  `cond` chains. Same comparisons, same reason codes, same short-circuit: one
+  row per ref, so adding a ref means adding a row.
+
 ### Fixed
 
 - The Claude profile decodes tool calls. `claude --output-format stream-json`
