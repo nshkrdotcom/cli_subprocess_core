@@ -13,20 +13,19 @@ Use the local model-selection script for workflow validation:
 - First-party profiles currently shipped here: Claude, Codex, Cursor, Amp, and
   Antigravity. Google coding-agent support is Antigravity-only.
 - Downstream provider SDKs should consume `CliSubprocessCore.*` facades such as `ExecutionSurface`, `TransportError`, `TransportInfo`, and `ProcessExit`, not raw `ExecutionPlane.*` modules.
-- Keep local sibling deps publish-aware. Local development uses
-  `build_support/dependency_sources.exs` and
-  `build_support/dependency_sources.config.exs`. Committed default dependency
-  priority is `path -> GitHub -> Hex` so local sibling checkouts resolve
-  consistently across downstream workspaces while clean standalone clones fall
-  back to GitHub. This repo pins the three canonical Execution Plane components
-  — `core/execution_plane`, `runtimes/execution_plane_process`, and
-  `protocols/execution_plane_jsonrpc` — by path, by GitHub `subdir`, and by Hex
-  version.
-- Local dependency overrides use `.dependency_sources.local.exs`.
-- Default dependency priority is `path -> GitHub -> Hex`; publish mode is
-  Hex-only and must fail with exact blockers if an internal dep is unavailable
-  on Hex.
-- Dependency source selection must not use environment variables.
+- Keep local sibling deps publish-aware. Committed dependency tuples remain
+  ordinary Hex requirements so standalone clones and published consumers work
+  without workspace tooling. Operator-managed development loads the MWO
+  bootstrap and resolves eligible local/GitHub/Hex coordinates from Portfolio
+  Registry; source preferences live in operator XDG configuration, never here.
+  This repo uses the three canonical Execution Plane components —
+  `core/execution_plane`, `runtimes/execution_plane_process`, and
+  `protocols/execution_plane_jsonrpc`.
+- MWO's process-scoped bootstrap pointer is the only dependency-management
+  environment input read by `mix.exs`; application runtime source selection
+  must not use environment variables.
+- Publish mode is Hex-only and must fail with exact blockers if an internal dep
+  is unavailable on Hex.
 - Weld reproduces only the historical `execution_plane 0.1.0` monolith; it is
   not the publication source for 0.2.0 or later. The current public topology is
   core-only `execution_plane` plus the independently published process and
@@ -89,4 +88,3 @@ knowledge to fix is reported, not suppressed.
 These tools find real defects. `normalize_session_id/1` returning the string
 `"nil"` for `nil`, and `Surface.capabilities/1` accepting a `nil` surface kind
 through an `is_atom/1` guard, were both found this way.
-
