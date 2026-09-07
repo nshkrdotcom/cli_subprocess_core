@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "catalog_version": "2026-07-25",
+  "catalog_version": "2026-09-07",
   "remote_default": "sonnet",
   "models": [
     {
@@ -25,8 +25,8 @@
         "description": "Default recommended Claude model. Best combination of speed and intelligence.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
-        "input_price_per_mtok_usd": 3,
-        "output_price_per_mtok_usd": 15
+        "input_price_per_mtok_usd": 2,
+        "output_price_per_mtok_usd": 10
       }
     },
     {
@@ -49,8 +49,8 @@
         "description": "Sonnet 5 with 1M context.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
-        "input_price_per_mtok_usd": 3,
-        "output_price_per_mtok_usd": 15
+        "input_price_per_mtok_usd": 2,
+        "output_price_per_mtok_usd": 10
       }
     },
     {
@@ -106,7 +106,11 @@
     {
       "id": "fable",
       "aliases": [
-        "claude-fable-5"
+        "claude-fable-5-1",
+        "claude-fable-5",
+        "claude-5-1-fable",
+        "fable-5.1",
+        "fable-5-1"
       ],
       "visibility": "public",
       "family": "claude",
@@ -118,12 +122,38 @@
         "max"
       ],
       "metadata": {
-        "display_name": "Fable 5",
-        "description": "Anthropic's most capable widely released Claude model for the most demanding reasoning and agentic work.",
+        "display_name": "Claude Fable 5.1",
+        "description": "Anthropic's most capable widely released Claude model for demanding reasoning and agentic work.",
         "context_window_tokens": 1000000,
         "max_output_tokens": 128000,
         "input_price_per_mtok_usd": 10,
-        "output_price_per_mtok_usd": 50
+        "output_price_per_mtok_usd": 50,
+        "cached_read_price_per_mtok_usd": 0.25
+      }
+    },
+    {
+      "id": "claude-mythos-5-1",
+      "aliases": [
+        "mythos-5.1",
+        "mythos-5-1"
+      ],
+      "visibility": "restricted",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Claude Mythos 5.1",
+        "description": "Restricted-access counterpart to Claude Fable 5.1 (Project Glasswing).",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 10,
+        "output_price_per_mtok_usd": 50,
+        "cached_read_price_per_mtok_usd": 0.25
       }
     },
     {

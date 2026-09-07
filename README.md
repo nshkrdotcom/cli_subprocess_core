@@ -68,9 +68,10 @@ checkout.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. The release order is core-only `execution_plane 0.3.0`, then
-`execution_plane_process 0.3.0` and `execution_plane_jsonrpc 0.2.0`, then
-`cli_subprocess_core`, then the provider/ASM consumers, so every published
+Hex consumers. For the September train, publish `ground_plane_contracts 0.1.1`,
+then `execution_plane_process 0.3.1`, then `cli_subprocess_core 0.8.0`, then
+the provider/ASM consumers. Core-only `execution_plane 0.3.0` and
+`execution_plane_jsonrpc 0.2.0` are already published prerequisites. Every published
 version sees both its lower runtime and the current catalog. Consumers
 switching between `:path` and `:github`/`:hex`
 resolution should prune any previously fetched `deps/cli_subprocess_core`
@@ -96,7 +97,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.7.0"}
+    {:cli_subprocess_core, "~> 0.8.0"}
   ]
 end
 ```

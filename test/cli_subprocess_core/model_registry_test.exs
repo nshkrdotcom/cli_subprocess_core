@@ -8,19 +8,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.resolve/3" do
     test "resolves with explicit request precedence" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4", model: "legacy")
+               ModelRegistry.resolve(:codex, "gpt-5.4-mini", model: "legacy")
 
       assert payload.resolution_source == :explicit
-      assert payload.resolved_model == "gpt-5.4"
+      assert payload.resolved_model == "gpt-5.4-mini"
       assert payload.provider == :codex
     end
 
     test "ignores legacy model values passed through opts" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, nil, model: "gpt-5.4")
+               ModelRegistry.resolve(:codex, nil, model: "gpt-5.4-mini")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-5.6-sol"
+      assert payload.resolved_model == "gpt-6-astra"
       assert payload.requested_model == nil
     end
 
@@ -99,15 +99,104 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "allow_unknown still resolves known Codex aliases normally (no unregistered marker)" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4", allow_unknown: true)
+               ModelRegistry.resolve(:codex, "gpt-5.4-mini", allow_unknown: true)
 
-      assert payload.resolved_model == "gpt-5.4"
+      assert payload.resolved_model == "gpt-5.4-mini"
       refute Map.get(payload.extra, "unregistered")
     end
 
     test "unknown Codex model still errors without allow_unknown" do
       assert {:error, {:unknown_model, "gpt-5.9-not-yet-released", _known, :codex}} =
                ModelRegistry.resolve(:codex, "gpt-5.9-not-yet-released")
+    end
+
+    test "resolves Antigravity models including gemini-3.8-flash and reasoning efforts" do
+      assert {:ok, %Selection{} = selection} =
+               ModelRegistry.resolve(:antigravity, "gemini-3.8-flash")
+
+      assert selection.resolved_model == "gemini-3.8-flash"
+      assert selection.model_family == "gemini"
+      assert selection.reasoning == "medium"
+
+      assert {:ok, %Selection{} = selection38} =
+               ModelRegistry.resolve(:antigravity, "gemini-3.8-flash", reasoning: "high")
+
+      assert selection38.reasoning == "high"
+
+      assert {:ok, %Selection{} = selection36} =
+               ModelRegistry.resolve(:antigravity, "gemini-3.6-flash", reasoning: "low")
+
+      assert selection36.resolved_model == "gemini-3.6-flash"
+      assert selection36.reasoning == "low"
+
+      assert {:ok, %Selection{} = selection31} =
+               ModelRegistry.resolve(:antigravity, "gemini-3.1-pro", reasoning: "low")
+
+      assert selection31.resolved_model == "gemini-3.1-pro"
+      assert selection31.reasoning == "low"
+
+      assert {:ok, %Selection{} = alias_sel} =
+               ModelRegistry.resolve(:antigravity, "3.8-flash")
+
+      assert alias_sel.resolved_model == "gemini-3.8-flash"
+
+      assert {:ok, %Selection{} = def_high} =
+               ModelRegistry.resolve(:antigravity, "default", reasoning: "high")
+
+      assert def_high.resolved_model == "default"
+      assert def_high.reasoning == "high"
+
+      assert {:ok, %Selection{} = def_none} =
+               ModelRegistry.resolve(:antigravity, "default")
+
+      assert def_none.resolved_model == "default"
+      assert def_none.reasoning == nil
+    end
+
+    test "resolves Claude Fable 5.1 and Mythos 5.1 with aliases" do
+      assert {:ok, %Selection{} = fable_full} =
+               ModelRegistry.resolve(:claude, "claude-fable-5-1")
+
+      assert fable_full.resolved_model == "fable"
+      assert fable_full.requested_model == "claude-fable-5-1"
+      assert fable_full.model_family == "claude"
+
+      assert {:ok, %Selection{} = fable_dot} =
+               ModelRegistry.resolve(:claude, "fable-5.1")
+
+      assert fable_dot.resolved_model == "fable"
+
+      assert {:ok, %Selection{} = mythos} =
+               ModelRegistry.resolve(:claude, "claude-mythos-5-1")
+
+      assert mythos.resolved_model == "claude-mythos-5-1"
+      assert mythos.visibility == :restricted
+    end
+
+    test "resolves GPT-6 Astra with aliases and reasoning efforts" do
+      assert {:ok, %Selection{} = astra} =
+               ModelRegistry.resolve(:codex, "gpt-6-astra")
+
+      assert astra.resolved_model == "gpt-6-astra"
+      assert astra.model_family == "gpt-6"
+      assert astra.reasoning == "low"
+      assert astra.reasoning_effort == 0.8
+
+      assert {:ok, %Selection{} = astra_xhigh} =
+               ModelRegistry.resolve(:codex, "gpt-6-astra", reasoning: "xhigh")
+
+      assert astra_xhigh.reasoning == "xhigh"
+      assert astra_xhigh.reasoning_effort == 2.1
+
+      assert {:ok, %Selection{} = gpt6_alias} =
+               ModelRegistry.resolve(:codex, "gpt-6")
+
+      assert gpt6_alias.resolved_model == "gpt-6-astra"
+
+      assert {:ok, %Selection{} = astra_alias} =
+               ModelRegistry.resolve(:codex, "astra")
+
+      assert astra_alias.resolved_model == "gpt-6-astra"
     end
 
     test "allow_unknown passes through an env-derived unknown Codex model too" do
@@ -124,7 +213,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "normalizes reasoning effort from resolved model" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4", reasoning_effort: :high)
+               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :high)
 
       assert payload.reasoning == "high"
       assert is_number(payload.reasoning_effort)
@@ -133,10 +222,10 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "resolves the current Codex family with live default efforts" do
       for {model_id, default_effort} <- [
-            {"gpt-5.6-sol", "low"},
+            {"gpt-5.6-sol", "medium"},
             {"gpt-5.6-terra", "medium"},
             {"gpt-5.6-luna", "medium"},
-            {"gpt-5.3-codex-spark", "high"}
+            {"gpt-6-astra", "low"}
           ] do
         assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
         assert payload.resolved_model == model_id
@@ -327,13 +416,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
 
       assert models == [
+               "gpt-6-astra",
                "gpt-5.6-sol",
                "gpt-5.6-terra",
                "gpt-5.6-luna",
                "gpt-5.5",
-               "gpt-5.4",
-               "gpt-5.4-mini",
-               "gpt-5.3-codex-spark"
+               "gpt-5.4-mini"
              ]
 
       refute "gpt-5.2-codex" in models
@@ -378,7 +466,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-5.6-sol"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-6-astra"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
     end
 
@@ -507,12 +595,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.normalize_reasoning_effort/3" do
     test "normalizes symbolic reasoning effort" do
       assert {:ok, %{reasoning: "medium", reasoning_effort: 1, normalized_reasoning_effort: 1}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4", :medium)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4-mini", :medium)
     end
 
     test "normalizes numeric reasoning effort when configured" do
       assert {:ok, %{reasoning: "low", reasoning_effort: 0.8, normalized_reasoning_effort: 0.8}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4", 0.8)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4-mini", 0.8)
     end
   end
 

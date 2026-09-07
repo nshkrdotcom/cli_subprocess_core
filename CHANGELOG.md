@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-07
+
+### Added
+
+- Add Gemini models to the Antigravity provider model catalog (`priv/models/antigravity.json`), including `gemini-3.8-flash` (with reasoning effort scaling for low, medium, and high), `gemini-3.7-flash`, `gemini-3.6-flash`, and `gemini-3.1-pro`.
+- Forward `--model` and `--effort` CLI flags in `CliSubprocessCore.ProviderProfiles.Antigravity` when non-default models or reasoning efforts are resolved in the model payload.
+- Update Claude model catalog (`priv/models/claude.json`) to `2026-09-03`, adding `claude-fable-5-1` and `fable-5.1` aliases for Claude Fable 5.1 with 75% discounted cache read pricing ($0.25/Mtok), and adding `mythos-5.1` (`Claude Mythos 5.1`) under restricted visibility.
+- Update Codex model catalog (`priv/models/codex.json`) to `2026-09-03`, adding `gpt-6-astra` (`GPT-6-Astra`) frontier reasoning and agentic coding model with multi-tier reasoning efforts (`low`, `medium`, `high`, `xhigh`, `max`).
+- Synchronize the Codex picker with authenticated CLI 0.153.4: Astra is the default at low effort, including CLI-only ultra; hide reserve/review entries and remove retired picker entries. API effort support remains separately documented.
+- Render the restricted Mythos model using its full provider identifier, `claude-mythos-5-1`.
+- Require execution_plane_process 0.3.1 with the erlexec EOF-loop fix.
+
 ## [0.7.0] - 2026-08-10
 
 ### Fixed
@@ -301,7 +313,8 @@ The package is Dialyzer- and Credo-clean with no ignore entries.
   base-URL, target, and clear-env materialization without ambient provider CLI
   env discovery.
 
-[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.5.0...v0.5.1

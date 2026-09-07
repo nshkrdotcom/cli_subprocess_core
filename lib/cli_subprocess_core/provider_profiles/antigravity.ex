@@ -70,7 +70,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
   def capabilities do
     # Not `:tools`: that advertises accepting host-supplied tools, which `agy`
     # does not. It brings its own, and this profile now decodes their calls.
-    [:sandbox, :streaming, :directory_mapping, :continuation]
+    [:sandbox, :streaming, :directory_mapping, :continuation, :reasoning]
   end
 
   @impl true
@@ -351,6 +351,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
 
   defp option_flags(opts) do
     []
+    |> Shared.maybe_add_pair("--model", model_value(opts))
+    |> Shared.maybe_add_pair("--effort", effort_value(opts))
     |> Shared.maybe_add_flag("--sandbox", Keyword.get(opts, :sandbox, false))
     |> Shared.maybe_add_flag(
       "--dangerously-skip-permissions",
@@ -363,6 +365,41 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
     |> add_dirs(Keyword.get(opts, :add_dirs, []))
     |> Kernel.++(permission_flags(opts))
   end
+
+  defp model_value(opts) do
+    resolved =
+      opts
+      |> Keyword.get(:model_payload, %{})
+      |> model_payload_value(:resolved_model)
+      |> Kernel.||(Keyword.get(opts, :model))
+
+    case resolved do
+      nil -> nil
+      "default" -> nil
+      model -> to_string(model)
+    end
+  end
+
+  defp effort_value(opts) do
+    effort =
+      opts
+      |> Keyword.get(:model_payload, %{})
+      |> model_payload_value(:reasoning)
+      |> Kernel.||(Keyword.get(opts, :effort))
+
+    case effort do
+      val when val in ["low", "medium", "high"] -> val
+      val when val in [:low, :medium, :high] -> Atom.to_string(val)
+      _other -> nil
+    end
+  end
+
+  defp model_payload_value(%{resolved_model: value}, :resolved_model), do: value
+
+  defp model_payload_value(payload, key) when is_map(payload),
+    do: Map.get(payload, key, Map.get(payload, Atom.to_string(key)))
+
+  defp model_payload_value(_payload, _key), do: nil
 
   defp permission_flags(opts) do
     mode = Shared.permission_mode(opts)

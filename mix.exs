@@ -3,7 +3,7 @@ if bootstrap = System.get_env("MIX_WORKSPACE_OPS_BOOTSTRAP"), do: Code.require_f
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.8.0"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -157,7 +157,7 @@ defmodule CliSubprocessCore.MixProject do
   defp execution_plane_dep, do: workspace_dep({:execution_plane, "~> 0.3.0"})
 
   defp execution_plane_process_dep,
-    do: workspace_dep({:execution_plane_process, "~> 0.3.0"})
+    do: workspace_dep({:execution_plane_process, "~> 0.3.1"})
 
   defp execution_plane_jsonrpc_dep,
     do: workspace_dep({:execution_plane_jsonrpc, "~> 0.2.0"})

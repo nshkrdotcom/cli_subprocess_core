@@ -90,6 +90,93 @@ defmodule CliSubprocessCore.ProviderProfiles.AntigravityTest do
              ]
     end
 
+    test "forwards resolved model when not default" do
+      assert {:ok, command} =
+               Antigravity.build_invocation(
+                 command: "agy-bin",
+                 prompt: "hello",
+                 model_payload: %{resolved_model: "gemini-3.8-flash"}
+               )
+
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--model",
+               "gemini-3.8-flash"
+             ]
+    end
+
+    test "omits model flag when resolved model is default or nil" do
+      for payload <- [%{resolved_model: "default"}, %{resolved_model: nil}, %{}] do
+        assert {:ok, command} =
+                 Antigravity.build_invocation(
+                   command: "agy-bin",
+                   prompt: "hello",
+                   model_payload: payload
+                 )
+
+        refute "--model" in command.args
+      end
+    end
+
+    test "forwards effort flag when reasoning is present" do
+      assert {:ok, command} =
+               Antigravity.build_invocation(
+                 command: "agy-bin",
+                 prompt: "hello",
+                 model_payload: %{resolved_model: "gemini-3.8-flash", reasoning: "medium"}
+               )
+
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--model",
+               "gemini-3.8-flash",
+               "--effort",
+               "medium"
+             ]
+    end
+
+    test "forwards direct model and effort options when model_payload is absent" do
+      assert {:ok, command} =
+               Antigravity.build_invocation(
+                 command: "agy-bin",
+                 prompt: "hello",
+                 model: "gemini-3.8-flash",
+                 effort: "high"
+               )
+
+      assert command.args == [
+               "--print",
+               "hello",
+               "--output-format",
+               "stream-json",
+               "--model",
+               "gemini-3.8-flash",
+               "--effort",
+               "high"
+             ]
+    end
+
+    test "capabilities includes :reasoning" do
+      assert :reasoning in Antigravity.capabilities()
+    end
+
+    test "omits effort flag when effort is invalid" do
+      assert {:ok, command} =
+               Antigravity.build_invocation(
+                 command: "agy-bin",
+                 prompt: "hello",
+                 effort: "invalid-effort"
+               )
+
+      refute "--effort" in command.args
+    end
+
     test "adds multiple repeatable add-dir flags without comma joining" do
       assert {:ok, command} =
                Antigravity.build_invocation(

@@ -1,6 +1,6 @@
 {
   "provider": "antigravity",
-  "catalog_version": "2026-05-28",
+  "catalog_version": "2026-09-03",
   "remote_default": "default",
   "models": [
     {
@@ -11,8 +11,88 @@
       "visibility": "public",
       "family": "antigravity",
       "default": true,
+      "reasoning_efforts": {
+        "low": 0.25,
+        "medium": 0.5,
+        "high": 1.0
+      },
       "metadata": {
         "description": "Default Antigravity CLI model selected by agy."
+      }
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "aliases": [
+        "gemini-3.8-flash-medium",
+        "3.8-flash",
+        "flash-3.8"
+      ],
+      "visibility": "public",
+      "family": "gemini",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.25,
+        "medium": 0.5,
+        "high": 1.0
+      },
+      "metadata": {
+        "description": "Gemini 3.8 Flash — most intelligent Flash model for agentic coding."
+      }
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "aliases": [
+        "gemini-3.7-flash-medium",
+        "3.7-flash",
+        "flash-3.7"
+      ],
+      "visibility": "public",
+      "family": "gemini",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.25,
+        "medium": 0.5,
+        "high": 1.0
+      },
+      "metadata": {
+        "description": "Gemini 3.7 Flash — previous-generation Flash model."
+      }
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "aliases": [
+        "gemini-3.6-flash-medium",
+        "3.6-flash",
+        "flash-3.6"
+      ],
+      "visibility": "public",
+      "family": "gemini",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": 0.25,
+        "medium": 0.5,
+        "high": 1.0
+      },
+      "metadata": {
+        "description": "Gemini 3.6 Flash — balanced speed and multimodal capabilities."
+      }
+    },
+    {
+      "id": "gemini-3.1-pro",
+      "aliases": [
+        "gemini-3.1-pro-high",
+        "3.1-pro",
+        "pro-3.1"
+      ],
+      "visibility": "public",
+      "family": "gemini",
+      "default_reasoning_effort": "high",
+      "reasoning_efforts": {
+        "low": 0.25,
+        "high": 1.0
+      },
+      "metadata": {
+        "description": "Gemini 3.1 Pro — advanced problem-solving and agentic capabilities."
       }
     }
   ]
