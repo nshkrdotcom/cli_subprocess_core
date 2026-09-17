@@ -153,18 +153,25 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert def_none.reasoning == nil
     end
 
+    test "keeps explicit Fable versions distinct from the native alias" do
+      for model <- ["fable", "claude-fable-5", "claude-fable-5-1"] do
+        assert {:ok, %Selection{resolved_model: ^model}} =
+                 ModelRegistry.resolve(:claude, model)
+      end
+    end
+
     test "resolves Claude Fable 5.1 and Mythos 5.1 with aliases" do
       assert {:ok, %Selection{} = fable_full} =
                ModelRegistry.resolve(:claude, "claude-fable-5-1")
 
-      assert fable_full.resolved_model == "fable"
+      assert fable_full.resolved_model == "claude-fable-5-1"
       assert fable_full.requested_model == "claude-fable-5-1"
       assert fable_full.model_family == "claude"
 
       assert {:ok, %Selection{} = fable_dot} =
                ModelRegistry.resolve(:claude, "fable-5.1")
 
-      assert fable_dot.resolved_model == "fable"
+      assert fable_dot.resolved_model == "claude-fable-5-1"
 
       assert {:ok, %Selection{} = mythos} =
                ModelRegistry.resolve(:claude, "claude-mythos-5-1")

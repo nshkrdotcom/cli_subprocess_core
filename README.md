@@ -254,3 +254,7 @@ profiles honest about what can be recovered and what must fail.
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+### Pinning Fable versions
+
+Use `claude-fable-5` for Fable 5 or `claude-fable-5-1` for Fable 5.1. Both IDs remain unchanged in CLI arguments. The short `fable` alias is passed to Claude Code, which normally selects 5.1 but can select 5 depending on provider, gateway, CLI version, or configuration. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config#work-with-fable).

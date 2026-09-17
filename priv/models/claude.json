@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "catalog_version": "2026-09-07",
+  "catalog_version": "2026-09-17",
   "remote_default": "sonnet",
   "models": [
     {
@@ -105,9 +105,29 @@
     },
     {
       "id": "fable",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Claude Fable 5.1",
+        "description": "Native Claude Code Fable alias; the resolved version depends on provider and CLI configuration.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 10,
+        "output_price_per_mtok_usd": 50,
+        "cached_read_price_per_mtok_usd": 0.25
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
       "aliases": [
-        "claude-fable-5-1",
-        "claude-fable-5",
         "claude-5-1-fable",
         "fable-5.1",
         "fable-5-1"
@@ -129,6 +149,32 @@
         "input_price_per_mtok_usd": 10,
         "output_price_per_mtok_usd": 50,
         "cached_read_price_per_mtok_usd": 0.25
+      }
+    },
+    {
+      "id": "claude-fable-5",
+      "aliases": [
+        "fable-5",
+        "fable-5.0",
+        "fable-5-0"
+      ],
+      "visibility": "public",
+      "family": "claude",
+      "reasoning_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "metadata": {
+        "display_name": "Claude Fable 5",
+        "description": "Pinned Claude Fable 5 model; distinct from Fable 5.1.",
+        "context_window_tokens": 1000000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 10,
+        "output_price_per_mtok_usd": 50,
+        "cached_read_price_per_mtok_usd": 1
       }
     },
     {

@@ -29,7 +29,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert claude_catalog.catalog_version == "2026-09-07"
+      assert claude_catalog.catalog_version == "2026-09-17"
       assert claude_catalog.remote_default == "sonnet"
 
       assert Enum.map(claude_catalog.models, & &1.id) == [
@@ -38,6 +38,8 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                "opus",
                "opus[1m]",
                "fable",
+               "claude-fable-5-1",
+               "claude-fable-5",
                "claude-mythos-5-1",
                "haiku",
                "legacy-sonnet"
@@ -69,8 +71,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
              end)
 
       assert Enum.any?(claude_catalog.models, fn model ->
-               model.id == "fable" and "claude-fable-5-1" in model.aliases and
-                 "claude-fable-5" in model.aliases and
+               model.id == "claude-fable-5-1" and "fable-5.1" in model.aliases and
                  model.metadata["display_name"] == "Claude Fable 5.1"
              end)
 
