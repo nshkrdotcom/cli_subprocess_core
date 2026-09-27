@@ -31,6 +31,35 @@ defmodule CliSubprocessCore.SessionTest do
     end
   end
 
+  test "large Codex prompt is delivered through stdin instead of argv" do
+    prompt = String.duplicate("x", 73_741) <> "\n"
+
+    script =
+      create_test_script("""
+      for arg in "$@"; do last="$arg"; done
+      [ "$last" = "-" ]
+      IFS= read -r line
+      [ "${#line}" -eq 73741 ]
+      printf '{"type":"result","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}\\n'
+      """)
+
+    ref = make_ref()
+
+    assert {:ok, session, _info} =
+             Session.start_session(
+               provider: :codex,
+               prompt: prompt,
+               command: script,
+               subscriber: {self(), ref}
+             )
+
+    assert_receive {@session_event_tag, ^ref, {:event, started}}, 2_000
+    assert started.kind == :run_started
+    assert_receive {@session_event_tag, ^ref, {:event, result}}, 5_000
+    assert result.kind == :result
+    assert :ok = Session.close(session)
+  end
+
   test "subscribe, unsubscribe, send, and end_input drive the session transport" do
     gate_path = temp_path!("session_result_gate")
 

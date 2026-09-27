@@ -28,6 +28,7 @@ defmodule CliSubprocessCore.Session do
   @transport_event_tag :cli_subprocess_core_session_transport
   @transport_start_timeout_ms 5_000
   @transport_start_poll_ms 10
+  @codex_argv_prompt_limit 32_768
 
   defstruct provider: nil,
             profile: nil,
@@ -211,6 +212,7 @@ defmodule CliSubprocessCore.Session do
   def init(opts) do
     with {:ok, options} <- Options.new(opts),
          {:ok, profile} <- resolve_profile(options),
+         options = stage_large_codex_prompt(options, profile),
          provider_profile_options = Options.provider_profile_options(options),
          transport_profile_options = profile.transport_options(provider_profile_options),
          {:ok, invocation, teardown} <-
@@ -253,6 +255,28 @@ defmodule CliSubprocessCore.Session do
         {:stop, reason}
     end
   end
+
+  # Codex exec accepts `-` as a stdin prompt. Keep large prompts off argv:
+  # erlexec's port command fails before Codex starts when an argument grows
+  # beyond its command buffer. Session already sends and closes bootstrap stdin.
+  defp stage_large_codex_prompt(
+         %Options{provider: :codex, stdin: nil, provider_options: provider_options} = options,
+         CliSubprocessCore.ProviderProfiles.Codex
+       ) do
+    case Keyword.get(provider_options, :prompt) do
+      prompt when is_binary(prompt) and byte_size(prompt) > @codex_argv_prompt_limit ->
+        %Options{
+          options
+          | stdin: prompt,
+            provider_options: Keyword.put(provider_options, :prompt, "-")
+        }
+
+      _ ->
+        options
+    end
+  end
+
+  defp stage_large_codex_prompt(options, _profile), do: options
 
   @impl GenServer
   def handle_continue(:emit_run_started, state) do
