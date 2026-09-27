@@ -133,11 +133,10 @@ merges with, caller-supplied authority.
 
 The Codex profile does not own model or backend policy.
 
-The shared model registry currently exposes `gpt-5.6-sol` as the live default,
-plus `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`,
-`gpt-5.4-mini`, and the ChatGPT Pro preview `gpt-5.3-codex-spark`. The profile
-consumes that resolved selection; it does not add aliases or preserve retired
-model IDs.
+The shared model registry exposes `gpt-6-astra` as the picker default,
+followed by `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`,
+`gpt-5.6-luna`, and `gpt-5.5`. The profile consumes that resolved selection;
+it does not add aliases or preserve retired picker IDs.
 
 It reads the resolved payload for:
 

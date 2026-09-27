@@ -232,6 +232,8 @@ defmodule CliSubprocessCore.ModelRegistryTest do
             {"gpt-5.6-sol", "medium"},
             {"gpt-5.6-terra", "medium"},
             {"gpt-5.6-luna", "medium"},
+            {"gpt-6-sol", "medium"},
+            {"gpt-6-luna", "medium"},
             {"gpt-6-astra", "low"}
           ] do
         assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
@@ -424,11 +426,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
       assert models == [
                "gpt-6-astra",
+               "gpt-6-sol",
+               "gpt-6-luna",
                "gpt-5.6-sol",
                "gpt-5.6-terra",
                "gpt-5.6-luna",
-               "gpt-5.5",
-               "gpt-5.4-mini"
+               "gpt-5.5"
              ]
 
       refute "gpt-5.2-codex" in models

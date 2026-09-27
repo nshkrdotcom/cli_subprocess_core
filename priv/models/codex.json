@@ -1,6 +1,6 @@
 {
   "provider": "codex",
-  "catalog_version": "2026-09-07",
+  "catalog_version": "2026-09-26",
   "remote_default": "gpt-6-astra",
   "models": [
     {
@@ -36,6 +36,68 @@
         ]
       },
       "default": true
+    },
+    {
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-6",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "none": null,
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1,
+        "max": null
+      },
+      "default": false,
+      "id": "gpt-6-sol",
+      "metadata": {
+        "display_name": "GPT-6-Sol",
+        "description": "Workhorse model for coding and everyday work.",
+        "supported_in_api": true,
+        "supports_personality": false,
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 2,
+        "output_price_per_mtok_usd": 10,
+        "cached_input_price_per_mtok_usd": 0.2,
+        "input_modalities": [
+          "text",
+          "image"
+        ]
+      }
+    },
+    {
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-6",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "none": null,
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1,
+        "max": null
+      },
+      "default": false,
+      "id": "gpt-6-luna",
+      "metadata": {
+        "display_name": "GPT-6-Luna",
+        "description": "Fast and affordable model for easier tasks.",
+        "supported_in_api": true,
+        "supports_personality": false,
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_mtok_usd": 0.1,
+        "output_price_per_mtok_usd": 0.5,
+        "cached_input_price_per_mtok_usd": 0.01,
+        "input_modalities": [
+          "text",
+          "image"
+        ]
+      }
     },
     {
       "id": "gpt-reserve",
@@ -166,7 +228,7 @@
     {
       "id": "gpt-5.4-mini",
       "aliases": [],
-      "visibility": "public",
+      "visibility": "internal",
       "family": "gpt-5",
       "default_reasoning_effort": "medium",
       "reasoning_efforts": {

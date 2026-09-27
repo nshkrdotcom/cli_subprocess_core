@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-26
+
+### Changed
+
+- Refresh the Codex picker catalog with GPT-6 Sol and GPT-6 Luna, keeping GPT-6 Astra as default and moving GPT-5.4 Mini out of the visible picker.
+- Record the supported reasoning efforts and default medium effort for Sol and Luna.
+
 ## [0.8.0] - 2026-09-17
 
 - Preserve explicit `claude-fable-5` and `claude-fable-5-1` model IDs instead of collapsing them into the provider-dependent `fable` alias.
@@ -323,3 +330,5 @@ The package is Dialyzer- and Credo-clean with no ignore entries.
 [0.3.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nshkrdotcom/cli_subprocess_core/releases/tag/v0.1.0
+
+[0.9.0]: https://github.com/nshkrdotcom/cli_subprocess_core/compare/v0.8.0...v0.9.0
