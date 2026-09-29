@@ -8,19 +8,19 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.resolve/3" do
     test "resolves with explicit request precedence" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4-mini", model: "legacy")
+               ModelRegistry.resolve(:codex, "gpt-5.5", model: "legacy")
 
       assert payload.resolution_source == :explicit
-      assert payload.resolved_model == "gpt-5.4-mini"
+      assert payload.resolved_model == "gpt-5.5"
       assert payload.provider == :codex
     end
 
     test "ignores legacy model values passed through opts" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, nil, model: "gpt-5.4-mini")
+               ModelRegistry.resolve(:codex, nil, model: "gpt-5.5")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-6-astra"
+      assert payload.resolved_model == "gpt-6.1-sol"
       assert payload.requested_model == nil
     end
 
@@ -99,9 +99,9 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "allow_unknown still resolves known Codex aliases normally (no unregistered marker)" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4-mini", allow_unknown: true)
+               ModelRegistry.resolve(:codex, "gpt-5.5", allow_unknown: true)
 
-      assert payload.resolved_model == "gpt-5.4-mini"
+      assert payload.resolved_model == "gpt-5.5"
       refute Map.get(payload.extra, "unregistered")
     end
 
@@ -220,7 +220,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "normalizes reasoning effort from resolved model" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :high)
+               ModelRegistry.resolve(:codex, "gpt-5.5", reasoning_effort: :high)
 
       assert payload.reasoning == "high"
       assert is_number(payload.reasoning_effort)
@@ -229,12 +229,13 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "resolves the current Codex family with live default efforts" do
       for {model_id, default_effort} <- [
-            {"gpt-5.6-sol", "medium"},
+            {"gpt-5.6-sol", "low"},
             {"gpt-5.6-terra", "medium"},
             {"gpt-5.6-luna", "medium"},
             {"gpt-6-sol", "medium"},
             {"gpt-6-luna", "medium"},
-            {"gpt-6-astra", "low"}
+            {"gpt-6-astra", "low"},
+            {"gpt-6.1-sol", "low"}
           ] do
         assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
         assert payload.resolved_model == model_id
@@ -296,10 +297,10 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:amp, "amp-1", reasoning_effort: :unsupported)
     end
 
-    test "rejects unsupported minimal reasoning for gpt-5.4-mini" do
+    test "rejects unsupported minimal reasoning for gpt-5.5" do
       assert {:error,
               {:invalid_reasoning_effort, :minimal, ["high", "low", "medium", "xhigh"], :codex}} =
-               ModelRegistry.resolve(:codex, "gpt-5.4-mini", reasoning_effort: :minimal)
+               ModelRegistry.resolve(:codex, "gpt-5.5", reasoning_effort: :minimal)
     end
 
     test "resolves Claude Ollama backend models through the core payload" do
@@ -425,6 +426,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
 
       assert models == [
+               "gpt-6.1-sol",
                "gpt-6-astra",
                "gpt-6-sol",
                "gpt-6-luna",
@@ -476,7 +478,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-6-astra"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-6.1-sol"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
     end
 
@@ -605,12 +607,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
   describe "ModelRegistry.normalize_reasoning_effort/3" do
     test "normalizes symbolic reasoning effort" do
       assert {:ok, %{reasoning: "medium", reasoning_effort: 1, normalized_reasoning_effort: 1}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4-mini", :medium)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.5", :medium)
     end
 
     test "normalizes numeric reasoning effort when configured" do
       assert {:ok, %{reasoning: "low", reasoning_effort: 0.8, normalized_reasoning_effort: 0.8}} =
-               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.4-mini", 0.8)
+               ModelRegistry.normalize_reasoning_effort(:codex, "gpt-5.5", 0.8)
     end
   end
 
@@ -626,9 +628,9 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "uses the model default reasoning when reasoning is omitted" do
       assert {:ok, %Selection{} = payload} =
-               ModelRegistry.build_arg_payload(:codex, "gpt-5.4-mini", [])
+               ModelRegistry.build_arg_payload(:codex, "gpt-5.5", [])
 
-      assert payload.resolved_model == "gpt-5.4-mini"
+      assert payload.resolved_model == "gpt-5.5"
       assert payload.reasoning == "medium"
     end
   end

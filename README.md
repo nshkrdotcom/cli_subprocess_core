@@ -69,7 +69,7 @@ Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
 Hex consumers. For the September train, publish `ground_plane_contracts 0.1.1`,
-then `execution_plane_process 0.3.1`, then `cli_subprocess_core 0.9.1`, then
+then `execution_plane_process 0.3.1`, then `cli_subprocess_core 0.9.2`, then
 the provider/ASM consumers. Core-only `execution_plane 0.3.0` and
 `execution_plane_jsonrpc 0.2.0` are already published prerequisites. Every published
 version sees both its lower runtime and the current catalog. Consumers
@@ -97,7 +97,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.9.1"}
+    {:cli_subprocess_core, "~> 0.9.2"}
   ]
 end
 ```
@@ -258,3 +258,5 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 ### Pinning Fable versions
 
 Use `claude-fable-5` for Fable 5 or `claude-fable-5-1` for Fable 5.1. Both IDs remain unchanged in CLI arguments. The short `fable` alias is passed to Claude Code, which normally selects 5.1 but can select 5 depending on provider, gateway, CLI version, or configuration. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config#work-with-fable).
+
+Release preparation and Hex lock handoff: [2026-09-29 release train](guides/release-train-2026-09-29.md).

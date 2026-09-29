@@ -7,13 +7,15 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-09-26"
-      assert codex_catalog.remote_default == "gpt-6-astra"
+      assert codex_catalog.catalog_version == "2026-09-29"
+      assert codex_catalog.remote_default == "gpt-6.1-sol"
 
-      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20260907.json", __DIR__))
+      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20260929.json", __DIR__))
       live = Jason.decode!(fixture)["data"]
 
-      for expected <- live, expected["id"] != "gpt-5.4-mini" do
+      assert Enum.map(codex_catalog.models, & &1.id) == Enum.map(live, & &1["id"])
+
+      for expected <- live do
         model = Enum.find(codex_catalog.models, &(&1.id == expected["id"]))
         assert model.default == expected["isDefault"]
         assert model.default_reasoning_effort == expected["defaultReasoningEffort"]
@@ -24,15 +26,6 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                  expected["supportedReasoningEfforts"]
                  |> Enum.map(& &1["reasoningEffort"])
                  |> Enum.sort()
-      end
-
-      for id <- ~w(gpt-6-sol gpt-6-luna) do
-        model = Enum.find(codex_catalog.models, &(&1.id == id))
-        assert model.visibility == :public
-        assert model.default_reasoning_effort == "medium"
-
-        assert Enum.sort(Map.keys(model.reasoning_efforts)) ==
-                 ~w(high low max medium none xhigh)
       end
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
@@ -164,7 +157,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                |> then(&ModelCatalog.load_from_path(:codex, &1))
 
       assert catalog.provider == :codex
-      assert catalog.remote_default == "gpt-6-astra"
+      assert catalog.remote_default == "gpt-6.1-sol"
     end
   end
 end

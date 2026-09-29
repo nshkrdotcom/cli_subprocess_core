@@ -3,7 +3,7 @@ if bootstrap = System.get_env("MIX_WORKSPACE_OPS_BOOTSTRAP"), do: Code.require_f
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.9.1"
+  @version "0.9.2"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -39,6 +39,7 @@ defmodule CliSubprocessCore.MixProject do
       logo: "assets/cli_subprocess_core.svg",
       extras: [
         "README.md": [title: "Overview", filename: "overview"],
+        "guides/release-train-2026-09-29.md": [title: "2026-09-29 Release Train"],
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"],
         "guides/getting-started.md": [title: "Getting Started"],

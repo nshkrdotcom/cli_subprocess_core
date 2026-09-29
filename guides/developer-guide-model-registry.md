@@ -81,25 +81,18 @@ This gives the core one place to answer:
 
 ## Current Codex Catalog Evidence
 
-The bundled Codex picker was refreshed on 2026-09-26 from the current
-model selection: `gpt-6-astra` (default), `gpt-6-sol`, `gpt-6-luna`,
-`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, and `gpt-5.5`.
-The September 7 authenticated response remains as a historical fixture;
-`gpt-5.4-mini`, `gpt-reserve`, and `codex-auto-review` are not picker entries.
+The authenticated `codex-cli 0.159.0` response captured on 2026-09-29 is
+recorded in `test/fixtures/codex_model_list_20260929.json`. The picker is
+`gpt-6.1-sol` (default, low), `gpt-6-astra` (low), `gpt-6-sol` (medium),
+`gpt-6-luna` (medium), `gpt-5.6-sol` (low), `gpt-5.6-terra` (medium),
+`gpt-5.6-luna` (medium), and `gpt-5.5` (medium).
+`gpt-reserve` and `codex-auto-review` are internal; GPT-5.4 Mini is absent.
 
-The pulled upstream source registry can lead the live backend. In the same
-checkout it placed Sol first and still included `gpt-5.2`, while the live
-backend made Sol the default, exposed Spark, and did not return `gpt-5.2` even
-as a hidden entry. Maintainers must use the authenticated live result for the
-bundled Codex CLI catalog and record the CLI version and probe date when it
-changes.
-
-The GPT-5.6 variants are explicit Codex CLI IDs; this catalog does not add the
-OpenAI API's `gpt-5.6` family alias. Sol and Terra support `low`, `medium`,
-`high`, `xhigh`, `max`, and `ultra`; Luna supports the same set except
-`ultra`. The live response reports Sol's default as `low` and Terra/Luna as
-`medium`. Spark is text-only, supports `low` through `xhigh`, defaults to
-`high`, and is not available through the OpenAI API during its preview.
+All support low, medium, high, and xhigh. All except GPT-5.5 support max;
+GPT-6.1 Sol, Astra, GPT-6 Sol, GPT-5.6 Sol, and Terra also support CLI ultra.
+These CLI efforts are distinct from Responses API support. GPT-5.5's
+upgrade metadata points to GPT-5.6 Sol and reports retirement on October 14.
+Existing `astra` and `gpt-6` convenience aliases still resolve to Astra.
 
 ## Resolution Sequence
 
