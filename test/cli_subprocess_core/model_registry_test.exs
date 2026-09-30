@@ -154,6 +154,12 @@ defmodule CliSubprocessCore.ModelRegistryTest do
     end
 
     test "keeps explicit Fable versions distinct from the native alias" do
+      for model <- ["claude-opus-5-5", "claude-sonnet-5-5"] do
+        assert {:ok, resolved} = ModelRegistry.resolve(:claude, model)
+        assert resolved.resolved_model == model
+        assert resolved.reasoning == "medium"
+      end
+
       for model <- ["fable", "claude-fable-5", "claude-fable-5-1"] do
         assert {:ok, %Selection{resolved_model: ^model}} =
                  ModelRegistry.resolve(:claude, model)

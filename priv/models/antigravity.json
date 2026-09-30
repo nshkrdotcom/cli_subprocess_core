@@ -1,6 +1,6 @@
 {
   "provider": "antigravity",
-  "catalog_version": "2026-09-03",
+  "catalog_version": "2026-09-29",
   "remote_default": "default",
   "models": [
     {
@@ -36,7 +36,7 @@
         "high": 1.0
       },
       "metadata": {
-        "description": "Gemini 3.8 Flash — most intelligent Flash model for agentic coding."
+        "description": "Gemini 3.8 Flash \u2014 most intelligent Flash model for agentic coding."
       }
     },
     {
@@ -55,7 +55,7 @@
         "high": 1.0
       },
       "metadata": {
-        "description": "Gemini 3.7 Flash — previous-generation Flash model."
+        "description": "Gemini 3.7 Flash \u2014 previous-generation Flash model."
       }
     },
     {
@@ -74,7 +74,7 @@
         "high": 1.0
       },
       "metadata": {
-        "description": "Gemini 3.6 Flash — balanced speed and multimodal capabilities."
+        "description": "Gemini 3.6 Flash \u2014 balanced speed and multimodal capabilities."
       }
     },
     {
@@ -92,7 +92,37 @@
         "high": 1.0
       },
       "metadata": {
-        "description": "Gemini 3.1 Pro — advanced problem-solving and agentic capabilities."
+        "description": "Gemini 3.1 Pro \u2014 advanced problem-solving and agentic capabilities."
+      }
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Sonnet 4.6 (Thinking)",
+        "description": "Confirmed by authenticated agy models on 2026-09-29."
+      }
+    },
+    {
+      "id": "claude-opus-4-6-thinking",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Opus 4.6 (Thinking)",
+        "description": "Confirmed by authenticated agy models on 2026-09-29."
+      }
+    },
+    {
+      "id": "gpt-oss-120b-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-oss",
+      "metadata": {
+        "display_name": "GPT-OSS 120B (Medium)",
+        "description": "Confirmed by authenticated agy models on 2026-09-29."
       }
     }
   ]

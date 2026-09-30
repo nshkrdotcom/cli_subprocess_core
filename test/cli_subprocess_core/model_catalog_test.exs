@@ -30,7 +30,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, claude_catalog} = ModelCatalog.load(:claude)
       assert claude_catalog.provider == :claude
-      assert claude_catalog.catalog_version == "2026-09-17"
+      assert claude_catalog.catalog_version == "2026-09-29"
       assert claude_catalog.remote_default == "sonnet"
 
       assert Enum.map(claude_catalog.models, & &1.id) == [
@@ -38,6 +38,8 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                "sonnet[1m]",
                "opus",
                "opus[1m]",
+               "claude-opus-5-5",
+               "claude-sonnet-5-5",
                "fable",
                "claude-fable-5-1",
                "claude-fable-5",
@@ -120,7 +122,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, antigravity_catalog} = ModelCatalog.load(:antigravity)
       assert antigravity_catalog.provider == :antigravity
-      assert antigravity_catalog.catalog_version == "2026-09-03"
+      assert antigravity_catalog.catalog_version == "2026-09-29"
       assert antigravity_catalog.remote_default == "default"
 
       assert Enum.map(antigravity_catalog.models, & &1.id) == [
@@ -128,7 +130,10 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                "gemini-3.8-flash",
                "gemini-3.7-flash",
                "gemini-3.6-flash",
-               "gemini-3.1-pro"
+               "gemini-3.1-pro",
+               "claude-sonnet-4-6",
+               "claude-opus-4-6-thinking",
+               "gpt-oss-120b-medium"
              ]
     end
 

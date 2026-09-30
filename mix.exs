@@ -3,7 +3,7 @@ if bootstrap = System.get_env("MIX_WORKSPACE_OPS_BOOTSTRAP"), do: Code.require_f
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.9.2"
+  @version "0.9.3"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -39,6 +39,7 @@ defmodule CliSubprocessCore.MixProject do
       logo: "assets/cli_subprocess_core.svg",
       extras: [
         "README.md": [title: "Overview", filename: "overview"],
+        "guides/provider-model-audit-2026-09-29.md": [title: "Provider Model Audit"],
         "guides/release-train-2026-09-29.md": [title: "2026-09-29 Release Train"],
         "CHANGELOG.md": [title: "Changelog"],
         LICENSE: [title: "License"],
@@ -147,11 +148,11 @@ defmodule CliSubprocessCore.MixProject do
     [execution_plane, execution_plane_process_dep(), execution_plane_jsonrpc_dep()] ++
       local_ground_overrides(execution_plane) ++
       [
-        {:jason, "~> 1.4"},
-        {:zoi, "~> 0.18"},
-        {:ex_doc, "~> 0.40", only: :dev, runtime: false},
-        {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-        {:dialyxir, "~> 1.4", only: :dev, runtime: false}
+        {:jason, "~> 1.4.5"},
+        {:zoi, "~> 0.18.11"},
+        {:ex_doc, "~> 0.40.4", only: :dev, runtime: false},
+        {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
+        {:dialyxir, "~> 1.4.8", only: :dev, runtime: false}
       ]
   end
 
@@ -176,7 +177,7 @@ defmodule CliSubprocessCore.MixProject do
   defp local_ground_overrides({:execution_plane, opts}) when is_list(opts) do
     if local_ground_paths_available?() do
       [
-        workspace_dep({:ground_plane_contracts, "~> 0.1.0", override: true}),
+        workspace_dep({:ground_plane_contracts, "~> 0.1.1", override: true}),
         workspace_dep({:ground_plane_persistence_policy, "~> 0.1.0", override: true})
       ]
     else
