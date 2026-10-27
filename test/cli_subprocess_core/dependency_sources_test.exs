@@ -10,9 +10,9 @@ defmodule CliSubprocessCore.DependencySourcesTest do
   # resolve only if this package pins them too. Pointing `:execution_plane` at
   # the historical monolith creates duplicate process and JSON-RPC modules.
   @hex_requirements %{
-    execution_plane: "~> 0.3.0",
-    execution_plane_process: "~> 0.3.1",
-    execution_plane_jsonrpc: "~> 0.2.0"
+    execution_plane: "~> 0.3.1",
+    execution_plane_process: "~> 0.3.2",
+    execution_plane_jsonrpc: "~> 0.2.1"
   }
 
   test "the standalone and publishable fallback declares the component releases" do

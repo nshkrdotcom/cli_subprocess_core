@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-10-26
+
+### Changed
+
+- Require Zoi 0.19.0, Execution Plane 0.3.1, Process 0.3.2, and JSON-RPC 0.2.1; refresh the complete Hex lockfile to the latest stable dependency releases.
+- Retain the current eight-model Codex catalog, including GPT-6.1 Terra and the GPT-6.1 Sol default.
+
 ## [0.9.4] - 2026-10-26
 
 ### Changed
