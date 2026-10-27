@@ -134,8 +134,9 @@ merges with, caller-supplied authority.
 The Codex profile does not own model or backend policy.
 
 The shared model registry exposes `gpt-6.1-sol` as the picker default,
-followed by `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`,
-`gpt-5.6-luna`, and `gpt-5.5`. The profile consumes that resolved selection;
+followed by `gpt-6-astra`, `gpt-6.1-terra`, `gpt-6-sol`, `gpt-6-luna`,
+`gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`.
+The profile consumes that resolved selection;
 it does not add aliases or preserve retired picker IDs.
 
 It reads the resolved payload for:

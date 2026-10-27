@@ -1,6 +1,6 @@
 {
   "provider": "codex",
-  "catalog_version": "2026-09-29",
+  "catalog_version": "2026-10-26",
   "remote_default": "gpt-6.1-sol",
   "models": [
     {
@@ -69,6 +69,31 @@
       "default": false
     },
     {
+      "id": "gpt-6.1-terra",
+      "aliases": [],
+      "family": "gpt-6",
+      "metadata": {
+        "display_name": "GPT-6.1 Terra",
+        "description": "GPT-6.1 Terra Codex model.",
+        "supports_personality": false,
+        "input_modalities": [
+          "text",
+          "image"
+        ]
+      },
+      "visibility": "public",
+      "default": false,
+      "default_reasoning_effort": "low",
+      "reasoning_efforts": {
+        "low": 0.8,
+        "medium": 1,
+        "high": 1.4,
+        "xhigh": 2.1,
+        "max": null,
+        "ultra": null
+      }
+    },
+    {
       "aliases": [],
       "visibility": "public",
       "family": "gpt-6",
@@ -100,6 +125,31 @@
       }
     },
     {
+      "id": "gpt-reserve",
+      "aliases": [],
+      "visibility": "internal",
+      "family": "gpt",
+      "default_reasoning_effort": "medium",
+      "reasoning_efforts": {
+        "low": null,
+        "medium": null,
+        "high": null,
+        "xhigh": null,
+        "max": null
+      },
+      "metadata": {
+        "display_name": "GPT-Reserve",
+        "description": "Fast and affordable agentic coding model.",
+        "supports_personality": false,
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "supported_in_api": false
+      },
+      "default": false
+    },
+    {
       "aliases": [],
       "visibility": "public",
       "family": "gpt-6",
@@ -128,31 +178,6 @@
           "image"
         ]
       }
-    },
-    {
-      "id": "gpt-reserve",
-      "aliases": [],
-      "visibility": "internal",
-      "family": "gpt",
-      "default_reasoning_effort": "medium",
-      "reasoning_efforts": {
-        "low": null,
-        "medium": null,
-        "high": null,
-        "xhigh": null,
-        "max": null
-      },
-      "metadata": {
-        "display_name": "GPT-Reserve",
-        "description": "Fast and affordable agentic coding model.",
-        "supports_personality": false,
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "supported_in_api": false
-      },
-      "default": false
     },
     {
       "id": "gpt-5.6-sol",
@@ -228,34 +253,6 @@
           "text",
           "image"
         ]
-      },
-      "default": false
-    },
-    {
-      "id": "gpt-5.5",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-5",
-      "default_reasoning_effort": "medium",
-      "reasoning_efforts": {
-        "low": 0.8,
-        "medium": 1,
-        "high": 1.4,
-        "xhigh": 2.1
-      },
-      "metadata": {
-        "display_name": "GPT-5.5",
-        "description": "Legacy coding model.",
-        "supported_in_api": true,
-        "supports_personality": false,
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "upgrade": {
-          "id": "gpt-5.6-sol",
-          "upgrade_copy": "GPT-5.5 retires on October 14, 2026. Switch to GPT-5.6 Sol to continue working in Codex."
-        }
       },
       "default": false
     },

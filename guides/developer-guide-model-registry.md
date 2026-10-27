@@ -81,18 +81,31 @@ This gives the core one place to answer:
 
 ## Current Codex Catalog Evidence
 
-The authenticated `codex-cli 0.159.0` response captured on 2026-09-29 is
-recorded in `test/fixtures/codex_model_list_20260929.json`. The picker is
-`gpt-6.1-sol` (default, low), `gpt-6-astra` (low), `gpt-6-sol` (medium),
-`gpt-6-luna` (medium), `gpt-5.6-sol` (low), `gpt-5.6-terra` (medium),
-`gpt-5.6-luna` (medium), and `gpt-5.5` (medium).
-`gpt-reserve` and `codex-auto-review` are internal; GPT-5.4 Mini is absent.
+The authenticated `codex-cli 0.164.0` `model/list` response captured on
+2026-10-26, including hidden entries, is recorded in
+`test/fixtures/codex_model_list_20261026.json`. The public picker order is:
 
-All support low, medium, high, and xhigh. All except GPT-5.5 support max;
-GPT-6.1 Sol, Astra, GPT-6 Sol, GPT-5.6 Sol, and Terra also support CLI ultra.
-These CLI efforts are distinct from Responses API support. GPT-5.5's
-upgrade metadata points to GPT-5.6 Sol and reports retirement on October 14.
+| Model | Default effort | Supported CLI efforts |
+| --- | --- | --- |
+| `gpt-6.1-sol` (default) | low | low, medium, high, xhigh, max, ultra |
+| `gpt-6-astra` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-6.1-terra` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-6-sol` | medium | low, medium, high, xhigh, max, ultra |
+| `gpt-6-luna` | medium | low, medium, high, xhigh, max |
+| `gpt-5.6-sol` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-5.6-terra` | medium | low, medium, high, xhigh, max, ultra |
+| `gpt-5.6-luna` | medium | low, medium, high, xhigh, max |
+
+All accept text and image input and report no personality support.
+`gpt-reserve` and `codex-auto-review` remain internal, default to medium,
+and support low through max. GPT-5.5 is absent and has been removed from
+the bundled catalog. Explicit unknown-model passthrough remains opt-in in
+Core (`allow_unknown: true`); the Codex SDK enables it by default.
 Existing `astra` and `gpt-6` convenience aliases still resolve to Astra.
+
+These efforts describe Codex CLI support, independently of Responses API
+support. The CLI response does not provide pricing or context/output limits;
+GPT-6.1 Terra does not inherit those fields from another model.
 
 ## Resolution Sequence
 

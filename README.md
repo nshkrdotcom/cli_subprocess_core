@@ -68,12 +68,17 @@ checkout.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. For the September train, publish `ground_plane_contracts 0.1.1`,
-then `execution_plane_process 0.3.1`, then `cli_subprocess_core 0.9.3`, then
-the provider/ASM consumers. Core-only `execution_plane 0.3.0` and
-`execution_plane_jsonrpc 0.2.0` are already published prerequisites. Every published
-version sees both its lower runtime and the current catalog. Consumers
-switching between `:path` and `:github`/`:hex`
+Hex consumers. Core 0.9.4 refreshes the Codex catalog from authenticated CLI
+0.164.0 metadata on 2026-10-26, adding GPT-6.1 Terra and removing GPT-5.5.
+GPT-6.1 Sol remains the default at low effort. See the
+[current Codex model card](guides/developer-guide-model-registry.md#current-codex-catalog-evidence)
+for the complete picker and reasoning support.
+
+The runtime prerequisites remain `execution_plane ~> 0.3.0`,
+`execution_plane_process ~> 0.3.1`, and `execution_plane_jsonrpc ~> 0.2.0`.
+Existing SDK and ASM requirements of `~> 0.9.3` already accept Core 0.9.4;
+consumers with an older lock must run `mix deps.update cli_subprocess_core`.
+Consumers switching between `:path` and `:github`/`:hex`
 resolution should prune any previously fetched `deps/cli_subprocess_core`
 copy — a stale fetched catalog would otherwise shadow the live one in
 isolated builds.
@@ -97,7 +102,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.9.3"}
+    {:cli_subprocess_core, "~> 0.9.4"}
   ]
 end
 ```

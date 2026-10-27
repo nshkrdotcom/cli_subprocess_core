@@ -7,10 +7,10 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-09-29"
+      assert codex_catalog.catalog_version == "2026-10-26"
       assert codex_catalog.remote_default == "gpt-6.1-sol"
 
-      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20260929.json", __DIR__))
+      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20261026.json", __DIR__))
       live = Jason.decode!(fixture)["data"]
 
       assert Enum.map(codex_catalog.models, & &1.id) == Enum.map(live, & &1["id"])
@@ -21,6 +21,9 @@ defmodule CliSubprocessCore.ModelCatalogTest do
         assert model.default_reasoning_effort == expected["defaultReasoningEffort"]
         assert model.visibility == :internal == expected["hidden"]
         assert model.metadata["display_name"] == expected["displayName"]
+        assert model.metadata["description"] == expected["description"]
+        assert model.metadata["input_modalities"] == expected["inputModalities"]
+        assert model.metadata["supports_personality"] == expected["supportsPersonality"]
 
         assert model.reasoning_efforts |> Map.keys() |> Enum.sort() ==
                  expected["supportedReasoningEfforts"]

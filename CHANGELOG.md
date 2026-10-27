@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-10-26
+
+### Changed
+
+- Refresh the Codex catalog from authenticated `codex-cli 0.164.0` model metadata: add GPT-6.1 Terra in picker order with low default effort and support through ultra, and remove retired GPT-5.5.
+- Preserve GPT-6.1 Sol as the default at low effort and align model descriptions, visibility, modalities, and reasoning support with the current CLI.
+
 ## [0.9.3] - 2026-09-29
 
 ### Changed
