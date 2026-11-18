@@ -20,7 +20,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
                ModelRegistry.resolve(:codex, nil, model: "gpt-6.1-terra")
 
       assert payload.resolution_source == :default
-      assert payload.resolved_model == "gpt-6.1-sol"
+      assert payload.resolved_model == "gpt-6.2-sol"
       assert payload.requested_model == nil
     end
 
@@ -235,13 +235,15 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
     test "resolves the current Codex family with live default efforts" do
       for {model_id, default_effort} <- [
-            {"gpt-5.6-sol", "low"},
+            {"gpt-5.6-sol", "medium"},
             {"gpt-5.6-terra", "medium"},
             {"gpt-5.6-luna", "medium"},
             {"gpt-6-sol", "medium"},
             {"gpt-6-luna", "medium"},
             {"gpt-6-astra", "low"},
-            {"gpt-6.1-sol", "low"},
+            {"gpt-6.1-sol", "medium"},
+            {"gpt-6.2-sol", "medium"},
+            {"gpt-6.2-astra", "low"},
             {"gpt-6.1-terra", "low"}
           ] do
         assert {:ok, %Selection{} = payload} = ModelRegistry.resolve(:codex, model_id)
@@ -441,9 +443,11 @@ defmodule CliSubprocessCore.ModelRegistryTest do
       assert {:ok, models} = ModelRegistry.list_visible(:codex)
 
       assert models == [
+               "gpt-6.2-sol",
+               "gpt-6.2-astra",
+               "gpt-6.1-terra",
                "gpt-6.1-sol",
                "gpt-6-astra",
-               "gpt-6.1-terra",
                "gpt-6-sol",
                "gpt-6-luna",
                "gpt-5.6-sol",
@@ -493,7 +497,7 @@ defmodule CliSubprocessCore.ModelRegistryTest do
 
   describe "ModelRegistry.default_model/2" do
     test "returns the default model id for provider defaults" do
-      assert {:ok, "gpt-6.1-sol"} = ModelRegistry.default_model(:codex)
+      assert {:ok, "gpt-6.2-sol"} = ModelRegistry.default_model(:codex)
       assert {:ok, "sonnet"} = ModelRegistry.default_model(:claude)
     end
 

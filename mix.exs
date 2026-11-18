@@ -3,7 +3,7 @@ if bootstrap = System.get_env("MIX_WORKSPACE_OPS_BOOTSTRAP"), do: Code.require_f
 defmodule CliSubprocessCore.MixProject do
   use Mix.Project
 
-  @version "0.9.5"
+  @version "0.9.6"
   @source_url "https://github.com/nshkrdotcom/cli_subprocess_core"
   @homepage_url "https://hex.pm/packages/cli_subprocess_core"
   @docs_url "https://hexdocs.pm/cli_subprocess_core"
@@ -152,17 +152,17 @@ defmodule CliSubprocessCore.MixProject do
         {:zoi, "~> 0.19.0"},
         {:ex_doc, "~> 0.40.4", only: :dev, runtime: false},
         {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
-        {:dialyxir, "~> 1.4.8", only: :dev, runtime: false}
+        {:dialyxir, "~> 1.4.9", only: :dev, runtime: false}
       ]
   end
 
-  defp execution_plane_dep, do: workspace_dep({:execution_plane, "~> 0.3.1"})
+  defp execution_plane_dep, do: workspace_dep({:execution_plane, "~> 0.3.2"})
 
   defp execution_plane_process_dep,
-    do: workspace_dep({:execution_plane_process, "~> 0.3.2"})
+    do: workspace_dep({:execution_plane_process, "~> 0.3.3"})
 
   defp execution_plane_jsonrpc_dep,
-    do: workspace_dep({:execution_plane_jsonrpc, "~> 0.2.1"})
+    do: workspace_dep({:execution_plane_jsonrpc, "~> 0.2.2"})
 
   defp workspace_dep(committed) do
     if function_exported?(MixWorkspaceOpsBootstrap, :dep, 2),

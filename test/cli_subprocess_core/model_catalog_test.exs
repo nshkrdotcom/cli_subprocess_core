@@ -7,10 +7,10 @@ defmodule CliSubprocessCore.ModelCatalogTest do
     test "loads known provider catalogs" do
       assert {:ok, codex_catalog} = ModelCatalog.load(:codex)
       assert codex_catalog.provider == :codex
-      assert codex_catalog.catalog_version == "2026-10-26"
-      assert codex_catalog.remote_default == "gpt-6.1-sol"
+      assert codex_catalog.catalog_version == "2026-11-17"
+      assert codex_catalog.remote_default == "gpt-6.2-sol"
 
-      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20261026.json", __DIR__))
+      fixture = File.read!(Path.expand("../fixtures/codex_model_list_20261117.json", __DIR__))
       live = Jason.decode!(fixture)["data"]
 
       assert Enum.map(codex_catalog.models, & &1.id) == Enum.map(live, & &1["id"])
@@ -165,7 +165,7 @@ defmodule CliSubprocessCore.ModelCatalogTest do
                |> then(&ModelCatalog.load_from_path(:codex, &1))
 
       assert catalog.provider == :codex
-      assert catalog.remote_default == "gpt-6.1-sol"
+      assert catalog.remote_default == "gpt-6.2-sol"
     end
   end
 end

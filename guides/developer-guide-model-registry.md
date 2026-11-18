@@ -81,18 +81,20 @@ This gives the core one place to answer:
 
 ## Current Codex Catalog Evidence
 
-The authenticated `codex-cli 0.164.0` `model/list` response captured on
-2026-10-26, including hidden entries, is recorded in
-`test/fixtures/codex_model_list_20261026.json`. The public picker order is:
+The authenticated `codex-cli 0.170.0` `model/list` response captured on
+2026-11-17, including hidden entries, is recorded in
+`test/fixtures/codex_model_list_20261117.json`. The public picker order is:
 
 | Model | Default effort | Supported CLI efforts |
 | --- | --- | --- |
-| `gpt-6.1-sol` (default) | low | low, medium, high, xhigh, max, ultra |
-| `gpt-6-astra` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-6.2-sol` (default) | medium | low, medium, high, xhigh, max, ultra |
+| `gpt-6.2-astra` | low | low, medium, high, xhigh, max, ultra |
 | `gpt-6.1-terra` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-6.1-sol` | medium | low, medium, high, xhigh, max, ultra |
+| `gpt-6-astra` | low | low, medium, high, xhigh, max, ultra |
 | `gpt-6-sol` | medium | low, medium, high, xhigh, max, ultra |
 | `gpt-6-luna` | medium | low, medium, high, xhigh, max |
-| `gpt-5.6-sol` | low | low, medium, high, xhigh, max, ultra |
+| `gpt-5.6-sol` | medium | low, medium, high, xhigh, max, ultra |
 | `gpt-5.6-terra` | medium | low, medium, high, xhigh, max, ultra |
 | `gpt-5.6-luna` | medium | low, medium, high, xhigh, max |
 

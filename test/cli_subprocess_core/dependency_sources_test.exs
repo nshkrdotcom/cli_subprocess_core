@@ -10,9 +10,9 @@ defmodule CliSubprocessCore.DependencySourcesTest do
   # resolve only if this package pins them too. Pointing `:execution_plane` at
   # the historical monolith creates duplicate process and JSON-RPC modules.
   @hex_requirements %{
-    execution_plane: "~> 0.3.1",
-    execution_plane_process: "~> 0.3.2",
-    execution_plane_jsonrpc: "~> 0.2.1"
+    execution_plane: "~> 0.3.2",
+    execution_plane_process: "~> 0.3.3",
+    execution_plane_jsonrpc: "~> 0.2.2"
   }
 
   test "the standalone and publishable fallback declares the component releases" do
@@ -38,10 +38,15 @@ defmodule CliSubprocessCore.DependencySourcesTest do
 
   defp standalone_deps do
     code =
-      "Mix.Project.config()[:deps] |> :erlang.term_to_binary() |> Base.encode64() |> IO.puts()"
+      """
+      Mix.start()
+      Mix.Project.in_project(:cli_subprocess_core, ".", fn _ ->
+        Mix.Project.config()[:deps] |> :erlang.term_to_binary() |> Base.encode64() |> IO.puts()
+      end)
+      """
 
     {output, 0} =
-      System.cmd("mix", ["run", "--no-start", "--no-compile", "--no-deps-check", "-e", code],
+      System.cmd("elixir", ["-e", code],
         cd: Path.expand("../..", __DIR__),
         env: [{"MIX_WORKSPACE_OPS_BOOTSTRAP", nil}, {"MIX_EXS", nil}],
         stderr_to_stdout: true

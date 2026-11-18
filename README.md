@@ -68,17 +68,17 @@ checkout.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. Core 0.9.5 refreshes the Codex catalog from authenticated CLI
-0.164.0 metadata on 2026-10-26, adding GPT-6.1 Terra and removing GPT-5.5.
-GPT-6.1 Sol remains the default at low effort. See the
+Hex consumers. Core 0.9.6 refreshes the Codex catalog from authenticated CLI
+0.170.0 metadata on 2026-11-17. It adds GPT-6.2 Sol and GPT-6.2 Astra.
+GPT-6.2 Sol is the default at medium effort. See the
 [current Codex model card](guides/developer-guide-model-registry.md#current-codex-catalog-evidence)
 for the complete picker and reasoning support.
 
-The runtime prerequisites are `execution_plane ~> 0.3.1`,
-`execution_plane_process ~> 0.3.2`, and `execution_plane_jsonrpc ~> 0.2.1`.
-Core 0.9.5 requires Zoi 0.19.0. SDK and ASM consumers must also update any
+The runtime prerequisites are `execution_plane ~> 0.3.2`,
+`execution_plane_process ~> 0.3.3`, and `execution_plane_jsonrpc ~> 0.2.2`.
+Core 0.9.6 requires Zoi 0.19.0. SDK and ASM consumers must also update any
 Zoi 0.18 requirements in their graph; the corresponding releases are
-Codex SDK 0.21.4 and ASM 0.17.4. Refresh existing locks with
+Codex SDK 0.21.5 and ASM 0.17.5. Refresh existing locks with
 `mix deps.update --all` after updating requirements.
 Consumers switching between `:path` and `:github`/`:hex`
 resolution should prune any previously fetched `deps/cli_subprocess_core`
@@ -104,7 +104,7 @@ For the covered runtime slice:
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.9.5"}
+    {:cli_subprocess_core, "~> 0.9.6"}
   ]
 end
 ```
