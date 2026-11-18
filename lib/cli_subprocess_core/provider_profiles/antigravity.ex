@@ -241,6 +241,24 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
     end
   end
 
+  defp result(
+         %{"status" => "ERROR", "error" => "invalid model selection (--model" <> _},
+         _raw,
+         state
+       ) do
+    Shared.emit_single(
+      :error,
+      Shared.error_payload(id(),
+        code: "model_rejected",
+        severity: :fatal,
+        message:
+          "agy rejected the requested model. Refresh the model list for the active account."
+      ),
+      %{},
+      state
+    )
+  end
+
   defp result(body, raw, state) do
     status = Shared.fetch_any(body, [:status, "status"])
     usage = Shared.fetch_any(body, [:usage, "usage"]) || %{}
@@ -375,7 +393,7 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
 
     case resolved do
       nil -> nil
-      "default" -> nil
+      model when model in ["default", "auto"] -> nil
       model -> to_string(model)
     end
   end
@@ -388,8 +406,8 @@ defmodule CliSubprocessCore.ProviderProfiles.Antigravity do
       |> Kernel.||(Keyword.get(opts, :effort))
 
     case effort do
-      val when val in ["low", "medium", "high"] -> val
-      val when val in [:low, :medium, :high] -> Atom.to_string(val)
+      val when val in ["low", "medium", "high", "xhigh", "max"] -> val
+      val when val in [:low, :medium, :high, :xhigh, :max] -> Atom.to_string(val)
       _other -> nil
     end
   end

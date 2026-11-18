@@ -1,6 +1,6 @@
 {
   "provider": "antigravity",
-  "catalog_version": "2026-09-29",
+  "catalog_version": "2026-11-18",
   "remote_default": "default",
   "models": [
     {
@@ -14,16 +14,218 @@
       "reasoning_efforts": {
         "low": 0.25,
         "medium": 0.5,
-        "high": 1.0
+        "high": 1.0,
+        "xhigh": 1.5
       },
       "metadata": {
         "description": "Default Antigravity CLI model selected by agy."
       }
     },
     {
+      "id": "gemini-4-argon-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Argon (Medium)"
+      }
+    },
+    {
+      "id": "gemini-4-argon-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Argon (High)"
+      }
+    },
+    {
+      "id": "gemini-4-argon-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Argon (Low)"
+      }
+    },
+    {
+      "id": "gemini-4-hydrogen-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Hydrogen (High)"
+      }
+    },
+    {
+      "id": "gemini-4-hydrogen-xhigh",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Hydrogen (XHigh)"
+      }
+    },
+    {
+      "id": "gemini-4-hydrogen-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Hydrogen (Medium)"
+      }
+    },
+    {
+      "id": "gemini-4-hydrogen-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Hydrogen (Low)"
+      }
+    },
+    {
+      "id": "gemini-pro-orchestrator-g1-pro",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Orchestrator (Argon)"
+      }
+    },
+    {
+      "id": "gemini-3.8-flash-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3.8 Flash (High)"
+      }
+    },
+    {
+      "id": "gemini-3.8-flash-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3.8 Flash (Medium)"
+      }
+    },
+    {
+      "id": "gemini-3.8-flash-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 3.8 Flash (Low)"
+      }
+    },
+    {
+      "id": "claude-opus-5-5-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Opus 5.5 (Low)"
+      }
+    },
+    {
+      "id": "claude-opus-5-5-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Opus 5.5 (Medium)"
+      }
+    },
+    {
+      "id": "claude-opus-5-5-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Opus 5.5 (High)"
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Sonnet 5.5 (Low)"
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Sonnet 5.5 (Medium)"
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "claude",
+      "metadata": {
+        "display_name": "Claude Sonnet 5.5 (High)"
+      }
+    },
+    {
+      "id": "gemini-4-carbon-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Carbon (High)",
+        "eligibility": "Google AI Ultra or eligible Enterprise"
+      }
+    },
+    {
+      "id": "gemini-4-carbon-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Carbon (Medium)",
+        "eligibility": "Google AI Ultra or eligible Enterprise"
+      }
+    },
+    {
+      "id": "gemini-4-carbon-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Carbon (Low)",
+        "eligibility": "Google AI Ultra or eligible Enterprise"
+      }
+    },
+    {
+      "id": "gemini-pro-orchestrator",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Orchestrator (Carbon)",
+        "eligibility": "Google AI Ultra"
+      }
+    },
+    {
+      "id": "gemini-pro-orchestrator-argon",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Orchestrator (Argon)"
+      }
+    },
+    {
       "id": "gemini-3.8-flash",
       "aliases": [
-        "gemini-3.8-flash-medium",
         "3.8-flash",
         "flash-3.8"
       ],

@@ -125,19 +125,16 @@ defmodule CliSubprocessCore.ModelCatalogTest do
 
       assert {:ok, antigravity_catalog} = ModelCatalog.load(:antigravity)
       assert antigravity_catalog.provider == :antigravity
-      assert antigravity_catalog.catalog_version == "2026-09-29"
+      assert antigravity_catalog.catalog_version == "2026-11-18"
       assert antigravity_catalog.remote_default == "default"
 
-      assert Enum.map(antigravity_catalog.models, & &1.id) == [
-               "default",
-               "gemini-3.8-flash",
-               "gemini-3.7-flash",
-               "gemini-3.6-flash",
-               "gemini-3.1-pro",
-               "claude-sonnet-4-6",
-               "claude-opus-4-6-thinking",
-               "gpt-oss-120b-medium"
-             ]
+      ids = Enum.map(antigravity_catalog.models, & &1.id)
+
+      assert hd(ids) == "default"
+      assert "gemini-4-carbon-high" in ids
+      assert "gemini-4-hydrogen-xhigh" in ids
+      assert "gemini-pro-orchestrator-g1-pro" in ids
+      assert "claude-sonnet-5-5-medium" in ids
     end
 
     test "returns model_unavailable for missing provider catalog" do

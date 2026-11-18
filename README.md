@@ -68,7 +68,7 @@ checkout.
 Downstream consumers (`claude_agent_sdk`, `agent_session_manager`) resolve
 their model lineup from whichever copy of this package their build uses —
 the workspace sibling for `:path` dependencies, the published package for
-Hex consumers. Core 0.9.6 refreshes the Codex catalog from authenticated CLI
+Hex consumers. Core 0.9.6 refreshed the Codex catalog from authenticated CLI
 0.170.0 metadata on 2026-11-17. It adds GPT-6.2 Sol and GPT-6.2 Astra.
 GPT-6.2 Sol is the default at medium effort. See the
 [current Codex model card](guides/developer-guide-model-registry.md#current-codex-catalog-evidence)
@@ -76,7 +76,7 @@ for the complete picker and reasoning support.
 
 The runtime prerequisites are `execution_plane ~> 0.3.2`,
 `execution_plane_process ~> 0.3.3`, and `execution_plane_jsonrpc ~> 0.2.2`.
-Core 0.9.6 requires Zoi 0.19.0. SDK and ASM consumers must also update any
+Core 0.10.0 requires Zoi 0.19.0. SDK and ASM consumers must also update any
 Zoi 0.18 requirements in their graph; the corresponding releases are
 Codex SDK 0.21.5 and ASM 0.17.5. Refresh existing locks with
 `mix deps.update --all` after updating requirements.
@@ -99,12 +99,21 @@ For the covered runtime slice:
 - `cli_subprocess_core` owns provider planning, normalized command/session
   APIs, and event projection above that lower owner
 
+## Antigravity model selection
+
+Use `CliSubprocessCore.AntigravityModels.list/1` to load the signed-in account's exact model IDs in CLI order.
+The bundled catalog also includes Gemini 4 Carbon for eligible Google AI Ultra
+and Enterprise accounts. Select an advertised slug to pin a model. An omitted
+model, `default`, or `auto` delegates selection to `agy`. Refresh discovery
+after changing accounts. A failed discovery query returns an error, while a
+successful empty list returns `{:ok, []}`.
+
 ## Installation
 
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.9.6"}
+    {:cli_subprocess_core, "~> 0.10.0"}
   ]
 end
 ```
