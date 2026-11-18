@@ -22,6 +22,42 @@
       }
     },
     {
+      "id": "gemini-4-neon-high",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Neon (High)"
+      }
+    },
+    {
+      "id": "gemini-4-neon-xhigh",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Neon (XHigh)"
+      }
+    },
+    {
+      "id": "gemini-4-neon-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Neon (Medium)"
+      }
+    },
+    {
+      "id": "gemini-4-neon-low",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Gemini 4 Neon (Low)"
+      }
+    },
+    {
       "id": "gemini-4-argon-medium",
       "aliases": [],
       "visibility": "public",
@@ -82,6 +118,15 @@
       "family": "gemini",
       "metadata": {
         "display_name": "Gemini 4 Hydrogen (Low)"
+      }
+    },
+    {
+      "id": "gemini-pro-orchestrator-neon",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gemini",
+      "metadata": {
+        "display_name": "Orchestrator (Neon)"
       }
     },
     {
@@ -172,6 +217,16 @@
       "family": "claude",
       "metadata": {
         "display_name": "Claude Sonnet 5.5 (High)"
+      }
+    },
+    {
+      "id": "gpt-oss-120b-medium",
+      "aliases": [],
+      "visibility": "public",
+      "family": "gpt-oss",
+      "metadata": {
+        "display_name": "GPT-OSS 120B (Medium)",
+        "description": "Confirmed by authenticated agy models on 2026-09-29."
       }
     },
     {
@@ -314,16 +369,6 @@
       "family": "claude",
       "metadata": {
         "display_name": "Claude Opus 4.6 (Thinking)",
-        "description": "Confirmed by authenticated agy models on 2026-09-29."
-      }
-    },
-    {
-      "id": "gpt-oss-120b-medium",
-      "aliases": [],
-      "visibility": "public",
-      "family": "gpt-oss",
-      "metadata": {
-        "display_name": "GPT-OSS 120B (Medium)",
         "description": "Confirmed by authenticated agy models on 2026-09-29."
       }
     }

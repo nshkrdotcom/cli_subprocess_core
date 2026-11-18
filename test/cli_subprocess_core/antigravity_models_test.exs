@@ -11,7 +11,7 @@ defmodule CliSubprocessCore.AntigravityModelsTest do
     File.write!(path, "#!/bin/sh\ncat '#{fixture}'\n")
     File.chmod!(path, 0o700)
 
-    assert {:ok, [%{id: "gemini-4-argon-medium"} | _] = models} =
+    assert {:ok, [%{id: "gemini-4-neon-high"} | _] = models} =
              AntigravityModels.list(cli_path: path)
 
     assert Enum.any?(models, &(&1.id == "gemini-pro-orchestrator-g1-pro"))
@@ -31,6 +31,23 @@ defmodule CliSubprocessCore.AntigravityModelsTest do
 
     assert Enum.chunk_every(invocation.args, 2)
            |> Enum.member?(["--model", "gemini-4-carbon-high"])
+  end
+
+  test "Neon slugs resolve exactly and Orchestrator leaves effort unset" do
+    for level <- ~w(low medium high xhigh) do
+      slug = "gemini-4-neon-#{level}"
+
+      assert {:ok, %{resolved_model: ^slug, reasoning: nil}} =
+               ModelRegistry.resolve(:antigravity, slug)
+    end
+
+    slug = "gemini-pro-orchestrator-neon"
+
+    assert {:ok, %{resolved_model: ^slug, reasoning: nil}} =
+             ModelRegistry.resolve(:antigravity, slug)
+
+    assert {:error, {:invalid_reasoning_effort, "high", [], :antigravity}} =
+             ModelRegistry.resolve(:antigravity, slug, reasoning: "high")
   end
 
   test "a rejected model is a fatal error with an account discovery hint" do

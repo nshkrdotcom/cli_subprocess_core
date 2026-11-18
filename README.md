@@ -76,7 +76,7 @@ for the complete picker and reasoning support.
 
 The runtime prerequisites are `execution_plane ~> 0.3.2`,
 `execution_plane_process ~> 0.3.3`, and `execution_plane_jsonrpc ~> 0.2.2`.
-Core 0.10.0 requires Zoi 0.19.0. SDK and ASM consumers must also update any
+Core 0.10.1 requires Zoi 0.19.0. SDK and ASM consumers must also update any
 Zoi 0.18 requirements in their graph; the corresponding releases are
 Codex SDK 0.21.5 and ASM 0.17.5. Refresh existing locks with
 `mix deps.update --all` after updating requirements.
@@ -102,7 +102,8 @@ For the covered runtime slice:
 ## Antigravity model selection
 
 Use `CliSubprocessCore.AntigravityModels.list/1` to load the signed-in account's exact model IDs in CLI order.
-The bundled catalog also includes Gemini 4 Carbon for eligible Google AI Ultra
+The bundled catalog includes Gemini 4 Neon and Orchestrator (Neon), as
+advertised by authenticated `agy models` on November 18, 2026. It also includes Gemini 4 Carbon for eligible Google AI Ultra
 and Enterprise accounts. Select an advertised slug to pin a model. An omitted
 model, `default`, or `auto` delegates selection to `agy`. Refresh discovery
 after changing accounts. A failed discovery query returns an error, while a
@@ -113,7 +114,7 @@ successful empty list returns `{:ok, []}`.
 ```elixir
 def deps do
   [
-    {:cli_subprocess_core, "~> 0.10.0"}
+    {:cli_subprocess_core, "~> 0.10.1"}
   ]
 end
 ```
